@@ -1,13 +1,9 @@
-import Sidebar from "../app/components/sidebar";
 
 export default function Home() {
   return (
     <div className="flex h-screen">
       {/* Left: Sidebar with fixed width */}
-      <div className="w-64">
-        <Sidebar />
-      </div>
-
+      
       {/* Right: Content Area */}
       <div className="flex-1 bg-gray-50 p-6">
         {/* You can build your topbar and content here */}

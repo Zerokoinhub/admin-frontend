@@ -1,6 +1,4 @@
 import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import Sidebar from "../app/components/sidebar"; // ✅ Use @/ for cleaner path
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,8 +11,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "Dashboard",
-  description: "ZeroKoin admin panel",
+  title: "Calculator",
+  description: "Zerokoin Calculator",
 };
 
 export default function RootLayout({ children }) {
@@ -25,15 +23,11 @@ export default function RootLayout({ children }) {
         <link rel="icon" href="/logo.png" />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <div className="flex h-screen">
-          {/* Sidebar on the left */}
-          <Sidebar />
-
+        
           {/* Page content on the right */}
           <main className="flex-1 bg-gray-50 p-6 overflow-y-auto">
             {children}
           </main>
-        </div>
       </body>
     </html>
   );

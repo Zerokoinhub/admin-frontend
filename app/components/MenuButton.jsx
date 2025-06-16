@@ -11,7 +11,7 @@ const MenuButton = ({ label, Icon, path }) => {
     <Link href={path}>
       <div
         className={`flex items-center space-x-3 px-4 py-2 rounded-lg text-sm font-medium transition cursor-pointer ${
-          isActive ? 'bg-cyan-700 text-white' : 'text-gray-700 hover:bg-gray-100'
+          isActive ? 'bg-cyan-700 text-white' : 'text-gray-700 hover:bg-gray-200'
         }`}
       >
         <Icon size={18} />
