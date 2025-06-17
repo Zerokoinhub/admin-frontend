@@ -1,4 +1,5 @@
 import { Geist, Geist_Mono } from "next/font/google";
+import React from "react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,20 +16,12 @@ export const metadata = {
   description: "ZeroKoin admin panel",
 };
 
-export default function RootLayout({ children }) {
+export default function CoinTransferLayout({ children }) {
   return (
-    <html lang="en">
-      <head>
-        {/* ✅ Move favicon to <head> */}
-        <link rel="icon" href="/logo.png" />
-      </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        
-          {/* Page content on the right */}
-          <main className="flex-1 bg-gray-50 p-6 overflow-y-auto">
-            {children}
-          </main>
-      </body>
-    </html>
+    <div className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <main className="flex-1 bg-gray-50 p-6 overflow-y-auto">
+        {children}
+      </main>
+    </div>
   );
 }
