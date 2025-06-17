@@ -39,6 +39,10 @@ const UserModal = ({ user, open, onClose }) => {
             <Input value={user.email} readOnly />
           </div>
           <div>
+            <label className="block text-sm mb-1">Email</label>
+            <Input value={user.country} readOnly />
+          </div>
+          <div>
             <label className="block text-sm mb-1">Wallet Address</label>
             <Input value={user.wallet} readOnly />
           </div>

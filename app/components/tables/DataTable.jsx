@@ -33,6 +33,7 @@ const DataTable = ({ data, onView }) => {
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
+              <TableHead>Country</TableHead>
               <TableHead>Wallet Address</TableHead>
               <TableHead>Referral Code</TableHead>
               <TableHead>Coins Earned</TableHead>
@@ -45,6 +46,7 @@ const DataTable = ({ data, onView }) => {
               <TableRow key={index}>
                 <TableCell>{user.name}</TableCell>
                 <TableCell>{user.email}</TableCell>
+                <TableCell>{user.country}</TableCell>
                 <TableCell>{user.wallet}</TableCell>
                 <TableCell>{user.referral}</TableCell>
                 <TableCell>{user.coins}</TableCell>
