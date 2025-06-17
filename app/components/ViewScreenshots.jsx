@@ -7,42 +7,41 @@ import { useState } from "react"
 export default function ViewScreenshots({ onBack, onApprove }) {
   const [showSuccess, setShowSuccess] = useState(false)
 
-  // Replace the screenshots array with direct public folder paths
   const screenshots = [
     {
       id: 1,
       type: "desktop",
-      imageUrl: "/screenshot-1.png", // Direct in public folder
+      imageUrl: "/screenshot-1.png",
       alt: "Desktop Screenshot 1",
     },
     {
       id: 2,
       type: "laptop",
-      imageUrl: "/screenshot-2.png", // Direct in public folder
+      imageUrl: "/screenshot-2.png",
       alt: "Laptop Screenshot 1",
     },
     {
       id: 3,
       type: "mobile",
-      imageUrl: "/screenshot-3.png", // Direct in public folder
+      imageUrl: "/screenshot-3.png",
       alt: "Mobile Screenshot 1",
     },
     {
       id: 4,
       type: "tablet",
-      imageUrl: "/screenshot-4.png", // Direct in public folder
+      imageUrl: "/screenshot-4.png",
       alt: "Tablet Screenshot 1",
     },
     {
       id: 5,
       type: "desktop",
-      imageUrl: "/screenshot-5.png", // Direct in public folder
+      imageUrl: "/screenshot-5.png",
       alt: "Desktop Screenshot 2",
     },
     {
       id: 6,
       type: "laptop",
-      imageUrl: "/screenshot-6.png", // Direct in public folder
+      imageUrl: "/screenshot-6.png",
       alt: "Laptop Screenshot 2",
     },
   ]
@@ -53,66 +52,58 @@ export default function ViewScreenshots({ onBack, onApprove }) {
 
   const handleSuccessClose = () => {
     setShowSuccess(false)
-    onApprove() // Call the original onApprove to go back to main page
+    onApprove()
   }
 
   return (
     <div className="bg-white rounded-lg shadow-sm relative">
-      {/* Screenshots Grid */}
-      <div className={`p-6 ${showSuccess ? "blur-sm" : ""} transition-all duration-300`}>
+      <div className={`p-4 sm:p-6 ${showSuccess ? "blur-sm" : ""} transition-all duration-300`}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-2">
             <button onClick={onBack} className="text-gray-600 hover:text-gray-800">
               <ArrowLeft className="w-4 h-4" />
             </button>
-            <h2 className="text-lg font-semibold text-gray-800">User Screenshots</h2>
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-800">User Screenshots</h2>
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        {/* Responsive grid: 1 col on mobile, 2 on tablet, 3 on desktop */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
           {screenshots.map((screenshot) => (
             <div
               key={screenshot.id}
-              className="bg-gray-100 rounded-lg h-32 flex items-center justify-center relative overflow-hidden border border-gray-200 hover:border-gray-300 transition-colors"
+              className="bg-gray-50 rounded-lg h-32 sm:h-36 lg:h-32 flex items-center justify-center relative overflow-hidden border-2 border-gray-200 hover:border-gray-300 transition-colors shadow-sm"
             >
               <img
                 src={screenshot.imageUrl || "/placeholder.svg"}
                 alt={screenshot.alt}
-                className="w-full h-full object-cover rounded-lg"
-                onError={(e) => {
-                  // Fallback to placeholder if image fails to load
-                  e.target.style.display = "none"
-                  e.target.nextSibling.style.display = "flex"
-                }}
+                className="max-w-full max-h-full object-contain rounded"
               />
-              {/* Fallback placeholder */}
-              <div className="hidden w-full h-full bg-gray-200 items-center justify-center">
-                <div className="text-center">
-                  <div className="w-8 h-8 bg-gray-400 rounded mb-2 mx-auto"></div>
-                  <span className="text-xs text-gray-500 capitalize">{screenshot.type}</span>
-                </div>
+
+              {/* Device type label */}
+              <div className="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
+                {screenshot.type}
               </div>
             </div>
           ))}
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex justify-end space-x-4">
+        {/* Responsive button layout */}
+        <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-4">
           <button
             onClick={handleApprove}
-            className="bg-teal-600 text-white px-8 py-2 rounded-lg hover:bg-teal-700 transition-colors"
+            className="w-full sm:w-auto bg-teal-600 text-white px-6 sm:px-8 py-2 rounded-lg hover:bg-teal-700 transition-colors order-2 sm:order-1"
           >
             Approved
           </button>
-          <button className="border border-gray-300 text-gray-700 px-8 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+          <button className="w-full sm:w-auto border border-gray-300 text-gray-700 px-6 sm:px-8 py-2 rounded-lg hover:bg-gray-50 transition-colors order-1 sm:order-2">
             Reject
           </button>
         </div>
       </div>
 
-      {/* Success Modal - appears over the blurred content */}
       {showSuccess && (
-        <div className="absolute inset-0 flex items-center justify-center z-50">
+        <div className="absolute inset-0 flex items-center justify-center z-50 p-4">
           <SuccessModal onClose={handleSuccessClose} />
         </div>
       )}

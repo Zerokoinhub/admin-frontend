@@ -25,40 +25,66 @@ export default function TransferHistory({ onBack }) {
 
   return (
     <div className="bg-white rounded-lg shadow-sm">
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-2">
             <button onClick={onBack} className="text-gray-600 hover:text-gray-800">
               <ArrowLeft className="w-4 h-4" />
             </button>
-            <h2 className="text-lg font-semibold text-gray-800">Transfer History</h2>
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Transfer History</h2>
           </div>
         </div>
-        {/* Rest of the component remains the same */}
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-3 px-4 font-medium text-gray-600">Name</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-600">Coin Transfer</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-600">Reason</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-600">Date</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-600">Transferred By</th>
-              </tr>
-            </thead>
-            <tbody>
-              {transferData.map((transfer, index) => (
-                <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="py-3 px-4 text-gray-800">{transfer.name}</td>
-                  <td className="py-3 px-4 text-gray-800">{transfer.coins}</td>
-                  <td className="py-3 px-4 text-gray-600">{transfer.reason}</td>
-                  <td className="py-3 px-4 text-gray-600">{transfer.date}</td>
-                  <td className="py-3 px-4 text-gray-600">{transfer.transferredBy}</td>
+        {/* Mobile-first responsive table */}
+        <div className="overflow-x-auto -mx-4 sm:mx-0">
+          <div className="inline-block min-w-full align-middle">
+            <table className="min-w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="text-left py-3 px-3 sm:px-6 font-medium text-gray-600 text-sm">Name</th>
+                  <th className="text-left py-3 px-3 sm:px-6 font-medium text-gray-600 text-sm">Coins</th>
+                  <th className="hidden sm:table-cell text-left py-3 px-6 font-medium text-gray-600 text-sm">Reason</th>
+                  <th className="hidden md:table-cell text-left py-3 px-6 font-medium text-gray-600 text-sm">Date</th>
+                  <th className="hidden lg:table-cell text-left py-3 px-6 font-medium text-gray-600 text-sm">
+                    Transferred By
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {transferData.map((transfer, index) => (
+                  <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-3 px-3 sm:px-6 text-gray-800 text-sm">
+                      <div>
+                        <div className="font-medium">{transfer.name}</div>
+                        {/* Show additional info on mobile */}
+                        <div className="sm:hidden text-xs text-gray-500 mt-1">
+                          {transfer.reason} • {transfer.date}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3 px-3 sm:px-6 text-gray-800 text-sm font-semibold">{transfer.coins}</td>
+                    <td className="hidden sm:table-cell py-3 px-6 text-gray-600 text-sm">{transfer.reason}</td>
+                    <td className="hidden md:table-cell py-3 px-6 text-gray-600 text-sm">{transfer.date}</td>
+                    <td className="hidden lg:table-cell py-3 px-6 text-gray-600 text-sm">{transfer.transferredBy}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Responsive pagination */}
+        <div className="mt-4 flex flex-col sm:flex-row items-center justify-between text-sm text-gray-600 space-y-2 sm:space-y-0">
+          <span>Showing {transferData.length} entries</span>
+          <div className="flex items-center space-x-2">
+            <button className="px-3 py-1 border border-gray-300 rounded hover:bg-white transition-colors text-sm">
+              Previous
+            </button>
+            <span className="px-3 py-1">1</span>
+            <button className="px-3 py-1 border border-gray-300 rounded hover:bg-white transition-colors text-sm">
+              Next
+            </button>
+          </div>
         </div>
       </div>
     </div>
