@@ -1,12 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { GraduationCap, Edit, Target, X, ChevronDown, Trash2, Edit3 } from "lucide-react"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { GraduationCap, Edit, Target, X, ChevronDown, Trash2, Edit3, Bell, Upload } from "lucide-react"
+import Image from "next/image"
 
 // Admin data for the table
 const adminData = [
@@ -21,10 +23,61 @@ const adminData = [
   { email: "anas24@gmail.com", role: "Super Admin", id: 9 },
 ]
 
+// Dummy notification data
+const notificationData = [
+  {
+    id: 1,
+    title: "New Update",
+    message: "Watch the full episode to learn zero koin video",
+    time: "2 hours ago",
+    avatar: "/logo.png",
+    network: "Zerokoin Network",
+  },
+  {
+    id: 2,
+    title: "New Update",
+    message: "Watch the full episode to learn zero koin video",
+    time: "4 hours ago",
+    avatar: "/logo.png",
+    network: "Zerokoin Network",
+  },
+  {
+    id: 3,
+    title: "New Update",
+    message: "Watch the full episode to learn zero koin video",
+    time: "6 hours ago",
+    avatar: "/logo.png",
+    network: "Zerokoin Network",
+  },
+  {
+    id: 4,
+    title: "New Update",
+    message: "Watch the full episode to learn zero koin video",
+    time: "8 hours ago",
+    avatar: "/logo.png",
+    network: "Zerokoin Network",
+  },
+  {
+    id: 5,
+    title: "New Update",
+    message: "Watch the full episode to learn zero koin video",
+    time: "1 day ago",
+    avatar: "/logo.png",
+    network: "Zerokoin Network",
+  },
+]
+
 export default function SettingPage() {
   const [currentView, setCurrentView] = useState("main")
   const [showExpiryDropdown, setShowExpiryDropdown] = useState(false)
   const [selectedExpiry, setSelectedExpiry] = useState("02:00")
+  const [showNotificationPanel, setShowNotificationPanel] = useState(false)
+  const [showNotificationList, setShowNotificationList] = useState(false)
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [showSendToDropdown, setShowSendToDropdown] = useState(false)
+  const [selectedSendTo, setSelectedSendTo] = useState("Send to")
+  const [uploadedImage, setUploadedImage] = useState(false)
+  const [notificationView, setNotificationView] = useState("empty")
   const [formData, setFormData] = useState({
     name: "Fayhan",
     email: "Menog",
@@ -32,12 +85,333 @@ export default function SettingPage() {
     time: "1 Month",
   })
 
+  // Listen for notification clicks from header
+  useEffect(() => {
+    const handleNotificationClick = () => {
+      if (currentView === "main") {
+        setShowNotificationPanel(true)
+      }
+    }
+
+    window.addEventListener("notificationClick", handleNotificationClick)
+    return () => window.removeEventListener("notificationClick", handleNotificationClick)
+  }, [currentView])
+
   const handleAddNewAdmin = () => {
     setCurrentView("permissions")
   }
 
   const handleViewControl = () => {
     setCurrentView("control")
+  }
+
+  const handleNotificationSettings = () => {
+    setCurrentView("notifications")
+    setNotificationView("empty")
+  }
+
+  const handleCreateNotification = () => {
+    setNotificationView("create")
+  }
+
+  const handleNext = () => {
+    setUploadedImage(true)
+    setNotificationView("send")
+  }
+
+  const handleSendNotification = () => {
+    setShowSuccessModal(true)
+    setTimeout(() => {
+      setShowSuccessModal(false)
+      setNotificationView("empty")
+      setShowNotificationList(true)
+    }, 3000)
+  }
+
+  const handleUploadImage = () => {
+    setUploadedImage(true)
+  }
+
+  // Notification Settings View
+  if (currentView === "notifications") {
+    // Empty Notification State
+    if (notificationView === "empty") {
+      return (
+        <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen relative">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Hye Admin!</h1>
+            <Button onClick={() => setCurrentView("main")} variant="outline" className="w-full sm:w-auto">
+              Back to Settings
+            </Button>
+          </div>
+
+          {/* Empty State */}
+          <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6">
+            <div className="w-24 sm:w-32 h-24 sm:h-32 bg-teal-100 rounded-full flex items-center justify-center">
+              <Bell className="h-12 sm:h-16 w-12 sm:w-16 text-teal-600" />
+            </div>
+            <div className="text-center space-y-2">
+              <h2 className="text-lg sm:text-xl font-medium text-gray-900">You have no Notification Yet!</h2>
+            </div>
+            <Button
+              onClick={handleCreateNotification}
+              className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-md text-sm font-medium"
+            >
+              Create Notification
+            </Button>
+          </div>
+
+          {/* Notification Panel */}
+          {showNotificationPanel && (
+            <div className="fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-50 border-l border-gray-200">
+              <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold text-gray-900">Notifications</h3>
+                  <span className="bg-teal-600 text-white text-xs px-2 py-1 rounded-full">5</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowNotificationPanel(false)}
+                  className="h-6 w-6 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="p-4">
+                <div className="flex items-center gap-3 mb-4">
+                  <Image src="/logo.png" alt="User" width={40} height={40} className="rounded-full" />
+                  <div>
+                    <p className="font-medium text-gray-900">Hi Anas</p>
+                    <p className="text-sm text-gray-500">Here Sign up to Zero Koin</p>
+                    <p className="text-xs text-gray-400">2 May 12:5 PM</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-600">
+                    View on Admin: <span className="font-medium">Abdul Salam</span>
+                  </p>
+                  <p className="text-xs text-gray-500">On 5th May, 2:30 PM</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Notification List */}
+          {showNotificationList && (
+            <div className="fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-50 border-l border-gray-200">
+              <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                <h3 className="font-semibold text-gray-900">Notifications</h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowNotificationList(false)}
+                  className="h-6 w-6 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                {notificationData.map((notification) => (
+                  <div key={notification.id} className="p-4 border-b border-gray-100 hover:bg-gray-50">
+                    <div className="flex items-start gap-3">
+                      <Image
+                        src={notification.avatar || "/placeholder.svg"}
+                        alt="Zerokoin"
+                        width={32}
+                        height={32}
+                        className="rounded-full flex-shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="font-medium text-gray-900 text-sm">{notification.network}</p>
+                          <Button variant="ghost" size="sm" className="h-4 w-4 p-0">
+                            <X className="h-3 w-3 text-gray-400" />
+                          </Button>
+                        </div>
+                        <p className="font-medium text-gray-800 text-sm mb-1">{notification.title}</p>
+                        <p className="text-xs text-gray-600 mb-2">{notification.message}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="p-4 border-t border-gray-200 flex gap-2">
+                <Button className="flex-1 bg-teal-600 hover:bg-teal-700 text-white text-sm">Manage</Button>
+                <Button variant="outline" className="flex-1 text-sm">
+                  Clear All
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    // Create Notification View
+    if (notificationView === "create") {
+      return (
+        <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Create Notification</h1>
+            <Button onClick={() => setNotificationView("empty")} variant="outline" className="w-full sm:w-auto">
+              Back
+            </Button>
+          </div>
+
+          {/* Create Form */}
+          <div className="max-w-2xl mx-auto space-y-6">
+            {/* Upload Image Area */}
+            <div
+              onClick={handleUploadImage}
+              className="border-2 border-dashed border-gray-300 rounded-lg p-8 sm:p-12 text-center cursor-pointer hover:border-gray-400 transition-colors"
+            >
+              <div className="space-y-4">
+                <div className="w-12 h-12 mx-auto bg-gray-100 rounded-lg flex items-center justify-center">
+                  <Upload className="h-6 w-6 text-gray-600" />
+                </div>
+                <div>
+                  <p className="text-gray-600 font-medium">Upload Image</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Static Content */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-900">Upcoming Zero Koin</h3>
+              <p className="text-gray-700 text-sm leading-relaxed">
+                Zero Koin mining is the process of validating transactions and securing the Zero Koin blockchain by
+                solving complex mathematical problems, typically using computing power, to earn rewards in Zero Koin.
+              </p>
+            </div>
+
+            {/* Next Button */}
+            <div className="flex justify-end">
+              <Button
+                onClick={handleNext}
+                className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-md text-sm font-medium"
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    // Filter & Send Notification View
+    if (notificationView === "send") {
+      return (
+        <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Filter & Send Notification</h1>
+            <div className="relative">
+              <Button
+                onClick={() => setShowSendToDropdown(!showSendToDropdown)}
+                className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2"
+              >
+                <Bell className="h-4 w-4" />
+                {selectedSendTo}
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+              {showSendToDropdown && (
+                <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10">
+                  <div className="py-1">
+                    {["New User", "Old User", "Top rated user"].map((option) => (
+                      <button
+                        key={option}
+                        onClick={() => {
+                          setSelectedSendTo(option)
+                          setShowSendToDropdown(false)
+                        }}
+                        className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <div className="w-2 h-2 bg-gray-400 rounded-full mr-3"></div>
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="max-w-2xl mx-auto space-y-6">
+            {/* Notification Preview */}
+            <div className="relative rounded-lg overflow-hidden">
+              <Image
+                src="/notification-bg.png"
+                alt="Notification Background"
+                width={600}
+                height={200}
+                className="w-full h-48 sm:h-56 object-cover"
+              />
+            </div>
+
+            {/* Static Content */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-900">Upcoming Zero Koin</h3>
+              <p className="text-gray-700 text-sm leading-relaxed">
+                Zero Koin mining is the process of validating transactions and securing the Zero Koin blockchain by
+                solving complex mathematical problems, typically using computing power, to earn rewards in Zero Koin.
+              </p>
+            </div>
+
+            {/* Send Button */}
+            <div className="flex justify-end">
+              <Button
+                onClick={handleSendNotification}
+                className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-md text-sm font-medium"
+              >
+                Send Notification
+              </Button>
+            </div>
+          </div>
+
+          {/* Success Modal */}
+          <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
+            <DialogContent className="sm:max-w-md bg-white text-center border-0 shadow-2xl mx-4">
+              <div className="py-8 px-6">
+                {/* Success Icon with Animation */}
+                <div className="relative mx-auto w-24 h-24 mb-8">
+                  {/* Main Circle */}
+                  <div className="w-24 h-24 bg-gradient-to-br from-teal-500 to-green-600 rounded-full flex items-center justify-center relative z-10">
+                    <Bell className="h-10 w-10 text-white" />
+                  </div>
+
+                  {/* Animated Dots */}
+                  <div className="absolute inset-0 animate-spin" style={{ animationDuration: "3s" }}>
+                    <div className="absolute w-3 h-3 bg-teal-500 rounded-full -top-1 left-1/2 transform -translate-x-1/2"></div>
+                    <div className="absolute w-2 h-2 bg-green-500 rounded-full top-2 -right-1"></div>
+                    <div className="absolute w-2 h-2 bg-teal-400 rounded-full top-1/2 -right-2 transform -translate-y-1/2"></div>
+                    <div className="absolute w-3 h-3 bg-green-400 rounded-full -bottom-1 right-2"></div>
+                    <div className="absolute w-2 h-2 bg-teal-500 rounded-full -bottom-1 left-1/2 transform -translate-x-1/2"></div>
+                    <div className="absolute w-2 h-2 bg-green-500 rounded-full bottom-2 -left-1"></div>
+                    <div className="absolute w-2 h-2 bg-teal-400 rounded-full top-1/2 -left-2 transform -translate-y-1/2"></div>
+                    <div className="absolute w-3 h-3 bg-green-400 rounded-full top-2 left-2"></div>
+                  </div>
+                </div>
+
+                {/* Success Text */}
+                <h3 className="text-xl font-semibold text-teal-600 mb-2">Your Notification</h3>
+                <h3 className="text-xl font-semibold text-teal-600 mb-6">has Successfully Send!</h3>
+
+                {/* Wait Text */}
+                <p className="text-sm text-gray-600 mb-2">Please wait</p>
+                <p className="text-sm text-gray-600 mb-8">You will be directed to the homepage soon</p>
+
+                {/* Loading Spinner */}
+                <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      )
+    }
   }
 
   // Main Settings View
@@ -125,15 +499,52 @@ export default function SettingPage() {
           </div>
         </div>
 
-        {/* Navigation Button */}
-        <div className="flex justify-center pt-4 sm:pt-8">
+        {/* Navigation Buttons */}
+        <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 pt-4 sm:pt-8">
           <Button
             onClick={handleViewControl}
             className="bg-teal-600 hover:bg-teal-700 text-white px-4 sm:px-6 py-2 rounded-md text-sm font-medium w-full sm:w-auto"
           >
             View Admin Control
           </Button>
+          <Button
+            onClick={handleNotificationSettings}
+            className="bg-teal-600 hover:bg-teal-700 text-white px-4 sm:px-6 py-2 rounded-md text-sm font-medium w-full sm:w-auto"
+          >
+            Notification Settings
+          </Button>
         </div>
+
+        {/* Notification Panel */}
+        {showNotificationPanel && (
+          <div className="fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-50 border-l border-gray-200">
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-gray-900">Notifications</h3>
+                <span className="bg-teal-600 text-white text-xs px-2 py-1 rounded-full">5</span>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setShowNotificationPanel(false)} className="h-6 w-6 p-0">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="p-4">
+              <div className="flex items-center gap-3 mb-4">
+                <Image src="/logo.png" alt="User" width={40} height={40} className="rounded-full" />
+                <div>
+                  <p className="font-medium text-gray-900">Hi Anas</p>
+                  <p className="text-sm text-gray-500">Here Sign up to Zero Koin</p>
+                  <p className="text-xs text-gray-400">2 May 12:5 PM</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm text-gray-600">
+                  View on Admin: <span className="font-medium">Abdul Salam</span>
+                </p>
+                <p className="text-xs text-gray-500">On 5th May, 2:30 PM</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
@@ -336,5 +747,6 @@ export default function SettingPage() {
     )
   }
 }
+
 
 
