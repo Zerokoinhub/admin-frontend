@@ -2,8 +2,8 @@
 
 import { useState } from "react"
 import { X } from "lucide-react"
-import ViewScreenshots from "../components/ViewScreenshots"
-import TransferHistory from "../components/TransferHistory"
+import ViewScreenshots from "../../src/components/ui/ViewScreenshots"
+import TransferHistory from "../../src/components/ui/TransferHistory"
 
 export default function CoinTransferPage() {
   const [showScreenshots, setShowScreenshots] = useState(false)

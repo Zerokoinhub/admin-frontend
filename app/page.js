@@ -1,6 +1,6 @@
 'use client';
 
-import DashboardPage from './components/dashboardPage';
+import DashboardPage from '../src/components/ui/dashboardPage';
 
 export default function Home() {
   return (

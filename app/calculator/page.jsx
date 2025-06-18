@@ -1,7 +1,7 @@
 "use client"
 
 import { DollarSign } from "lucide-react"
-import CalculatorChart from "../components/charts/CalculatorChart"
+import CalculatorChart from "../../src/components/ui/charts/CalculatorChart"
 
 export default function CalculatorPage() {
   return (

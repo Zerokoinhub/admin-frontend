@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import DashboardStatCard from "../components/StatCard";
+import DashboardStatCard from "../../src/components/ui/StatCard";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { User, Wallet, Coins } from "lucide-react";
@@ -14,8 +14,8 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-import DataTable from "../components/tables/DataTable";
-import UserModal from "../components/modals/UserModal"; // ✅ Modal import
+import DataTable from "../../src/components/ui/tables/DataTable";
+import UserModal from "../../src/components/ui/modals/UserModal"; // ✅ Modal import
 
 const chartData = [
   { year: "2010", value1: 5, value2: 5, value3: 5, value4: 5 },

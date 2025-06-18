@@ -1,6 +1,6 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import AppShell from "./components/AppShell"; // NEW Client Component
+import AppShell from "../src/components/ui/AppShell"; // NEW Client Component
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
