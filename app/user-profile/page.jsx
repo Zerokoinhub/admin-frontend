@@ -1,11 +1,23 @@
 "use client"
 
-import { useState } from "react"
-import { Users, MessageSquare, Plus, X } from "lucide-react"
+import { useState, useMemo } from "react"
+import { Users, MessageSquare, Plus, X, Loader2 } from "lucide-react"
+import { useUsers } from "../../hooks/useUsers"
+import { userHelpers } from "../../lib/api"
+import UserSelector from "../components/UserSelector"
 
 export default function UserProfilePage() {
   const [showCoinHistory, setShowCoinHistory] = useState(false)
+  const [selectedUser, setSelectedUser] = useState(null)
+  const { users, loading, error } = useUsers(1, 100) // Get more users for better stats
 
+  // Calculate real statistics from API data
+  const stats = useMemo(() => {
+    if (!users.length) return { totalUsers: 0, totalReferrals: 0, usersWithWallets: 0 }
+    return userHelpers.calculateStats(users)
+  }, [users])
+
+  // Mock coin history - this would come from another API endpoint
   const coinHistory = [
     { date: "05/05/2025", type: "Earn", source: "Learning", coins: "+100", notes: "Watched Course" },
     { date: "05/05/2025", type: "Earn", source: "Learning", coins: "+100", notes: "Watched Course" },
@@ -20,6 +32,32 @@ export default function UserProfilePage() {
     { date: "05/05/2025", type: "Earn", source: "Referrals", coins: "+100", notes: "Watched Course" },
   ]
 
+  const formattedUser = selectedUser ? userHelpers.formatUser(selectedUser) : null
+
+  if (loading) {
+    return (
+      <div className="p-4 sm:p-6 bg-gray-50 min-h-full flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-teal-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading user data...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 sm:p-6 bg-gray-50 min-h-full">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+          <p className="text-red-600">Error loading users: {error}</p>
+          <button onClick={() => window.location.reload()} className="mt-2 text-red-600 hover:text-red-800 underline">
+            Try again
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="p-4 sm:p-6 bg-gray-50 min-h-full">
       {/* Responsive header */}
@@ -33,16 +71,16 @@ export default function UserProfilePage() {
         </button>
       </div>
 
-      {/* Responsive stats cards */}
+      {/* Real-time stats cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
         <div className="bg-white rounded-lg p-4 sm:p-6 shadow-sm">
           <div className="flex items-center space-x-3 mb-4">
             <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center">
               <Users className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
             </div>
-            <span className="text-gray-600 font-medium text-sm sm:text-base">Learning User</span>
+            <span className="text-gray-600 font-medium text-sm sm:text-base">Total Users</span>
           </div>
-          <div className="text-2xl sm:text-3xl font-bold text-gray-800">00</div>
+          <div className="text-2xl sm:text-3xl font-bold text-gray-800">{stats.totalUsers}</div>
         </div>
 
         <div className="bg-white rounded-lg p-4 sm:p-6 shadow-sm">
@@ -52,7 +90,7 @@ export default function UserProfilePage() {
             </div>
             <span className="text-gray-600 font-medium text-sm sm:text-base">Total Referrals</span>
           </div>
-          <div className="text-2xl sm:text-3xl font-bold text-gray-800">00</div>
+          <div className="text-2xl sm:text-3xl font-bold text-gray-800">{stats.totalReferrals}</div>
         </div>
 
         <div className="bg-white rounded-lg p-4 sm:p-6 shadow-sm sm:col-span-2 lg:col-span-1">
@@ -60,64 +98,115 @@ export default function UserProfilePage() {
             <div className="w-8 h-8 sm:w-10 sm:h-10 bg-purple-100 rounded-full flex items-center justify-center">
               <Plus className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
             </div>
-            <span className="text-gray-600 font-medium text-sm sm:text-base">Total Adds</span>
+            <span className="text-gray-600 font-medium text-sm sm:text-base">Users with Wallets</span>
           </div>
-          <div className="text-2xl sm:text-3xl font-bold text-gray-800">00</div>
+          <div className="text-2xl sm:text-3xl font-bold text-gray-800">{stats.usersWithWallets}</div>
         </div>
       </div>
 
+      {/* User Selection */}
+      {!showCoinHistory && (
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Select User to View Profile</label>
+          <UserSelector selectedUser={selectedUser} onUserSelect={setSelectedUser} className="max-w-md" />
+        </div>
+      )}
+
       {/* Conditional responsive content */}
       {!showCoinHistory ? (
-        <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
-          <div className="flex items-center justify-between mb-4 sm:mb-6">
-            <h2 className="text-lg sm:text-xl font-semibold text-gray-800">User Details</h2>
-            <button className="text-gray-400 hover:text-gray-600 transition-colors">
-              <X className="w-5 h-5" />
-            </button>
+        selectedUser && formattedUser ? (
+          <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800">User Details</h2>
+              <button
+                onClick={() => setSelectedUser(null)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-2">Name</label>
+                <input
+                  type="text"
+                  value={formattedUser.name}
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-gray-50 text-sm sm:text-base"
+                  readOnly
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-2">Email</label>
+                <input
+                  type="email"
+                  value={formattedUser.email}
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-gray-50 text-sm sm:text-base"
+                  readOnly
+                />
+              </div>
+
+              <div className="lg:col-span-2">
+                <label className="block text-sm font-medium text-gray-600 mb-2">Wallet Address</label>
+                <input
+                  type="text"
+                  value={formattedUser.walletAddress}
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent text-xs sm:text-sm bg-gray-50 font-mono break-all"
+                  readOnly
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-2">Current Balance</label>
+                <input
+                  type="text"
+                  value={`${formattedUser.balance} coins`}
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-gray-50 text-sm sm:text-base"
+                  readOnly
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-2">Member Since</label>
+                <input
+                  type="text"
+                  value={formattedUser.createdAt}
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-gray-50 text-sm sm:text-base"
+                  readOnly
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-2">Invite Code</label>
+                <input
+                  type="text"
+                  value={formattedUser.inviteCode}
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-gray-50 text-xs sm:text-sm font-mono"
+                  readOnly
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-2">Referred By</label>
+                <input
+                  type="text"
+                  value={formattedUser.referredBy || "Direct signup"}
+                  className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-gray-50 text-sm sm:text-base"
+                  readOnly
+                />
+              </div>
+            </div>
           </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">Name</label>
-              <input
-                type="text"
-                defaultValue="Anas"
-                className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-gray-50 text-sm sm:text-base"
-                readOnly
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">Email</label>
-              <input
-                type="email"
-                defaultValue="anas@767.com"
-                className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-gray-50 text-sm sm:text-base"
-                readOnly
-              />
-            </div>
-
-            <div className="lg:col-span-2">
-              <label className="block text-sm font-medium text-gray-600 mb-2">Wallet Address</label>
-              <input
-                type="text"
-                defaultValue="XXNSJDBSJSJKABDKSBDMSJCHNA1JASN0N"
-                className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent text-xs sm:text-sm bg-gray-50 font-mono break-all"
-                readOnly
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">Country</label>
-              <input
-                type="text"
-                defaultValue="Pakistan"
-                className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-gray-50 text-sm sm:text-base"
-                readOnly
-              />
+        ) : (
+          <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+            <div className="text-gray-500 mb-4">
+              <Users className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+              <h3 className="text-lg font-medium text-gray-800 mb-2">No User Selected</h3>
+              <p className="text-gray-600">Please select a user from the dropdown above to view their profile.</p>
             </div>
           </div>
-        </div>
+        )
       ) : (
         <div className="bg-white rounded-lg shadow-sm">
           <div className="p-4 sm:p-6 border-b">
