@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 import RewardRevenueChart from "./charts/RewardRevenueChart";
 import UserGrowthChart from "./charts/UserGrowthChart";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,58 +9,66 @@ import {
   Eye,
   HandCoins,
   Calculator,
-  Gift,
   Wallet,
   BadgePercent,
 } from "lucide-react";
-import { fetchData } from "@/lib/api";
+import { userAPI, userHelpers } from "@/lib/api";
 
 export default function DashboardPage() {
   const [dashboardStats, setDashboardStats] = useState({
-    totalMiner: 0,
+    totalUsers: 0,
     totalReferrals: 0,
     calculatorUser: 0,
     totalRevenue: 0,
     totalCoinDistribution: 0,
     viewRewards: 0,
+    usersWithWallets: 0,
   });
 
   const [users, setUsers] = useState([]);
 
   useEffect(() => {
-    async function loadDashboardStats() {
+    async function loadDashboardData() {
       try {
-        const response = await fetchData('/users');
-        const usersData = response.data.users;
+        const response = await userAPI.getUsers(1, 100);
+        const usersData = response.data.users || [];
 
-        const totalMiner = usersData.length;
-        const totalReferrals = usersData.filter(user => user.referredBy !== null).length;
-        const totalRevenue = usersData.reduce((sum, user) => sum + (user.recentAmount || 0), 0);
-        const totalCoinDistribution = usersData.reduce((sum, user) => sum + (user.balance || 0), 0);
+        const stats = userHelpers.calculateStats(usersData);
+        const totalRevenue = usersData.reduce(
+          (sum, user) => sum + (user.recentAmount || 0),
+          0
+        );
 
         setDashboardStats({
-          totalMiner,
-          totalReferrals,
+          totalUsers: stats.totalUsers,
+          totalReferrals: stats.totalReferrals,
           calculatorUser: 0,
           totalRevenue,
-          totalCoinDistribution,
+          totalCoinDistribution: stats.totalBalance,
           viewRewards: 0,
+          usersWithWallets: stats.usersWithWallets,
         });
 
-        setUsers(usersData); // ✅ save for chart use
+        setUsers(usersData);
       } catch (error) {
-        console.error('Failed to load dashboard stats:', error);
+        console.error("Failed to load dashboard stats:", error);
+      } finally {
       }
     }
 
-    loadDashboardStats();
+    loadDashboardData();
   }, []);
 
   const stats = [
     {
-      label: "Total Miner",
-      value: dashboardStats.totalMiner,
-      icon: <HandCoins className="h-6 w-6 text-cyan-700" />,
+      label: "Total Users",
+      value: dashboardStats.totalUsers,
+      icon: <Users className="h-6 w-6 text-cyan-700" />,
+    },
+    {
+      label: "Users with Wallets",
+      value: dashboardStats.usersWithWallets,
+      icon: <Wallet className="h-6 w-6 text-cyan-700" />,
     },
     {
       label: "Total Referrals",
@@ -85,21 +93,18 @@ export default function DashboardPage() {
     {
       label: "Total Coin Distribution",
       value: dashboardStats.totalCoinDistribution,
-      icon: <Users className="h-6 w-6 text-cyan-700" />,
-    },
-    {
-      label: "View Rewards",
-      value: dashboardStats.viewRewards,
-      icon: <Gift className="h-6 w-6 text-cyan-700" />,
+      icon: <HandCoins className="h-6 w-6 text-cyan-700" />,
     },
   ];
 
   return (
     <div className="min-h-screen flex flex-col">
-      <main className="flex-1 bg-gray-50 p-4 flex flex-col gap-4">
-        <h2 className="text-xl font-semibold text-gray-800">Hey Admin 👋</h2>
 
-        {/* Stats */}
+      <main className="flex-1 bg-gray-50 p-4 flex flex-col gap-4">
+        <h2 className="text-xl font-semibold text-gray-800">
+          Hey <strong>Abdul Salam</strong> 👋
+        </h2>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {stats.map((item, index) => (
             <Card key={index} className="rounded-xl border h-24 md:h-28">
@@ -114,13 +119,12 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* Charts */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-36 flex-1">
+        <div className="grid grid-cols-1 md:grid-cols-2 md:gap-3 gap-36 flex-1">
           <div className="h-[300px]">
-            <UserGrowthChart users={users} /> {/* ✅ pass to growth chart too if needed */}
+            <UserGrowthChart users={users} />
           </div>
           <div className="h-[300px]">
-            <RewardRevenueChart users={users} /> {/* ✅ reward chart now receives data */}
+            <RewardRevenueChart users={users} />
           </div>
         </div>
       </main>

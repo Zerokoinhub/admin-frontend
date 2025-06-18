@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { ChevronDown, Search, User } from "lucide-react"
-import { useUsers } from "../../hooks/useUsers"
+import { useUsers } from "../../../hooks/useUsers"
 
 export default function UserSelector({ selectedUser, onUserSelect, className = "" }) {
   const [isOpen, setIsOpen] = useState(false)

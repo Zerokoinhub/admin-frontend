@@ -31,7 +31,7 @@ export default function Header({ onMenuClick, onNotificationClick, notificationC
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-30 h-14 px-4 sm:px-6 border-b border-gray-200 flex items-center justify-between bg-white shadow-sm md:ml-64">
+    <header className="fixed top-0 left-0 right-0 z-30 h-21 px-4 sm:px-6 border-b border-gray-200 flex items-center justify-between bg-white shadow-sm md:ml-64">
       {/* Left: Burger + Title */}
       <div className="flex items-center gap-3 w-full">
         {/* Burger menu (only on mobile) */}

@@ -1,6 +1,7 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import AppShell from "../src/components/ui/AppShell"; // NEW Client Component
+import AppShell from "../src/components/ui/AppShell";
+import RouteLoaderProvider from "../src/components/ui/RouteLoaderProvider"; // ✅ Correct import
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,7 +25,9 @@ export default function RootLayout({ children }) {
         <link rel="icon" href="/logo.png" />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <AppShell>{children}</AppShell>
+        <RouteLoaderProvider>
+          <AppShell>{children}</AppShell>
+        </RouteLoaderProvider>
       </body>
     </html>
   );

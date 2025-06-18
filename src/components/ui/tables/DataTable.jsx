@@ -33,6 +33,7 @@ const DataTable = ({ data, onView }) => {
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
+              <TableHead>Role</TableHead>
               <TableHead>Country</TableHead>
               <TableHead>Wallet Address</TableHead>
               <TableHead>Referral Code</TableHead>
@@ -44,9 +45,10 @@ const DataTable = ({ data, onView }) => {
           <TableBody>
             {data.map((user, index) => (
               <TableRow key={index}>
-                <TableCell>{user.name}</TableCell>
-                <TableCell>{user.email}</TableCell>
-                <TableCell>{user.country}</TableCell>
+                <TableCell>{user.name || "N/A"}</TableCell>
+                <TableCell>{user.email || "N/A"}</TableCell>
+                <TableCell>{user.role || "N/A"}</TableCell>
+                <TableCell>{user.country || "N/A"}</TableCell>
                 <TableCell>{user.wallet}</TableCell>
                 <TableCell>{user.referral}</TableCell>
                 <TableCell>{user.coins}</TableCell>

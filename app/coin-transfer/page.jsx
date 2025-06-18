@@ -2,11 +2,11 @@
 
 import { useState } from "react"
 import { X } from "lucide-react"
-import ViewScreenshots from "../components/ViewScreenshots"
-import TransferHistory from "../components/TransferHistory"
-import UserSelector from "../components/UserSelector"
-import { userHelpers } from "../../lib/api"
-import User from "lucide-react" // Declaring the User variable
+import ViewScreenshots from "../../src/components/ui/ViewScreenshots"
+import TransferHistory from "../../src/components/ui/TransferHistory"
+import UserSelector from "../../src/components/ui/UserSelector"
+import { userHelpers } from "../../src/lib/api"
+import {User} from "lucide-react" // Declaring the User variable
 
 export default function CoinTransferPage() {
   const [showScreenshots, setShowScreenshots] = useState(false)

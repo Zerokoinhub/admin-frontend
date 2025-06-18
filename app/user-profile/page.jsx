@@ -3,8 +3,8 @@
 import { useState, useMemo } from "react"
 import { Users, MessageSquare, Plus, X, Loader2 } from "lucide-react"
 import { useUsers } from "../../hooks/useUsers"
-import { userHelpers } from "../../lib/api"
-import UserSelector from "../components/UserSelector"
+import { userHelpers } from "../../src/lib/api"
+import UserSelector from "../../src/components/ui/UserSelector"
 
 export default function UserProfilePage() {
   const [showCoinHistory, setShowCoinHistory] = useState(false)

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { userAPI } from "../lib/api"
+import { userAPI } from "../src/lib/api"
 
 export function useUsers(page = 1, limit = 10) {
   const [users, setUsers] = useState([])

@@ -1,34 +1,36 @@
 "use client"
 
 import { ArrowLeft, Loader2 } from "lucide-react"
-import { useUsers } from "../../hooks/useUsers"
+import  useUsers  from "./UserSelector"
 
 export default function TransferHistory({ onBack }) {
   const { users, loading, error } = useUsers(1, 50)
 
   // Generate transfer history using real user names
-  const generateTransferData = (users) => {
-    if (!users.length) return []
+ const generateTransferData = (users) => {
+  const safeUsers = Array.isArray(users) ? users : []
+  if (safeUsers.length === 0) return []
 
-    const transferReasons = [
-      "Bonus for milestone",
-      "Referral reward",
-      "Course completion",
-      "Daily login bonus",
-      "Achievement unlock",
-    ]
+  const transferReasons = [
+    "Bonus for milestone",
+    "Referral reward",
+    "Course completion",
+    "Daily login bonus",
+    "Achievement unlock",
+  ]
 
-    const transferAmounts = [400, 350, 300, 250, 200, 150, 100]
+  const transferAmounts = [400, 350, 300, 250, 200, 150, 100]
 
-    return users.slice(0, 11).map((user, index) => ({
-      name: user.name || "Unknown User",
-      coins: transferAmounts[index % transferAmounts.length],
-      reason: transferReasons[index % transferReasons.length],
-      date: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toLocaleDateString(),
-      transferredBy: "Admin 1",
-      userId: user._id,
-    }))
-  }
+  return safeUsers.slice(0, 11).map((user, index) => ({
+    name: user.name || "Unknown User",
+    coins: transferAmounts[index % transferAmounts.length],
+    reason: transferReasons[index % transferReasons.length],
+    date: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toLocaleDateString(),
+    transferredBy: "Admin 1",
+    userId: user._id,
+  }))
+}
+
 
   const transferData = generateTransferData(users)
 
