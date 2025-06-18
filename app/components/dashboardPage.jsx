@@ -52,7 +52,7 @@ const stats = [
 
 export default function DashboardPage() {
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col ">
       <main className="flex-1 bg-gray-50 p-4 flex flex-col gap-4 ">
         <h2 className="text-xl font-semibold text-gray-800">Hey Admin 👋</h2>
 
