@@ -1,6 +1,15 @@
-"use client"
+"use client";
 
-import { Line, LineChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts"
+import {
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+} from "recharts";
 
 const statusData = [
   { year: 2010, value1: 5, value2: 5, value3: 5, value4: 5 },
@@ -13,7 +22,7 @@ const statusData = [
   { year: 2017, value1: 95, value2: 65, value3: 60, value4: 55 },
   { year: 2018, value1: 110, value2: 70, value3: 68, value4: 60 },
   { year: 2019, value1: 125, value2: 85, value3: 80, value4: 75 },
-]
+];
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
@@ -26,29 +35,43 @@ const CustomTooltip = ({ active, payload, label }) => {
           </p>
         ))}
       </div>
-    )
+    );
   }
-  return null
-}
+  return null;
+};
 
 export default function StatusChart() {
   return (
-    <div className="bg-white rounded-xl shadow-sm p-6">
-      <h3 className="text-xl font-semibold text-gray-800 mb-6">Status User Range per Year</h3>
+    <div className="bg-white rounded-2xl shadow p-4 sm:p-6 md:p-8 min-h-[300px] h-[45vh] sm:h-[50vh] md:h-[55vh] lg:h-[60vh]">
+      <h3 className="text-lg sm:text-xl md:text-2xl font-semibold text-gray-800 mb-4 sm:mb-6">
+        Status User Range per Year
+      </h3>
 
-      <div className="h-96">
+      <div className="h-full w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={statusData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+          <LineChart
+            data={statusData}
+            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+          >
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis dataKey="year" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: "#6b7280" }} />
+            <XAxis
+              dataKey="year"
+              axisLine={false}
+              tickLine={false}
+              tick={{ fontSize: 12, fill: "#6b7280" }}
+            />
             <YAxis
               axisLine={false}
               tickLine={false}
               tick={{ fontSize: 12, fill: "#6b7280" }}
-              label={{ value: "Units of Measure", angle: -90, position: "insideLeft" }}
+              label={{
+                value: "Units of Measure",
+                angle: -90,
+                position: "insideLeft",
+              }}
             />
             <Tooltip content={<CustomTooltip />} />
-            <Legend />
+            <Legend verticalAlign="top" height={36} />
             <Line
               type="monotone"
               dataKey="value1"
@@ -85,5 +108,5 @@ export default function StatusChart() {
         </ResponsiveContainer>
       </div>
     </div>
-  )
+  );
 }
