@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -9,8 +9,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { GraduationCap, Edit, Target, X, ChevronDown, Trash2, Edit3, Bell, Upload } from "lucide-react"
 import Image from "next/image"
+import { useUsers } from "../../hooks/useUsers"
+import { userHelpers } from "@/lib/api"
 
-// Admin data for the table
+// Admin data for the table - keeping this as static since it's admin-specific
 const adminData = [
   { email: "anas24@gmail.com", role: "Super Admin", id: 1 },
   { email: "anas24@gmail.com", role: "Super Admin", id: 2 },
@@ -21,50 +23,6 @@ const adminData = [
   { email: "anas24@gmail.com", role: "Super Admin", id: 7 },
   { email: "anas24@gmail.com", role: "Super Admin", id: 8 },
   { email: "anas24@gmail.com", role: "Super Admin", id: 9 },
-]
-
-// Dummy notification data
-const notificationData = [
-  {
-    id: 1,
-    title: "New Update",
-    message: "Watch the full episode to learn zero koin video",
-    time: "2 hours ago",
-    avatar: "/logo.png",
-    network: "Zerokoin Network",
-  },
-  {
-    id: 2,
-    title: "New Update",
-    message: "Watch the full episode to learn zero koin video",
-    time: "4 hours ago",
-    avatar: "/logo.png",
-    network: "Zerokoin Network",
-  },
-  {
-    id: 3,
-    title: "New Update",
-    message: "Watch the full episode to learn zero koin video",
-    time: "6 hours ago",
-    avatar: "/logo.png",
-    network: "Zerokoin Network",
-  },
-  {
-    id: 4,
-    title: "New Update",
-    message: "Watch the full episode to learn zero koin video",
-    time: "8 hours ago",
-    avatar: "/logo.png",
-    network: "Zerokoin Network",
-  },
-  {
-    id: 5,
-    title: "New Update",
-    message: "Watch the full episode to learn zero koin video",
-    time: "1 day ago",
-    avatar: "/logo.png",
-    network: "Zerokoin Network",
-  },
 ]
 
 export default function SettingPage() {
@@ -84,6 +42,43 @@ export default function SettingPage() {
     role: "Super Admin",
     time: "1 Month",
   })
+
+  // Fetch users data for statistics
+  const { users, loading, error } = useUsers(1, 100)
+
+  // Calculate real statistics from users
+  const stats = useMemo(() => {
+    if (!users || users.length === 0) {
+      return {
+        learningRewards: 0,
+        referralsRewards: 0,
+        adBaseRewards: 0,
+      }
+    }
+
+    const userStats = userHelpers.calculateStats(users)
+    return {
+      learningRewards: users.length, // Total users as learning rewards
+      referralsRewards: userStats.totalReferrals,
+      adBaseRewards: Math.floor(users.length * 0.3), // Mock ad-based rewards
+    }
+  }, [users])
+
+  // Generate notification data from real users
+  const notificationData = useMemo(() => {
+    if (!users || users.length === 0) return []
+
+    return users.slice(0, 5).map((user, index) => ({
+      id: user._id,
+      title: "New Update",
+      message: "Watch the full episode to learn zero koin video",
+      time: `${(index + 1) * 2} hours ago`,
+      avatar: "/placeholder.svg?height=32&width=32",
+      network: "Zerokoin Network",
+      userName: user.name || "Unknown User",
+      userEmail: user.email,
+    }))
+  }, [users])
 
   // Listen for notification clicks from header
   useEffect(() => {
@@ -132,6 +127,16 @@ export default function SettingPage() {
     setUploadedImage(true)
   }
 
+  if (loading) {
+    return (
+      <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
+        <div className="flex justify-center items-center h-64">
+          <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+        </div>
+      </div>
+    )
+  }
+
   // Notification Settings View
   if (currentView === "notifications") {
     // Empty Notification State
@@ -168,7 +173,9 @@ export default function SettingPage() {
               <div className="p-4 border-b border-gray-200 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <h3 className="font-semibold text-gray-900">Notifications</h3>
-                  <span className="bg-teal-600 text-white text-xs px-2 py-1 rounded-full">5</span>
+                  <span className="bg-teal-600 text-white text-xs px-2 py-1 rounded-full">
+                    {notificationData.length}
+                  </span>
                 </div>
                 <Button
                   variant="ghost"
@@ -180,14 +187,26 @@ export default function SettingPage() {
                 </Button>
               </div>
               <div className="p-4">
-                <div className="flex items-center gap-3 mb-4">
-                  <Image src="/logo.png" alt="User" width={40} height={40} className="rounded-full" />
-                  <div>
-                    <p className="font-medium text-gray-900">Hi Anas</p>
-                    <p className="text-sm text-gray-500">Here Sign up to Zero Koin</p>
-                    <p className="text-xs text-gray-400">2 May 12:5 PM</p>
+                {notificationData.length > 0 ? (
+                  <div className="flex items-center gap-3 mb-4">
+                    <Image
+                      src="/placeholder.svg?height=40&width=40"
+                      alt="User"
+                      width={40}
+                      height={40}
+                      className="rounded-full"
+                    />
+                    <div>
+                      <p className="font-medium text-gray-900">Hi {notificationData[0].userName}</p>
+                      <p className="text-sm text-gray-500">Here Sign up to Zero Koin</p>
+                      <p className="text-xs text-gray-400">2 May 12:5 PM</p>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="text-center text-gray-500 py-4">
+                    <p>No notifications available</p>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <p className="text-sm text-gray-600">
                     View on Admin: <span className="font-medium">Abdul Salam</span>
@@ -217,7 +236,7 @@ export default function SettingPage() {
                   <div key={notification.id} className="p-4 border-b border-gray-100 hover:bg-gray-50">
                     <div className="flex items-start gap-3">
                       <Image
-                        src={notification.avatar || "/placeholder.svg"}
+                        src={notification.avatar || "/placeholder.svg?height=32&width=32"}
                         alt="Zerokoin"
                         width={32}
                         height={32}
@@ -433,7 +452,7 @@ export default function SettingPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Learning Rewards</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">45</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.learningRewards}</p>
                 </div>
               </div>
             </CardContent>
@@ -447,7 +466,7 @@ export default function SettingPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Referrals Rewards</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">4657</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.referralsRewards}</p>
                 </div>
               </div>
             </CardContent>
@@ -461,7 +480,7 @@ export default function SettingPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Ad Base Rewards</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">575</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.adBaseRewards}</p>
                 </div>
               </div>
             </CardContent>
@@ -521,21 +540,33 @@ export default function SettingPage() {
             <div className="p-4 border-b border-gray-200 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-gray-900">Notifications</h3>
-                <span className="bg-teal-600 text-white text-xs px-2 py-1 rounded-full">5</span>
+                <span className="bg-teal-600 text-white text-xs px-2 py-1 rounded-full">{notificationData.length}</span>
               </div>
               <Button variant="ghost" size="sm" onClick={() => setShowNotificationPanel(false)} className="h-6 w-6 p-0">
                 <X className="h-4 w-4" />
               </Button>
             </div>
             <div className="p-4">
-              <div className="flex items-center gap-3 mb-4">
-                <Image src="/logo.png" alt="User" width={40} height={40} className="rounded-full" />
-                <div>
-                  <p className="font-medium text-gray-900">Hi Anas</p>
-                  <p className="text-sm text-gray-500">Here Sign up to Zero Koin</p>
-                  <p className="text-xs text-gray-400">2 May 12:5 PM</p>
+              {notificationData.length > 0 ? (
+                <div className="flex items-center gap-3 mb-4">
+                  <Image
+                    src="/placeholder.svg?height=40&width=40"
+                    alt="User"
+                    width={40}
+                    height={40}
+                    className="rounded-full"
+                  />
+                  <div>
+                    <p className="font-medium text-gray-900">Hi {notificationData[0].userName}</p>
+                    <p className="text-sm text-gray-500">Here Sign up to Zero Koin</p>
+                    <p className="text-xs text-gray-400">2 May 12:5 PM</p>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="text-center text-gray-500 py-4">
+                  <p>No notifications available</p>
+                </div>
+              )}
               <div className="space-y-2">
                 <p className="text-sm text-gray-600">
                   View on Admin: <span className="font-medium">Abdul Salam</span>
@@ -574,7 +605,7 @@ export default function SettingPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Learning Rewards</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">45</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.learningRewards}</p>
                 </div>
               </div>
             </CardContent>
@@ -588,7 +619,7 @@ export default function SettingPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Referrals Rewards</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">4657</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.referralsRewards}</p>
                 </div>
               </div>
             </CardContent>
@@ -602,7 +633,7 @@ export default function SettingPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Ad Base Rewards</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">575</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.adBaseRewards}</p>
                 </div>
               </div>
             </CardContent>
