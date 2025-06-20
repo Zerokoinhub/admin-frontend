@@ -8,12 +8,13 @@ export default function useLogin() {
   const [error, setError] = useState('');
   const router = useRouter();
 
+  // ✅ Login Admin
   const loginUser = async ({ email, password }) => {
     setLoading(true);
     setError('');
 
     try {
-      const res = await fetch('http://localhost:5000/api/auth/login', {
+      const res = await fetch('http://localhost:5000/api/admin/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -23,19 +24,16 @@ export default function useLogin() {
 
       const data = await res.json();
 
-      // ✅ Log server response
-      console.log('✅ Server Response:', data);
-
-      if (!res.ok || !data.success) {
+      if (!res.ok || !data.success || !data.data || !data.data.admin) {
         throw new Error(data.message || 'Login failed');
       }
 
-      // ✅ Store token and user data in localStorage
+      // ✅ Save token & admin info
       localStorage.setItem('token', data.data.token);
-      localStorage.setItem('user', JSON.stringify(data.data.user));
+      localStorage.setItem('user', JSON.stringify(data.data.admin));
 
-      // ✅ Log role
-      console.log('🛡️ User Role:', data.data.user.role);
+      // ✅ Log admin role
+      console.log('🛡️ Logged in as:', data.data.admin?.role || 'Unknown Role');
 
       // ✅ Redirect to dashboard
       router.push('/dashboard');
@@ -47,8 +45,45 @@ export default function useLogin() {
     }
   };
 
+  // ✅ Register Admin
+  const registerUser = async ({ name, email, password }) => {
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await fetch('http://localhost:5000/api/admin/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name, email, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success || !data.data || !data.data.admin) {
+        throw new Error(data.message || 'Registration failed');
+      }
+
+      // ✅ Save token & admin info
+      localStorage.setItem('token', data.data.token);
+      localStorage.setItem('user', JSON.stringify(data.data.admin));
+
+      console.log('✅ Registration successful:', data.data.admin.email);
+
+      // ✅ Redirect to dashboard
+      router.push('/dashboard');
+    } catch (err) {
+      console.error('❌ Registration Error:', err.message);
+      setError(err.message || 'Registration failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     loginUser,
+    registerUser,
     loading,
     error,
   };

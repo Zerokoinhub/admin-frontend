@@ -7,95 +7,41 @@ import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts"
-import { X, User } from "lucide-react"
+import { X, User, Clock, FileText, Edit, Trash2, Plus, Eye, BarChart3 } from "lucide-react"
 import Image from "next/image"
 import { useUsers } from "../../hooks/useUsers"
-
-// Course data for the table
-const courseData = [
-  {
-    title: "Zero Koin Course",
-    category: "Mining",
-    language: "English",
-    status: "Active",
-    enroll: "5,430",
-    revenue: "320.00",
-  },
-  {
-    title: "Zero Koin Course",
-    category: "Mining",
-    language: "English",
-    status: "Active",
-    enroll: "5,430",
-    revenue: "320.00",
-  },
-  {
-    title: "Zero Koin Course",
-    category: "Mining",
-    language: "English",
-    status: "Active",
-    enroll: "5,430",
-    revenue: "300.00",
-  },
-  {
-    title: "Zero Koin Course",
-    category: "Mining",
-    language: "English",
-    status: "Active",
-    enroll: "5,430",
-    revenue: "300.00",
-  },
-  {
-    title: "Zero Koin Course",
-    category: "Mining",
-    language: "English",
-    status: "Active",
-    enroll: "5,430",
-    revenue: "350.00",
-  },
-  {
-    title: "Zero Koin Course",
-    category: "Mining",
-    language: "English",
-    status: "Inactive",
-    enroll: "5,430",
-    revenue: "250.00",
-  },
-  {
-    title: "Zero Koin Course",
-    category: "Mining",
-    language: "English",
-    status: "Inactive",
-    enroll: "5,430",
-    revenue: "200.00",
-  },
-]
-
-// Live courses data
-const liveCourses = [
-  { title: "Learn Mining", subtitle: "Total Blocks", icon: "⛏️", color: "bg-teal-600" },
-  { title: "Blockchain Stock", subtitle: "Total Blocks", icon: "📊", color: "bg-blue-600" },
-  { title: "Learn Crypto", subtitle: "Total Blocks", icon: "₿", color: "bg-teal-600" },
-  { title: "NFT's", subtitle: "Total Blocks", icon: "¥", color: "bg-yellow-600" },
-  { title: "Crypto Course", subtitle: "Total Blocks", icon: "€", color: "bg-teal-600" },
-]
+import { useCourses } from "../../hooks/useCourses"
 
 export default function CourseManagementPage() {
   const [currentView, setCurrentView] = useState("main")
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false)
+  const [selectedCourse, setSelectedCourse] = useState(null)
+  const [isEditing, setIsEditing] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({
-    language: "English",
-    category: "Mining",
-    content: "",
-    timer: "2 Hour",
+    courseName: "",
+    pages: [{ title: "", content: "", time: 0 }],
   })
 
-  // Fetch users data for analytics
-  const { users, loading, error } = useUsers(1, 100) // Get more users for analytics
+  // Fetch courses and users data
+  const {
+    courses,
+    loading: coursesLoading,
+    error: coursesError,
+    createCourse,
+    updateCourse,
+    deleteCourse,
+    refreshCourses,
+    hasPermission,
+    userRole,
+    roleDisplayName,
+    permissionsList,
+  } = useCourses()
+
+  const { users, loading, error } = useUsers(1, 100)
 
   const handleViewCourse = () => {
     setCurrentView("course")
@@ -106,142 +52,288 @@ export default function CourseManagementPage() {
   }
 
   const handleUploadCourse = () => {
+    if (!hasPermission("create")) {
+      alert("You don't have permission to create courses")
+      return
+    }
+    setCurrentView("upload")
+    setFormData({
+      courseName: "",
+      pages: [{ title: "", content: "", time: 0 }],
+    })
+    setIsEditing(false)
+  }
+
+  const handleSubmitCourse = async () => {
+    if (!formData.courseName.trim()) {
+      alert("Please enter a course name")
+      return
+    }
+
+    if (formData.pages.some((page) => !page.title.trim() || !page.content.trim())) {
+      alert("Please fill in all page titles and content")
+      return
+    }
+
+    setIsSubmitting(true)
+
+    try {
+      let result
+      if (isEditing && selectedCourse) {
+        result = await updateCourse(selectedCourse._id, formData)
+      } else {
+        result = await createCourse(formData)
+      }
+
+      if (result.success) {
+        setIsSuccessModalOpen(true)
+        setTimeout(() => {
+          setIsSuccessModalOpen(false)
+          setCurrentView("main")
+          setSelectedCourse(null)
+          setIsEditing(false)
+        }, 2000)
+      } else {
+        alert(`Error: ${result.error}`)
+      }
+    } catch (error) {
+      alert(`Error: ${error.message}`)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleEditCourse = (course) => {
+    if (!hasPermission("edit")) {
+      alert("You don't have permission to edit courses")
+      return
+    }
+
+    setSelectedCourse(course)
+    setFormData({
+      courseName: course.courseName,
+      pages: [...course.pages],
+    })
+    setIsEditing(true)
     setCurrentView("upload")
   }
 
-  const handleSubmitCourse = () => {
-    setIsSuccessModalOpen(true)
-    setTimeout(() => {
-      setIsSuccessModalOpen(false)
-      setCurrentView("course")
-    }, 3000)
+  const handleDeleteCourse = async (courseId) => {
+    if (!hasPermission("delete")) {
+      alert("You don't have permission to delete courses")
+      return
+    }
+
+    if (!confirm("Are you sure you want to delete this course? This action cannot be undone.")) {
+      return
+    }
+
+    const result = await deleteCourse(courseId)
+    if (result.success) {
+      alert("Course deleted successfully")
+    } else {
+      alert(`Error deleting course: ${result.error}`)
+    }
   }
 
-  // Generate analytics data from real users
+  const handleCourseClick = (course) => {
+    setSelectedCourse(course)
+    setCurrentView("course")
+  }
+
+  const addPage = () => {
+    setFormData({
+      ...formData,
+      pages: [...formData.pages, { title: "", content: "", time: 0 }],
+    })
+  }
+
+  const removePage = (index) => {
+    if (formData.pages.length > 1) {
+      setFormData({
+        ...formData,
+        pages: formData.pages.filter((_, i) => i !== index),
+      })
+    }
+  }
+
+  const updatePage = (index, field, value) => {
+    const updatedPages = formData.pages.map((page, i) => (i === index ? { ...page, [field]: value } : page))
+    setFormData({ ...formData, pages: updatedPages })
+  }
+
+  // Calculate total duration for a course
+  const getTotalDuration = (pages) => {
+    return pages.reduce((total, page) => total + (page.time || 0), 0)
+  }
+
+  // Format duration in minutes to readable format
+  const formatDuration = (minutes) => {
+    if (minutes < 60) return `${minutes}m`
+    const hours = Math.floor(minutes / 60)
+    const mins = minutes % 60
+    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`
+  }
+
+  // Generate analytics data from real courses and users
   const generateAnalyticsData = () => {
-    if (!users || users.length === 0) {
+    if (!courses || courses.length === 0) {
       return [
-        { name: "Total User", value: 0, color: "#0d9488" },
-        { name: "Active user", value: 0, color: "#22c55e" },
-        { name: "Non active", value: 0, color: "#a855f7" },
-        { name: "Absence", value: 0, color: "#c084fc" },
+        { name: "Active Courses", value: 0, color: "#0d9488" },
+        { name: "Inactive Courses", value: 0, color: "#ef4444" },
+        { name: "Total Pages", value: 0, color: "#22c55e" },
+        { name: "Total Duration", value: 0, color: "#a855f7" },
       ]
     }
 
-    const totalUsers = users.length
-    const activeUsers = Math.floor(totalUsers * 0.6) // Assume 60% are active
-    const nonActiveUsers = Math.floor(totalUsers * 0.25) // 25% non-active
-    const absenceUsers = totalUsers - activeUsers - nonActiveUsers // Remaining
+    const activeCourses = courses.filter((course) => course.isActive).length
+    const inactiveCourses = courses.length - activeCourses
+    const totalPages = courses.reduce((total, course) => total + course.pages.length, 0)
+    const totalDuration = courses.reduce((total, course) => total + getTotalDuration(course.pages), 0)
+
+    const total = activeCourses + inactiveCourses + totalPages + Math.floor(totalDuration / 60)
 
     return [
-      { name: "Total User", value: Math.round((totalUsers / totalUsers) * 100), color: "#0d9488" },
-      { name: "Active user", value: Math.round((activeUsers / totalUsers) * 100), color: "#22c55e" },
-      { name: "Non active", value: Math.round((nonActiveUsers / totalUsers) * 100), color: "#a855f7" },
-      { name: "Absence", value: Math.round((absenceUsers / totalUsers) * 100), color: "#c084fc" },
+      { name: "Active Courses", value: Math.round((activeCourses / total) * 100) || 1, color: "#0d9488" },
+      { name: "Inactive Courses", value: Math.round((inactiveCourses / total) * 100) || 1, color: "#ef4444" },
+      { name: "Total Pages", value: Math.round((totalPages / total) * 100) || 1, color: "#22c55e" },
+      {
+        name: "Duration (hrs)",
+        value: Math.round((Math.floor(totalDuration / 60) / total) * 100) || 1,
+        color: "#a855f7",
+      },
     ]
   }
 
   const analyticsData = generateAnalyticsData()
 
-  // Upload Course View (User Details as main page)
+  // Upload Course View
   if (currentView === "upload") {
     return (
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Zerokoin Course</h1>
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-            <Button
-              onClick={handleUploadCourse}
-              className="bg-teal-600 hover:bg-teal-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium"
-            >
-              Upload new Course
-            </Button>
-            <Button
-              onClick={handleViewAnalytics}
-              className="bg-teal-600 hover:bg-teal-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium"
-            >
-              View Course analytics
-            </Button>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">
+              {isEditing ? "Edit Course" : "Create New Course"}
+            </h1>
+            <p className="text-sm text-gray-600 mt-1">
+              {roleDisplayName} • {isEditing ? "Editing existing course" : "Adding new course"}
+            </p>
           </div>
+          <Button variant="ghost" onClick={() => setCurrentView("main")} className="self-start sm:self-center">
+            ← Back to Courses
+          </Button>
         </div>
 
-        {/* User Details Card */}
-        <div className="flex justify-center px-3 sm:px-0">
-          <Card className="bg-white border border-gray-200 w-full max-w-md">
+        {/* Course Upload Form */}
+        <div className="max-w-4xl mx-auto">
+          <Card className="bg-white border border-gray-200">
             <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-4 sm:mb-6">
-                <h2 className="text-lg font-semibold text-gray-900">User Details</h2>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setCurrentView("course")}
-                  className="h-6 w-6 p-0 hover:bg-gray-100 flex-shrink-0"
-                >
-                  <X className="h-4 w-4 text-gray-500" />
-                </Button>
-              </div>
-              <div className="space-y-4">
+              <div className="space-y-6">
+                {/* Course Name */}
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-700">Select Language</Label>
-                  <Select
-                    value={formData.language}
-                    onValueChange={(value) => setFormData({ ...formData, language: value })}
-                  >
-                    <SelectTrigger className="border-gray-200">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="English">English</SelectItem>
-                      <SelectItem value="German">German</SelectItem>
-                      <SelectItem value="French">French</SelectItem>
-                      <SelectItem value="Arabian">Arabian</SelectItem>
-                      <SelectItem value="Hindi">Hindi</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-700">Select Category</Label>
-                  <Select
-                    value={formData.category}
-                    onValueChange={(value) => setFormData({ ...formData, category: value })}
-                  >
-                    <SelectTrigger className="border-gray-200">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Mining">Mining</SelectItem>
-                      <SelectItem value="Trading">Trading</SelectItem>
-                      <SelectItem value="Crypto">Crypto</SelectItem>
-                      <SelectItem value="Forex">Forex</SelectItem>
-                      <SelectItem value="Web AI">Web AI</SelectItem>
-                      <SelectItem value="Quotes">Quotes</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-700">Content</Label>
-                  <Textarea
-                    value={formData.content}
-                    onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                    className="border-gray-200 min-h-[100px]"
-                    placeholder="Enter course content..."
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-700">Timer</Label>
+                  <Label className="text-sm font-medium text-gray-700">Course Name</Label>
                   <Input
-                    value={formData.timer}
-                    onChange={(e) => setFormData({ ...formData, timer: e.target.value })}
+                    value={formData.courseName}
+                    onChange={(e) => setFormData({ ...formData, courseName: e.target.value })}
                     className="border-gray-200"
+                    placeholder="Enter course name..."
+                    disabled={isSubmitting}
                   />
                 </div>
+
+                {/* Course Pages */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium text-gray-700">Course Pages</Label>
+                    <Button
+                      type="button"
+                      onClick={addPage}
+                      className="bg-teal-600 hover:bg-teal-700 text-white text-sm"
+                      disabled={isSubmitting}
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Page
+                    </Button>
+                  </div>
+
+                  {formData.pages.map((page, index) => (
+                    <Card key={index} className="border border-gray-200">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="font-medium text-gray-900">Page {index + 1}</h4>
+                          {formData.pages.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removePage(index)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              disabled={isSubmitting}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium text-gray-700">Page Title</Label>
+                            <Input
+                              value={page.title}
+                              onChange={(e) => updatePage(index, "title", e.target.value)}
+                              className="border-gray-200"
+                              placeholder="Enter page title..."
+                              disabled={isSubmitting}
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium text-gray-700">Content</Label>
+                            <Textarea
+                              value={page.content}
+                              onChange={(e) => updatePage(index, "content", e.target.value)}
+                              className="border-gray-200 min-h-[100px]"
+                              placeholder="Enter page content..."
+                              disabled={isSubmitting}
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium text-gray-700">Duration (minutes)</Label>
+                            <Input
+                              type="number"
+                              value={page.time}
+                              onChange={(e) => updatePage(index, "time", Number.parseInt(e.target.value) || 0)}
+                              className="border-gray-200"
+                              placeholder="Enter duration in minutes..."
+                              min="0"
+                              disabled={isSubmitting}
+                            />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
                 <div className="flex justify-end pt-4">
                   <Button
                     onClick={handleSubmitCourse}
-                    className="bg-teal-600 hover:bg-teal-700 text-white px-4 sm:px-6 py-2 rounded-md text-sm font-medium w-full sm:w-auto"
+                    className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-md text-sm font-medium"
+                    disabled={isSubmitting}
                   >
-                    Upload Course
+                    {isSubmitting ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        {isEditing ? "Updating..." : "Creating..."}
+                      </div>
+                    ) : isEditing ? (
+                      "Update Course"
+                    ) : (
+                      "Create Course"
+                    )}
                   </Button>
                 </div>
               </div>
@@ -253,35 +345,17 @@ export default function CourseManagementPage() {
         <Dialog open={isSuccessModalOpen} onOpenChange={setIsSuccessModalOpen}>
           <DialogContent className="sm:max-w-sm bg-white text-center border-0 shadow-2xl mx-4">
             <div className="py-6 sm:py-8 px-4">
-              {/* Animated Circle with Decorative Dots */}
               <div className="relative mx-auto w-20 sm:w-24 h-20 sm:h-24 mb-6 sm:mb-8">
-                {/* Main Circle */}
                 <div className="w-20 sm:w-24 h-20 sm:h-24 bg-gradient-to-br from-teal-500 to-green-600 rounded-full flex items-center justify-center relative z-10">
                   <User className="h-8 sm:h-10 w-8 sm:w-10 text-white" />
                 </div>
-
-                {/* Decorative Dots */}
-                <div className="absolute inset-0 animate-spin" style={{ animationDuration: "3s" }}>
-                  <div className="absolute w-2 sm:w-3 h-2 sm:h-3 bg-teal-500 rounded-full -top-1 left-1/2 transform -translate-x-1/2"></div>
-                  <div className="absolute w-1.5 sm:w-2 h-1.5 sm:h-2 bg-green-500 rounded-full top-2 -right-1"></div>
-                  <div className="absolute w-1.5 sm:w-2 h-1.5 sm:h-2 bg-teal-400 rounded-full top-1/2 -right-2 transform -translate-y-1/2"></div>
-                  <div className="absolute w-2 sm:w-3 h-2 sm:h-3 bg-green-400 rounded-full -bottom-1 right-2"></div>
-                  <div className="absolute w-1.5 sm:w-2 h-1.5 sm:h-2 bg-teal-500 rounded-full -bottom-1 left-1/2 transform -translate-x-1/2"></div>
-                  <div className="absolute w-1.5 sm:w-2 h-1.5 sm:h-2 bg-green-500 rounded-full bottom-2 -left-1"></div>
-                  <div className="absolute w-1.5 sm:w-2 h-1.5 sm:h-2 bg-teal-400 rounded-full top-1/2 -left-2 transform -translate-y-1/2"></div>
-                  <div className="absolute w-2 sm:w-3 h-2 sm:h-3 bg-green-400 rounded-full top-2 left-2"></div>
-                </div>
               </div>
-
-              {/* Success Text */}
-              <h3 className="text-lg sm:text-xl font-semibold text-teal-600 mb-1">Your Course is</h3>
-              <h3 className="text-lg sm:text-xl font-semibold text-teal-600 mb-4 sm:mb-6">Successfully Uploaded</h3>
-
-              {/* Wait Text */}
+              <h3 className="text-lg sm:text-xl font-semibold text-teal-600 mb-1">Course Successfully</h3>
+              <h3 className="text-lg sm:text-xl font-semibold text-teal-600 mb-4 sm:mb-6">
+                {isEditing ? "Updated!" : "Created!"}
+              </h3>
               <p className="text-sm text-gray-600 mb-1">Please wait</p>
-              <p className="text-sm text-gray-600 mb-6 sm:mb-8">You will be directed to the homepage soon</p>
-
-              {/* Loading Spinner */}
+              <p className="text-sm text-gray-600 mb-6 sm:mb-8">Redirecting to course list...</p>
               <div className="w-6 sm:w-8 h-6 sm:h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
             </div>
           </DialogContent>
@@ -296,20 +370,39 @@ export default function CourseManagementPage() {
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Course Management</h1>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Course Management</h1>
+            <div className="flex items-center gap-4 mt-1">
+              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                {roleDisplayName}
+              </Badge>
+              <p className="text-sm text-gray-600">{permissionsList}</p>
+            </div>
+          </div>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
             <Button
               onClick={handleViewCourse}
               className="bg-teal-600 hover:bg-teal-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium"
             >
-              View Course
+              <Eye className="h-4 w-4 mr-2" />
+              View Courses
             </Button>
             <Button
               onClick={handleViewAnalytics}
-              className="bg-teal-600 hover:bg-teal-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium"
+              className="bg-purple-600 hover:bg-purple-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium"
             >
-              View Course analytics
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Analytics
             </Button>
+            {hasPermission("create") && (
+              <Button
+                onClick={handleUploadCourse}
+                className="bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create Course
+              </Button>
+            )}
           </div>
         </div>
 
@@ -324,43 +417,124 @@ export default function CourseManagementPage() {
           />
         </div>
 
-        {/* Popular Courses History */}
+        {/* Courses Table */}
         <Card className="bg-white border border-gray-200">
           <CardContent className="p-3 sm:p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Our Popular Courses History</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">All Courses</h3>
+              {hasPermission("create") && (
+                <Button onClick={handleUploadCourse} size="sm" className="bg-green-600 hover:bg-green-700 text-white">
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Course
+                </Button>
+              )}
+            </div>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="border-b border-gray-200">
-                    <TableHead className="font-semibold text-gray-700 py-3 min-w-[140px]">Title</TableHead>
-                    <TableHead className="font-semibold text-gray-700 py-3 min-w-[100px]">Category</TableHead>
-                    <TableHead className="font-semibold text-gray-700 py-3 min-w-[100px]">Language</TableHead>
+                    <TableHead className="font-semibold text-gray-700 py-3 min-w-[200px]">Course Name</TableHead>
+                    <TableHead className="font-semibold text-gray-700 py-3 min-w-[100px]">Pages</TableHead>
+                    <TableHead className="font-semibold text-gray-700 py-3 min-w-[120px]">Duration</TableHead>
                     <TableHead className="font-semibold text-gray-700 py-3 min-w-[80px]">Status</TableHead>
-                    <TableHead className="font-semibold text-gray-700 py-3 min-w-[120px]">Total Enroll</TableHead>
-                    <TableHead className="font-semibold text-gray-700 py-3 min-w-[130px]">Total Revenue</TableHead>
+                    <TableHead className="font-semibold text-gray-700 py-3 min-w-[120px]">Created</TableHead>
+                    {(hasPermission("edit") || hasPermission("delete")) && (
+                      <TableHead className="font-semibold text-gray-700 py-3 min-w-[120px]">Actions</TableHead>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {courseData.map((course, index) => (
-                    <TableRow key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                      <TableCell className="py-3 text-gray-900 text-sm">{course.title}</TableCell>
-                      <TableCell className="py-3 text-gray-900 text-sm">{course.category}</TableCell>
-                      <TableCell className="py-3 text-gray-900 text-sm">{course.language}</TableCell>
-                      <TableCell className="py-3">
-                        <Badge
-                          className={
-                            course.status === "Active"
-                              ? "bg-green-100 text-green-800 hover:bg-green-100 border-0 text-xs"
-                              : "bg-red-100 text-red-800 hover:bg-red-100 border-0 text-xs"
-                          }
-                        >
-                          {course.status}
-                        </Badge>
+                  {coursesLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8">
+                        <div className="flex justify-center items-center">
+                          <div className="w-6 h-6 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                          <span className="ml-2 text-gray-600">Loading courses...</span>
+                        </div>
                       </TableCell>
-                      <TableCell className="py-3 text-gray-900 text-sm">{course.enroll}</TableCell>
-                      <TableCell className="py-3 text-gray-900 text-sm">{course.revenue}</TableCell>
                     </TableRow>
-                  ))}
+                  ) : coursesError ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-red-600">
+                        Error loading courses: {coursesError}
+                      </TableCell>
+                    </TableRow>
+                  ) : courses.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                        <div className="flex flex-col items-center gap-2">
+                          <FileText className="h-12 w-12 text-gray-300" />
+                          <p>No courses found</p>
+                          {hasPermission("create") && (
+                            <Button onClick={handleUploadCourse} size="sm" className="mt-2">
+                              <Plus className="h-4 w-4 mr-1" />
+                              Create First Course
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    courses.map((course) => (
+                      <TableRow key={course._id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <TableCell className="py-3 text-gray-900 text-sm font-medium">{course.courseName}</TableCell>
+                        <TableCell className="py-3 text-gray-900 text-sm">
+                          <div className="flex items-center gap-1">
+                            <FileText className="h-4 w-4 text-gray-500" />
+                            {course.pages.length}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-3 text-gray-900 text-sm">
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-4 w-4 text-gray-500" />
+                            {formatDuration(getTotalDuration(course.pages))}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-3">
+                          <Badge
+                            className={
+                              course.isActive
+                                ? "bg-green-100 text-green-800 hover:bg-green-100 border-0 text-xs"
+                                : "bg-red-100 text-red-800 hover:bg-red-100 border-0 text-xs"
+                            }
+                          >
+                            {course.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="py-3 text-gray-900 text-sm">
+                          {new Date(course.createdAt).toLocaleDateString()}
+                        </TableCell>
+                        {(hasPermission("edit") || hasPermission("delete")) && (
+                          <TableCell className="py-3">
+                            <div className="flex items-center gap-2">
+                              {hasPermission("edit") && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEditCourse(course)}
+                                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                  title="Edit Course"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {hasPermission("delete") && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteCourse(course._id)}
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  title="Delete Course"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>
@@ -376,26 +550,39 @@ export default function CourseManagementPage() {
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Zerokoin Course</h1>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Course Viewer</h1>
+            <p className="text-sm text-gray-600 mt-1">{roleDisplayName} • Browse and view course details</p>
+          </div>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-            <Button
-              onClick={handleUploadCourse}
-              className="bg-teal-600 hover:bg-teal-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium"
-            >
-              Upload new Course
-            </Button>
+            {hasPermission("create") && (
+              <Button
+                onClick={handleUploadCourse}
+                className="bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create Course
+              </Button>
+            )}
             <Button
               onClick={handleViewAnalytics}
-              className="bg-teal-600 hover:bg-teal-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium"
+              className="bg-purple-600 hover:bg-purple-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium"
             >
-              View Course analytics
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Analytics
+            </Button>
+            <Button
+              onClick={() => setCurrentView("main")}
+              className="bg-gray-600 hover:bg-gray-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium"
+            >
+              Back to Main
             </Button>
           </div>
         </div>
 
-        {/* Single Container with Coin Image and Live Courses */}
+        {/* Course Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-          {/* Main Course Image - Takes 2 columns on large screens */}
+          {/* Main Course Image */}
           <div className="lg:col-span-2">
             <Card className="bg-white border border-gray-200">
               <CardContent className="p-0">
@@ -412,55 +599,125 @@ export default function CourseManagementPage() {
             </Card>
           </div>
 
-          {/* Live Courses - Takes 1 column on large screens, full width on mobile */}
+          {/* All Courses List */}
           <div className="lg:col-span-1">
             <Card className="bg-white border border-gray-200 h-48 sm:h-60 lg:h-80">
               <CardContent className="p-3 sm:p-6 h-full overflow-y-auto">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Live Courses</h3>
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">All Courses</h3>
+                  <Badge variant="outline" className="text-xs">
+                    {courses.length} total
+                  </Badge>
+                </div>
                 <div className="space-y-2 sm:space-y-3">
-                  {liveCourses.map((course, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center space-x-2 sm:space-x-3 p-2 sm:p-3 bg-gray-50 rounded-lg"
-                    >
-                      <div
-                        className={`w-8 sm:w-10 h-8 sm:h-10 ${course.color} rounded-lg flex items-center justify-center text-white font-bold text-sm sm:text-base flex-shrink-0`}
-                      >
-                        {course.icon}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-gray-900 text-sm sm:text-base truncate">{course.title}</h4>
-                        <p className="text-xs sm:text-sm text-gray-500 truncate">{course.subtitle}</p>
-                      </div>
-                      <span className="text-xs text-gray-400 flex-shrink-0">Live now</span>
+                  {coursesLoading ? (
+                    <div className="flex justify-center items-center py-4">
+                      <div className="w-4 h-4 border-2 border-teal-600 border-t-transparent rounded-full animate-spin"></div>
                     </div>
-                  ))}
+                  ) : courses.length === 0 ? (
+                    <div className="text-center py-4">
+                      <FileText className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                      <p className="text-sm text-gray-500">No courses available</p>
+                    </div>
+                  ) : (
+                    courses.map((course, index) => (
+                      <div
+                        key={course._id}
+                        className="flex items-center space-x-2 sm:space-x-3 p-2 sm:p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
+                        onClick={() => handleCourseClick(course)}
+                      >
+                        <div className="w-8 sm:w-10 h-8 sm:h-10 bg-teal-600 rounded-lg flex items-center justify-center text-white font-bold text-sm sm:text-base flex-shrink-0">
+                          {course.courseName.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium text-gray-900 text-sm sm:text-base truncate">
+                            {course.courseName}
+                          </h4>
+                          <p className="text-xs sm:text-sm text-gray-500 truncate">
+                            {course.pages.length} pages • {formatDuration(getTotalDuration(course.pages))}
+                          </p>
+                        </div>
+                        <Badge
+                          className={
+                            course.isActive ? "bg-green-100 text-green-800 text-xs" : "bg-red-100 text-red-800 text-xs"
+                          }
+                        >
+                          {course.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                      </div>
+                    ))
+                  )}
                 </div>
               </CardContent>
             </Card>
           </div>
         </div>
 
-        {/* Course Description */}
-        <Card className="bg-white border border-gray-200">
-          <CardContent className="p-3 sm:p-6">
-            <div className="flex items-start space-x-3 sm:space-x-4">
-              <div className="w-10 sm:w-12 h-10 sm:h-12 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
-                <User className="h-5 sm:h-6 w-5 sm:w-6 text-gray-600" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-2">
-                  <h4 className="font-semibold text-gray-900">Zero Koin Course</h4>
-                  <span className="text-sm text-gray-500">12 Minutes ago</span>
+        {/* Selected Course Details */}
+        {selectedCourse && (
+          <Card className="bg-white border border-gray-200">
+            <CardContent className="p-3 sm:p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-start space-x-3 sm:space-x-4">
+                  <div className="w-10 sm:w-12 h-10 sm:h-12 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
+                    <User className="h-5 sm:h-6 w-5 sm:w-6 text-gray-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-2">
+                      <h4 className="font-semibold text-gray-900">{selectedCourse.courseName}</h4>
+                      <span className="text-sm text-gray-500">
+                        Created: {new Date(selectedCourse.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4 mb-3 text-sm text-gray-600">
+                      <div className="flex items-center gap-1">
+                        <FileText className="h-4 w-4" />
+                        {selectedCourse.pages.length} pages
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-4 w-4" />
+                        {formatDuration(getTotalDuration(selectedCourse.pages))}
+                      </div>
+                      <Badge
+                        className={selectedCourse.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}
+                      >
+                        {selectedCourse.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
+                  </div>
                 </div>
-                <p className="text-gray-700 text-sm leading-relaxed">
-                  Zero Koin mining is the process of validating transactions and securing the Zero Koin blockchain by
-                  solving complex mathematical problems, typically using computing power to earn rewards in Zero Koin.
-                </p>
+                {hasPermission("edit") && (
+                  <Button
+                    onClick={() => handleEditCourse(selectedCourse)}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit Course
+                  </Button>
+                )}
               </div>
-            </div>
-          </CardContent>
-        </Card>
+
+              {/* Course Pages */}
+              <div className="space-y-4">
+                <h5 className="font-medium text-gray-900">Course Content:</h5>
+                {selectedCourse.pages.map((page, index) => (
+                  <div key={index} className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h6 className="font-medium text-gray-900">
+                        Page {index + 1}: {page.title}
+                      </h6>
+                      <span className="text-sm text-gray-500 flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {page.time} minutes
+                      </span>
+                    </div>
+                    <p className="text-gray-700 text-sm leading-relaxed">{page.content}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     )
   }
@@ -471,34 +728,105 @@ export default function CourseManagementPage() {
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Zerokoin Course</h1>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Course Analytics</h1>
+            <p className="text-sm text-gray-600 mt-1">{roleDisplayName} • View course statistics and insights</p>
+          </div>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+            {hasPermission("create") && (
+              <Button
+                onClick={handleUploadCourse}
+                className="bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create Course
+              </Button>
+            )}
             <Button
-              onClick={handleUploadCourse}
-              className="bg-teal-600 hover:bg-teal-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium"
+              onClick={() => setCurrentView("main")}
+              className="bg-gray-600 hover:bg-gray-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium"
             >
-              Upload new Course
-            </Button>
-            <Button
-              onClick={handleViewAnalytics}
-              className="bg-teal-600 hover:bg-teal-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium"
-            >
-              View Course analytics
+              Back to Courses
             </Button>
           </div>
         </div>
 
-        {/* Course Analytics */}
-        <div className="space-y-4 sm:space-y-6">
-          <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Course Analytics</h2>
+        {/* Course Statistics */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 sm:gap-6">
+          <Card className="bg-white border border-gray-200">
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Total Courses</p>
+                  <p className="text-2xl font-bold text-gray-900">{courses.length}</p>
+                </div>
+                <div className="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center">
+                  <FileText className="h-6 w-6 text-teal-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-          {loading ? (
+          <Card className="bg-white border border-gray-200">
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Active Courses</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {courses.filter((course) => course.isActive).length}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                  <Badge className="bg-green-600 text-white">✓</Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white border border-gray-200">
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Total Pages</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {courses.reduce((total, course) => total + course.pages.length, 0)}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <FileText className="h-6 w-6 text-purple-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white border border-gray-200">
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Total Duration</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {formatDuration(courses.reduce((total, course) => total + getTotalDuration(course.pages), 0))}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Clock className="h-6 w-6 text-blue-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Course Analytics Chart */}
+        <div className="space-y-4 sm:space-y-6">
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Course Distribution</h2>
+
+          {coursesLoading ? (
             <div className="flex justify-center items-center h-64">
               <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
             </div>
-          ) : error ? (
+          ) : coursesError ? (
             <div className="text-center text-red-600 p-4">
-              <p>Error loading analytics: {error}</p>
+              <p>Error loading analytics: {coursesError}</p>
             </div>
           ) : (
             <Card className="bg-white border border-gray-200 max-w-lg mx-auto">
@@ -524,7 +852,7 @@ export default function CourseManagementPage() {
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="text-center">
                       <h3 className="text-sm font-medium text-gray-600">Course Summary</h3>
-                      <p className="text-xs text-gray-500 mt-1">Total Users: {users.length}</p>
+                      <p className="text-xs text-gray-500 mt-1">Total: {courses.length} courses</p>
                     </div>
                   </div>
                 </div>
@@ -533,10 +861,7 @@ export default function CourseManagementPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-4 sm:mt-6">
                   {analyticsData.map((item, index) => (
                     <div key={index} className="flex items-center space-x-2">
-                      <div
-                        className={`w-3 h-3 rounded-full flex-shrink-0`}
-                        style={{ backgroundColor: item.color }}
-                      ></div>
+                      <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }}></div>
                       <div className="text-xs min-w-0">
                         <div className="font-medium text-gray-900 truncate">{item.name}</div>
                         <div className="text-white bg-gray-800 px-1 rounded text-xs inline-block">{item.value}%</div>
@@ -552,6 +877,3 @@ export default function CourseManagementPage() {
     )
   }
 }
-
-
-
