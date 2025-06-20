@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import LoginSignup from './LoginSignUp/page';
+import DashboardPage from '@/components/ui/dashboardPage';
 
 export default function page() {
   const [checkingAuth, setCheckingAuth] = useState(true); // loading flag
@@ -29,8 +29,8 @@ export default function page() {
   if (checkingAuth) return null; // Avoid flicker while checking
 
   return (
-    <div className="">
-      <LoginSignup />
+    <div className="p-4">
+      <DashboardPage/>
     </div>
   );
 }

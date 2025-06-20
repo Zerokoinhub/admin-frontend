@@ -9,7 +9,7 @@ export default function Header({ onMenuClick, onNotificationClick, notificationC
 
   const getHeaderTitle = () => {
     switch (pathname) {
-      case "/":
+      case "/dashboard":
         return "Dashboard";
       case "/rewards-system":
         return "Rewards System";

@@ -26,8 +26,15 @@ export default function DashboardPage() {
   });
 
   const [users, setUsers] = useState([]);
+  const [userName, setUserName] = useState("");
 
   useEffect(() => {
+    // Load user name from localStorage
+    const user = JSON.parse(localStorage.getItem("user"));
+    //console.log(user);
+    setUserName(user.username);
+
+    // Load dashboard data
     async function loadDashboardData() {
       try {
         const response = await userAPI.getUsers(1, 100);
@@ -52,7 +59,6 @@ export default function DashboardPage() {
         setUsers(usersData);
       } catch (error) {
         console.error("Failed to load dashboard stats:", error);
-      } finally {
       }
     }
 
@@ -99,10 +105,9 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-
       <main className="flex-1 bg-gray-50 p-4 flex flex-col gap-4">
         <h2 className="text-xl font-semibold text-gray-800">
-          Hey <strong>Abdul Salam</strong> 👋
+          Hey <strong>{userName || "User"}</strong> 👋
         </h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">

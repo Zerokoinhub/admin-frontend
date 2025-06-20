@@ -36,9 +36,12 @@ const Page = () => {
     async function loadUsers() {
       try {
         const res = await userAPI.getUsers(1, 100);
-        const userList = res.data.users || [];
+        const allUsers = res.data.users || [];
 
-        setUsers(userList);
+        // ✅ Only keep users with role "user"
+        const userList = allUsers.filter((user) => user.role === "user");
+
+        setUsers(userList); // only "user" role users are stored
 
         const calculated = userHelpers.calculateStats(userList);
         setStats({
@@ -72,7 +75,6 @@ const Page = () => {
   return (
     <div className="space-y-4">
       {loading && <FullScreenLoader />} {/* ✅ loader show while fetching */}
-
       {/* Header */}
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold">User Management</h2>
@@ -83,33 +85,46 @@ const Page = () => {
           {showTable ? "View Status" : "View All Users"}
         </Button>
       </div>
-
       {/* Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <DashboardStatCard icon={User} label="Total Users" value={stats.totalUsers.toString()} />
-        <DashboardStatCard icon={Wallet} label="Wallet Connected" value={stats.usersWithWallets.toString()} />
-        <DashboardStatCard icon={Coins} label="Total Coin Earned" value={stats.totalBalance.toString()} />
+        <DashboardStatCard
+          icon={User}
+          label="Total Users"
+          value={stats.totalUsers.toString()}
+        />
+        <DashboardStatCard
+          icon={Wallet}
+          label="Wallet Connected"
+          value={stats.usersWithWallets.toString()}
+        />
+        <DashboardStatCard
+          icon={Coins}
+          label="Total Coin Earned"
+          value={stats.totalBalance.toString()}
+        />
       </div>
-
       {/* Data Table or Chart */}
       {showTable ? (
         <DataTable
-          data={users.map((user) => ({
-            name: user.name || "Unnamed",
-            email: user.email,
-            country: "Pakistan",
-            wallet:
-              user.walletAddresses?.metamask ||
-              user.walletAddresses?.trustWallet ||
-              "Not Connected",
-            referral: user.referredBy || "None",
-            coins: user.balance || 0,
-            status:
-              user.walletAddresses?.metamask || user.walletAddresses?.trustWallet
-                ? "Connected"
-                : "Not Connected",
-            role: user.role,
-          }))}
+          data={users
+            .filter((user) => user.role === "user") // ✅ Only include users with role 'user'
+            .map((user) => ({
+              name: user.name || "Unnamed",
+              email: user.email,
+              country: "Pakistan",
+              wallet:
+                user.walletAddresses?.metamask ||
+                user.walletAddresses?.trustWallet ||
+                "Not Connected",
+              referral: user.referredBy || "None",
+              coins: user.balance || 0,
+              status:
+                user.walletAddresses?.metamask ||
+                user.walletAddresses?.trustWallet
+                  ? "Connected"
+                  : "Not Connected",
+              role: user.role,
+            }))}
           onView={(user) => {
             setSelectedUser(user);
             setOpen(true);
@@ -141,9 +156,12 @@ const Page = () => {
           </CardContent>
         </Card>
       )}
-
       {/* Modal */}
-      <UserModal user={selectedUser} open={open} onClose={() => setOpen(false)} />
+      <UserModal
+        user={selectedUser}
+        open={open}
+        onClose={() => setOpen(false)}
+      />
     </div>
   );
 };

@@ -118,3 +118,11 @@
     @apply bg-background text-foreground;
   }
 }
+/* globals.css or your main stylesheet */
+.clip-triangle-up {
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+}
+
+.clip-triangle-down {
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}

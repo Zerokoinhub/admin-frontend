@@ -1,4 +1,5 @@
 'use client'
+import { LogOut } from 'lucide-react'
 
 import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
@@ -64,7 +65,7 @@ function SidebarContent({ onClose }) {
       <nav>
         <ul className="space-y-2 px-4">
           <li>
-            <MenuButton label="Dashboard" Icon={LayoutDashboard} path="/" onClick={onClose} />
+            <MenuButton label="Dashboard" Icon={LayoutDashboard} path="/dashboard" onClick={onClose} />
           </li>
           <li>
             <MenuButton label="User Management" Icon={Users} path="/user-management" onClick={onClose} />
@@ -89,6 +90,19 @@ function SidebarContent({ onClose }) {
           </li>
         </ul>
       </nav>
+        <div className="mt-auto px-4">
+    <button
+      onClick={() => {
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+        window.location.href = '/' // or use router.push('/')
+      }}
+      className="flex items-center w-full gap-3 px-4 py-2 text-red-600 hover:bg-red-50 rounded-md mt-6 transition"
+    >
+      <LogOut className="w-5 h-5" />
+      <span className="text-sm font-medium">Sign out</span>
+    </button>
+  </div>
     </>
   );
 }
