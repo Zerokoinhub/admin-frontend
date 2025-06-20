@@ -25,7 +25,7 @@ const adminData = [
   { email: "anas24@gmail.com", role: "Super Admin", id: 9 },
 ]
 
-export default function SettingPage() {
+export default function SettingPage({ userRole = "super_admin" }) {
   const [currentView, setCurrentView] = useState("main")
   const [showExpiryDropdown, setShowExpiryDropdown] = useState(false)
   const [selectedExpiry, setSelectedExpiry] = useState("02:00")
@@ -58,9 +58,9 @@ export default function SettingPage() {
 
     const userStats = userHelpers.calculateStats(users)
     return {
-      learningRewards: users.length, // Total users as learning rewards
+      learningRewards: users.length,
       referralsRewards: userStats.totalReferrals,
-      adBaseRewards: Math.floor(users.length * 0.3), // Mock ad-based rewards
+      adBaseRewards: Math.floor(users.length * 0.3),
     }
   }, [users])
 
@@ -93,7 +93,9 @@ export default function SettingPage() {
   }, [currentView])
 
   const handleAddNewAdmin = () => {
-    setCurrentView("permissions")
+    if (userRole === "super_admin") {
+      setCurrentView("permissions")
+    }
   }
 
   const handleViewControl = () => {
@@ -106,25 +108,45 @@ export default function SettingPage() {
   }
 
   const handleCreateNotification = () => {
-    setNotificationView("create")
+    if (userRole === "super_admin" || userRole === "editor") {
+      setNotificationView("create")
+    }
   }
 
   const handleNext = () => {
-    setUploadedImage(true)
-    setNotificationView("send")
+    if (userRole === "super_admin" || userRole === "editor") {
+      setUploadedImage(true)
+      setNotificationView("send")
+    }
   }
 
   const handleSendNotification = () => {
-    setShowSuccessModal(true)
-    setTimeout(() => {
-      setShowSuccessModal(false)
-      setNotificationView("empty")
-      setShowNotificationList(true)
-    }, 3000)
+    if (userRole === "super_admin" || userRole === "editor") {
+      setShowSuccessModal(true)
+      setTimeout(() => {
+        setShowSuccessModal(false)
+        setNotificationView("empty")
+        setShowNotificationList(true)
+      }, 3000)
+    }
   }
 
   const handleUploadImage = () => {
-    setUploadedImage(true)
+    if (userRole === "super_admin" || userRole === "editor") {
+      setUploadedImage(true)
+    }
+  }
+
+  const handleRemoveAdmin = (adminId) => {
+    if (userRole === "super_admin") {
+      console.log("Removing admin:", adminId)
+    }
+  }
+
+  const handleEditAdmin = (adminId) => {
+    if (userRole === "super_admin") {
+      console.log("Editing admin:", adminId)
+    }
   }
 
   if (loading) {
@@ -159,12 +181,15 @@ export default function SettingPage() {
             <div className="text-center space-y-2">
               <h2 className="text-lg sm:text-xl font-medium text-gray-900">You have no Notification Yet!</h2>
             </div>
-            <Button
-              onClick={handleCreateNotification}
-              className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-md text-sm font-medium"
-            >
-              Create Notification
-            </Button>
+            {/* Only Super Admin and Editor can create notifications */}
+            {(userRole === "super_admin" || userRole === "editor") && (
+              <Button
+                onClick={handleCreateNotification}
+                className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-md text-sm font-medium"
+              >
+                Create Notification
+              </Button>
+            )}
           </div>
 
           {/* Notification Panel */}
@@ -285,7 +310,9 @@ export default function SettingPage() {
             {/* Upload Image Area */}
             <div
               onClick={handleUploadImage}
-              className="border-2 border-dashed border-gray-300 rounded-lg p-8 sm:p-12 text-center cursor-pointer hover:border-gray-400 transition-colors"
+              className={`border-2 border-dashed border-gray-300 rounded-lg p-8 sm:p-12 text-center transition-colors ${
+                userRole === "viewer" ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:border-gray-400"
+              }`}
             >
               <div className="space-y-4">
                 <div className="w-12 h-12 mx-auto bg-gray-100 rounded-lg flex items-center justify-center">
@@ -308,12 +335,14 @@ export default function SettingPage() {
 
             {/* Next Button */}
             <div className="flex justify-end">
-              <Button
-                onClick={handleNext}
-                className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-md text-sm font-medium"
-              >
-                Next
-              </Button>
+              {(userRole === "super_admin" || userRole === "editor") && (
+                <Button
+                  onClick={handleNext}
+                  className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-md text-sm font-medium"
+                >
+                  Next
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -331,12 +360,13 @@ export default function SettingPage() {
               <Button
                 onClick={() => setShowSendToDropdown(!showSendToDropdown)}
                 className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2"
+                disabled={userRole === "viewer"}
               >
                 <Bell className="h-4 w-4" />
                 {selectedSendTo}
                 <ChevronDown className="h-4 w-4" />
               </Button>
-              {showSendToDropdown && (
+              {showSendToDropdown && userRole !== "viewer" && (
                 <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10">
                   <div className="py-1">
                     {["New User", "Old User", "Top rated user"].map((option) => (
@@ -382,12 +412,14 @@ export default function SettingPage() {
 
             {/* Send Button */}
             <div className="flex justify-end">
-              <Button
-                onClick={handleSendNotification}
-                className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-md text-sm font-medium"
-              >
-                Send Notification
-              </Button>
+              {(userRole === "super_admin" || userRole === "editor") && (
+                <Button
+                  onClick={handleSendNotification}
+                  className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-md text-sm font-medium"
+                >
+                  Send Notification
+                </Button>
+              )}
             </div>
           </div>
 
@@ -452,7 +484,10 @@ export default function SettingPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Learning Rewards</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.learningRewards}</p>
+                  {/* Only Super Admin can see numbers */}
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
+                    {userRole === "super_admin" ? stats.learningRewards : "***"}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -480,43 +515,48 @@ export default function SettingPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Ad Base Rewards</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.adBaseRewards}</p>
+                  {/* Only Super Admin can see numbers */}
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
+                    {userRole === "super_admin" ? stats.adBaseRewards : "***"}
+                  </p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Expiry Dropdown */}
-        <div className="flex justify-center sm:justify-end">
-          <div className="relative">
-            <Button
-              onClick={() => setShowExpiryDropdown(!showExpiryDropdown)}
-              className="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1 h-8"
-            >
-              Expiry {selectedExpiry}
-              <ChevronDown className="h-3 w-3" />
-            </Button>
-            {showExpiryDropdown && (
-              <div className="absolute right-0 mt-1 w-24 bg-white border border-gray-200 rounded shadow-lg z-10">
-                <div className="py-1">
-                  {["1 Day", "2 Day", "3 Day", "4 Day", "5 Day"].map((option) => (
-                    <button
-                      key={option}
-                      onClick={() => {
-                        setSelectedExpiry(option.split(" ")[0] + ":00")
-                        setShowExpiryDropdown(false)
-                      }}
-                      className="block w-full text-left px-2 py-1 text-xs text-gray-700 hover:bg-gray-100"
-                    >
-                      {option}
-                    </button>
-                  ))}
+        {/* Expiry Dropdown - Only Super Admin and Editor */}
+        {(userRole === "super_admin" || userRole === "editor") && (
+          <div className="flex justify-center sm:justify-end">
+            <div className="relative">
+              <Button
+                onClick={() => setShowExpiryDropdown(!showExpiryDropdown)}
+                className="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1 h-8"
+              >
+                Expiry {selectedExpiry}
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+              {showExpiryDropdown && (
+                <div className="absolute right-0 mt-1 w-24 bg-white border border-gray-200 rounded shadow-lg z-10">
+                  <div className="py-1">
+                    {["1 Day", "2 Day", "3 Day", "4 Day", "5 Day"].map((option) => (
+                      <button
+                        key={option}
+                        onClick={() => {
+                          setSelectedExpiry(option.split(" ")[0] + ":00")
+                          setShowExpiryDropdown(false)
+                        }}
+                        className="block w-full text-left px-2 py-1 text-xs text-gray-700 hover:bg-gray-100"
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Navigation Buttons */}
         <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 pt-4 sm:pt-8">
@@ -587,12 +627,15 @@ export default function SettingPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Maintained control</h1>
-          <Button
-            onClick={handleAddNewAdmin}
-            className="bg-teal-600 hover:bg-teal-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium w-full sm:w-auto"
-          >
-            Add New Admin
-          </Button>
+          {/* Only Super Admin can add new admin */}
+          {userRole === "super_admin" && (
+            <Button
+              onClick={handleAddNewAdmin}
+              className="bg-teal-600 hover:bg-teal-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium w-full sm:w-auto"
+            >
+              Add New Admin
+            </Button>
+          )}
         </div>
 
         {/* Stats Cards */}
@@ -605,7 +648,10 @@ export default function SettingPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Learning Rewards</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.learningRewards}</p>
+                  {/* Only Super Admin can see numbers */}
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
+                    {userRole === "super_admin" ? stats.learningRewards : "***"}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -633,7 +679,10 @@ export default function SettingPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Ad Base Rewards</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.adBaseRewards}</p>
+                  {/* Only Super Admin can see numbers */}
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
+                    {userRole === "super_admin" ? stats.adBaseRewards : "***"}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -650,7 +699,10 @@ export default function SettingPage() {
                   <TableRow className="border-b border-gray-200">
                     <TableHead className="font-semibold text-gray-700 py-3 min-w-[200px]">Admin Email</TableHead>
                     <TableHead className="font-semibold text-gray-700 py-3 min-w-[120px]">Role</TableHead>
-                    <TableHead className="font-semibold text-gray-700 py-3 min-w-[160px]">Action</TableHead>
+                    {/* Only Super Admin can see actions */}
+                    {userRole === "super_admin" && (
+                      <TableHead className="font-semibold text-gray-700 py-3 min-w-[160px]">Action</TableHead>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -658,24 +710,29 @@ export default function SettingPage() {
                     <TableRow key={admin.id} className="border-b border-gray-100 hover:bg-gray-50">
                       <TableCell className="py-3 text-gray-900 text-sm">{admin.email}</TableCell>
                       <TableCell className="py-3 text-gray-900 text-sm">{admin.role}</TableCell>
-                      <TableCell className="py-3">
-                        <div className="flex flex-col sm:flex-row gap-2">
-                          <Button
-                            size="sm"
-                            className="bg-teal-600 hover:bg-teal-700 text-white px-2 py-1 text-xs flex items-center gap-1 justify-center"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                            <span className="hidden sm:inline">Remove</span>
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="bg-teal-600 hover:bg-teal-700 text-white px-2 py-1 text-xs flex items-center gap-1 justify-center"
-                          >
-                            <Edit3 className="h-3 w-3" />
-                            <span className="hidden sm:inline">Edit</span>
-                          </Button>
-                        </div>
-                      </TableCell>
+                      {/* Only Super Admin can see actions */}
+                      {userRole === "super_admin" && (
+                        <TableCell className="py-3">
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => handleRemoveAdmin(admin.id)}
+                              className="bg-teal-600 hover:bg-teal-700 text-white px-2 py-1 text-xs flex items-center gap-1 justify-center"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              <span className="hidden sm:inline">Remove</span>
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => handleEditAdmin(admin.id)}
+                              className="bg-teal-600 hover:bg-teal-700 text-white px-2 py-1 text-xs flex items-center gap-1 justify-center"
+                            >
+                              <Edit3 className="h-3 w-3" />
+                              <span className="hidden sm:inline">Edit</span>
+                            </Button>
+                          </div>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -687,8 +744,20 @@ export default function SettingPage() {
     )
   }
 
-  // Permissions new Admin View
+  // Permissions new Admin View - Super Admin Only
   if (currentView === "permissions") {
+    if (userRole !== "super_admin") {
+      return (
+        <div className="p-6 text-center">
+          <h2 className="text-xl font-semibold text-red-600">Access Denied</h2>
+          <p className="text-gray-600 mt-2">You don't have permission to assign permissions.</p>
+          <Button onClick={() => setCurrentView("control")} className="mt-4">
+            Go Back
+          </Button>
+        </div>
+      )
+    }
+
     return (
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
         {/* Header */}
@@ -778,6 +847,7 @@ export default function SettingPage() {
     )
   }
 }
+
 
 
 

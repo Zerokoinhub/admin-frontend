@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -15,6 +15,13 @@ import { userHelpers } from "@/lib/api"
 export default function RewardsSystemPage() {
   const [currentView, setCurrentView] = useState("distribution")
   const [selectedUser, setSelectedUser] = useState(null)
+  const [userRole, setUserRole] = useState("viewer")
+
+  // Fetch user role from localStorage
+  useEffect(() => {
+    const role = localStorage.getItem("userRole") || "viewer"
+    setUserRole(role)
+  }, [])
 
   // Fetch users data
   const { users, loading, error, pagination } = useUsers(1, 100)
@@ -54,7 +61,7 @@ export default function RewardsSystemPage() {
     return users.slice(0, 7).map((user, index) => ({
       id: user._id,
       name: user.name || "Unknown User",
-      referrals: Math.floor(Math.random() * 50) + 10, // Mock referral count
+      referrals: Math.floor(Math.random() * 50) + 10,
       fraudRisk: Math.random() > 0.5 ? "Low" : "Medium",
       email: user.email,
       balance: user.balance || 0,
@@ -87,8 +94,8 @@ export default function RewardsSystemPage() {
     const userStats = userHelpers.calculateStats(users)
     return {
       trackReferrals: userStats.totalReferrals,
-      dailyReports: users.length * 10, // Mock daily reports
-      fraudDetection: Math.floor(users.length * 0.1), // Mock fraud detection
+      dailyReports: users.length * 10,
+      fraudDetection: Math.floor(users.length * 0.1),
     }
   }, [users])
 
@@ -172,13 +179,31 @@ export default function RewardsSystemPage() {
                   <Label htmlFor="name" className="text-sm font-medium text-gray-700">
                     Name
                   </Label>
-                  <Input id="name" value={user.name} readOnly className="bg-gray-50 border-gray-200 text-gray-900" />
+                  <Input
+                    id="name"
+                    value={user.name}
+                    readOnly={userRole === "viewer"}
+                    className={
+                      userRole === "viewer"
+                        ? "bg-gray-50 border-gray-200 text-gray-900"
+                        : "border-gray-200 text-gray-900"
+                    }
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="email" className="text-sm font-medium text-gray-700">
                     Email
                   </Label>
-                  <Input id="email" value={user.email} readOnly className="bg-gray-50 border-gray-200 text-gray-900" />
+                  <Input
+                    id="email"
+                    value={user.email}
+                    readOnly={userRole === "viewer"}
+                    className={
+                      userRole === "viewer"
+                        ? "bg-gray-50 border-gray-200 text-gray-900"
+                        : "border-gray-200 text-gray-900"
+                    }
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="wallet" className="text-sm font-medium text-gray-700">
@@ -187,21 +212,28 @@ export default function RewardsSystemPage() {
                   <Input
                     id="wallet"
                     value={user.walletAddress}
-                    readOnly
-                    className="bg-gray-50 border-gray-200 text-gray-900 text-xs font-mono"
+                    readOnly={userRole === "viewer"}
+                    className={
+                      userRole === "viewer"
+                        ? "bg-gray-50 border-gray-200 text-gray-900 text-xs font-mono"
+                        : "border-gray-200 text-gray-900 text-xs font-mono"
+                    }
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="coins" className="text-sm font-medium text-gray-700">
-                    Coins Earned
-                  </Label>
-                  <Input
-                    id="coins"
-                    value={`${user.balance}$`}
-                    readOnly
-                    className="bg-gray-50 border-gray-200 text-gray-900"
-                  />
-                </div>
+                {/* Only Super Admin can see earnings */}
+                {userRole === "super_admin" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="coins" className="text-sm font-medium text-gray-700">
+                      Coins Earned
+                    </Label>
+                    <Input
+                      id="coins"
+                      value={`${user.balance}$`}
+                      readOnly
+                      className="bg-gray-50 border-gray-200 text-gray-900"
+                    />
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -243,7 +275,10 @@ export default function RewardsSystemPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Daily Reports</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.dailyReports}</p>
+                  {/* Only Super Admin can see numbers */}
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
+                    {userRole === "super_admin" ? stats.dailyReports : "***"}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -273,7 +308,7 @@ export default function RewardsSystemPage() {
                   <TableRow className="border-b border-gray-200">
                     <TableHead className="font-semibold text-gray-700 py-4 px-3 sm:px-6 min-w-[100px]">Date</TableHead>
                     <TableHead className="font-semibold text-gray-700 py-4 px-3 sm:px-6 min-w-[200px]">
-                      Referral email
+                      Referrals Email
                     </TableHead>
                     <TableHead className="font-semibold text-gray-700 py-4 px-3 sm:px-6 min-w-[120px]">UID</TableHead>
                   </TableRow>
@@ -373,6 +408,7 @@ export default function RewardsSystemPage() {
                         size="sm"
                         onClick={() => handleViewUser(user)}
                         className="bg-teal-600 hover:bg-teal-700 text-white px-3 sm:px-4 py-1 text-sm w-full sm:w-auto"
+                        disabled={userRole === "viewer"}
                       >
                         View
                       </Button>
@@ -387,5 +423,7 @@ export default function RewardsSystemPage() {
     </div>
   )
 }
+
+
 
 
