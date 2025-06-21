@@ -14,20 +14,33 @@ import {
   Shield,
   EyeOff,
   TrendingUp,
+  TrendingDown,
   Activity,
   DollarSign,
+  UserCheck,
+  UserX,
+  Crown,
 } from "lucide-react"
 import { userAPI, userHelpers } from "@/lib/api"
 
 export default function DashboardPage() {
   const [dashboardStats, setDashboardStats] = useState({
     totalUsers: 0,
+    activeUsers: 0,
+    inactiveUsers: 0,
     totalReferrals: 0,
-    calculatorUser: 0,
+    calculatorUsers: 0,
     totalRevenue: 0,
     totalCoinDistribution: 0,
-    viewRewards: 0,
     usersWithWallets: 0,
+    adminUsers: 0,
+    regularUsers: 0,
+    growthMetrics: {
+      newUsersLast30Days: 0,
+      newUsersLast7Days: 0,
+      growthRate30Days: 0,
+      growthRate7Days: 0,
+    },
   })
 
   const [users, setUsers] = useState([])
@@ -36,6 +49,7 @@ export default function DashboardPage() {
   const [userRole, setUserRole] = useState("")
   const [roleDisplayName, setRoleDisplayName] = useState("")
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   // Get user data from localStorage
   const getUserData = () => {
@@ -63,19 +77,13 @@ export default function DashboardPage() {
     }
   }
 
-  // Get auth token from localStorage
-  const getAuthToken = () => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("token")
-    }
-    return null
-  }
-
   // Get role display name
   const getRoleDisplayName = (role) => {
     switch (role) {
       case "superadmin":
         return "Super Admin"
+      case "admin":
+        return "Admin"
       case "editor":
         return "Editor"
       case "viewer":
@@ -89,6 +97,7 @@ export default function DashboardPage() {
   const getRoleColorScheme = (role) => {
     switch (role) {
       case "superadmin":
+      case "admin":
         return {
           bg: "bg-gradient-to-r from-purple-50 to-indigo-50",
           badge: "bg-purple-100 text-purple-800 border-purple-200",
@@ -117,13 +126,14 @@ export default function DashboardPage() {
 
   // Check if user has permission to view revenue data
   const canViewRevenue = (role) => {
-    return role === "superadmin"
+    return role === "superadmin" || role === "admin"
   }
 
   // Get permissions description
   const getPermissionsDescription = (role) => {
     switch (role) {
       case "superadmin":
+      case "admin":
         return "Full Dashboard Access"
       case "editor":
         return "Limited Access (No Revenue Data)"
@@ -149,46 +159,78 @@ export default function DashboardPage() {
     }).format(amount)
   }
 
-  useEffect(() => {
-    // Load user data from localStorage
-    const userData = getUserData()
-    const token = getAuthToken()
+  // Format percentage
+  const formatPercentage = (num) => {
+    return `${num >= 0 ? "+" : ""}${num.toFixed(1)}%`
+  }
 
+  useEffect(() => {
+    const userData = getUserData()
     setUserName(userData.username)
     setUserEmail(userData.email)
     setUserRole(userData.role)
     setRoleDisplayName(getRoleDisplayName(userData.role))
 
-    // Debug log to verify data extraction
-    console.log("User Data from localStorage:", {
-      userData,
-      token: token ? "Present" : "Missing",
-      role: userData.role,
-    })
-
-    // Load dashboard data
     async function loadDashboardData() {
       try {
         setIsLoading(true)
-        const response = await userAPI.getUsers(1, 100)
-        const usersData = response.data.users || []
+        setError(null)
 
+        // Fetch all users with a higher limit to get comprehensive data
+        const usersResponse = await userAPI.getUsers(1, 1000)
+        const usersData = usersResponse.data?.users || []
+
+        // Calculate comprehensive stats
         const stats = userHelpers.calculateStats(usersData)
-        const totalRevenue = usersData.reduce((sum, user) => sum + (user.recentAmount || 0), 0)
+        const growthMetrics = userHelpers.calculateGrowthMetrics(usersData)
+
+        // Try to get additional data from specific endpoints
+        let calculatorUsersCount = stats.calculatorUsers
+        let totalWalletsCount = stats.usersWithWallets
+        let totalReferralsCount = stats.totalReferrals
+
+        try {
+          const [calculatorRes, walletsRes, referralsRes] = await Promise.allSettled([
+            userAPI.getCalculatorUsers(),
+            userAPI.getTotalWallets(),
+            userAPI.getTotalReferrals(),
+          ])
+
+          if (calculatorRes.status === "fulfilled" && calculatorRes.value?.data) {
+            calculatorUsersCount = Array.isArray(calculatorRes.value.data)
+              ? calculatorRes.value.data.length
+              : calculatorRes.value.data.count || calculatorUsersCount
+          }
+
+          if (walletsRes.status === "fulfilled" && walletsRes.value?.data) {
+            totalWalletsCount = walletsRes.value.data.count || walletsRes.value.data || totalWalletsCount
+          }
+
+          if (referralsRes.status === "fulfilled" && referralsRes.value?.data) {
+            totalReferralsCount = referralsRes.value.data.count || referralsRes.value.data || totalReferralsCount
+          }
+        } catch (apiError) {
+          console.warn("Some API endpoints failed, using calculated values:", apiError)
+        }
 
         setDashboardStats({
           totalUsers: stats.totalUsers,
-          totalReferrals: stats.totalReferrals,
-          calculatorUser: 0,
-          totalRevenue,
+          activeUsers: stats.activeUsers,
+          inactiveUsers: stats.inactiveUsers,
+          totalReferrals: totalReferralsCount,
+          calculatorUsers: calculatorUsersCount,
+          totalRevenue: stats.totalRevenue,
           totalCoinDistribution: stats.totalBalance,
-          viewRewards: 0,
-          usersWithWallets: stats.usersWithWallets,
+          usersWithWallets: totalWalletsCount,
+          adminUsers: stats.adminUsers,
+          regularUsers: stats.regularUsers,
+          growthMetrics,
         })
 
         setUsers(usersData)
       } catch (error) {
         console.error("Failed to load dashboard stats:", error)
+        setError(error.message)
       } finally {
         setIsLoading(false)
       }
@@ -204,54 +246,87 @@ export default function DashboardPage() {
       label: "Total Users",
       value: dashboardStats.totalUsers,
       icon: <Users className="h-5 w-5" />,
-      allowedRoles: ["superadmin", "editor", "viewer"],
+      allowedRoles: ["superadmin", "admin", "editor", "viewer"],
       color: "from-blue-500 to-blue-600",
       bgColor: "bg-blue-50",
       textColor: "text-blue-600",
-      change: "+12%",
-      changeType: "positive",
+      change: formatPercentage(dashboardStats.growthMetrics.growthRate30Days),
+      changeType: dashboardStats.growthMetrics.growthRate30Days >= 0 ? "positive" : "negative",
+    },
+    {
+      label: "Active Users",
+      value: dashboardStats.activeUsers,
+      icon: <UserCheck className="h-5 w-5" />,
+      allowedRoles: ["superadmin", "admin", "editor", "viewer"],
+      color: "from-green-500 to-green-600",
+      bgColor: "bg-green-50",
+      textColor: "text-green-600",
+      change: `${dashboardStats.totalUsers > 0 ? ((dashboardStats.activeUsers / dashboardStats.totalUsers) * 100).toFixed(1) : 0}%`,
+      changeType: "neutral",
     },
     {
       label: "Users with Wallets",
       value: dashboardStats.usersWithWallets,
       icon: <Wallet className="h-5 w-5" />,
-      allowedRoles: ["superadmin", "editor", "viewer"],
+      allowedRoles: ["superadmin", "admin", "editor", "viewer"],
       color: "from-emerald-500 to-emerald-600",
       bgColor: "bg-emerald-50",
       textColor: "text-emerald-600",
-      change: "+8%",
-      changeType: "positive",
+      change: `${dashboardStats.totalUsers > 0 ? ((dashboardStats.usersWithWallets / dashboardStats.totalUsers) * 100).toFixed(1) : 0}%`,
+      changeType: "neutral",
     },
     {
       label: "Total Referrals",
       value: dashboardStats.totalReferrals,
       icon: <BadgePercent className="h-5 w-5" />,
-      allowedRoles: ["superadmin", "editor", "viewer"],
+      allowedRoles: ["superadmin", "admin", "editor", "viewer"],
       color: "from-purple-500 to-purple-600",
       bgColor: "bg-purple-50",
       textColor: "text-purple-600",
-      change: "+15%",
-      changeType: "positive",
+      change: `${dashboardStats.totalUsers > 0 ? ((dashboardStats.totalReferrals / dashboardStats.totalUsers) * 100).toFixed(1) : 0}%`,
+      changeType: "neutral",
     },
     {
       label: "Calculator Users",
-      value: dashboardStats.calculatorUser,
+      value: dashboardStats.calculatorUsers,
       icon: <Calculator className="h-5 w-5" />,
-      allowedRoles: ["superadmin", "editor", "viewer"],
+      allowedRoles: ["superadmin", "admin", "editor", "viewer"],
       color: "from-orange-500 to-orange-600",
       bgColor: "bg-orange-50",
       textColor: "text-orange-600",
-      change: "0%",
+      change: `${dashboardStats.totalUsers > 0 ? ((dashboardStats.calculatorUsers / dashboardStats.totalUsers) * 100).toFixed(1) : 0}%`,
       changeType: "neutral",
+    },
+    {
+      label: "Admin Users",
+      value: dashboardStats.adminUsers,
+      icon: <Crown className="h-5 w-5" />,
+      allowedRoles: ["superadmin", "admin"],
+      color: "from-indigo-500 to-indigo-600",
+      bgColor: "bg-indigo-50",
+      textColor: "text-indigo-600",
+      change: `${dashboardStats.totalUsers > 0 ? ((dashboardStats.adminUsers / dashboardStats.totalUsers) * 100).toFixed(1) : 0}%`,
+      changeType: "neutral",
+    },
+    {
+      label: "Inactive Users",
+      value: dashboardStats.inactiveUsers,
+      icon: <UserX className="h-5 w-5" />,
+      allowedRoles: ["superadmin", "admin", "editor"],
+      color: "from-red-500 to-red-600",
+      bgColor: "bg-red-50",
+      textColor: "text-red-600",
+      change: `${dashboardStats.totalUsers > 0 ? ((dashboardStats.inactiveUsers / dashboardStats.totalUsers) * 100).toFixed(1) : 0}%`,
+      changeType: dashboardStats.inactiveUsers > dashboardStats.activeUsers * 0.1 ? "negative" : "neutral",
     },
     {
       label: "Total Revenue",
       value: dashboardStats.totalRevenue,
       icon: <DollarSign className="h-5 w-5" />,
-      allowedRoles: ["superadmin"],
-      color: "from-red-500 to-red-600",
-      bgColor: "bg-red-50",
-      textColor: "text-red-600",
+      allowedRoles: ["superadmin", "admin"],
+      color: "from-yellow-500 to-yellow-600",
+      bgColor: "bg-yellow-50",
+      textColor: "text-yellow-600",
       change: "+23%",
       changeType: "positive",
       isRevenue: true,
@@ -260,7 +335,7 @@ export default function DashboardPage() {
       label: "Coin Distribution",
       value: dashboardStats.totalCoinDistribution,
       icon: <HandCoins className="h-5 w-5" />,
-      allowedRoles: ["superadmin", "editor", "viewer"],
+      allowedRoles: ["superadmin", "admin", "editor", "viewer"],
       color: "from-teal-500 to-teal-600",
       bgColor: "bg-teal-50",
       textColor: "text-teal-600",
@@ -285,6 +360,26 @@ export default function DashboardPage() {
     )
   }
 
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+            <Shield className="h-8 w-8 text-red-600" />
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900">Error Loading Dashboard</h2>
+          <p className="text-gray-600 max-w-md">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   // Show error state if no user data
   if (!userName || !userRole) {
     return (
@@ -297,9 +392,6 @@ export default function DashboardPage() {
           <p className="text-gray-600 max-w-md">
             Unable to load user data from localStorage. Please log in again to access the dashboard.
           </p>
-          <div className="text-sm text-gray-500 bg-gray-100 p-3 rounded-lg">
-            <strong>Debug Info:</strong> User: {userName || "Not found"}, Role: {userRole || "Not found"}
-          </div>
         </div>
       </div>
     )
@@ -336,6 +428,30 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
+
+          {/* Growth Metrics Summary */}
+          <div className="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white/60 rounded-lg p-3">
+              <p className="text-xs text-gray-600">New Users (7 days)</p>
+              <p className="text-lg font-semibold text-gray-900">{dashboardStats.growthMetrics.newUsersLast7Days}</p>
+            </div>
+            <div className="bg-white/60 rounded-lg p-3">
+              <p className="text-xs text-gray-600">New Users (30 days)</p>
+              <p className="text-lg font-semibold text-gray-900">{dashboardStats.growthMetrics.newUsersLast30Days}</p>
+            </div>
+            <div className="bg-white/60 rounded-lg p-3">
+              <p className="text-xs text-gray-600">Growth Rate (7d)</p>
+              <p className="text-lg font-semibold text-gray-900">
+                {formatPercentage(dashboardStats.growthMetrics.growthRate7Days)}
+              </p>
+            </div>
+            <div className="bg-white/60 rounded-lg p-3">
+              <p className="text-xs text-gray-600">Growth Rate (30d)</p>
+              <p className="text-lg font-semibold text-gray-900">
+                {formatPercentage(dashboardStats.growthMetrics.growthRate30Days)}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -350,8 +466,8 @@ export default function DashboardPage() {
               <div>
                 <h3 className="font-medium text-amber-900 mb-1">Limited Access Notice</h3>
                 <p className="text-sm text-amber-800">
-                  Revenue data and financial analytics are restricted to Super Admin users only. Contact your
-                  administrator if you need access to this information.
+                  Revenue data and financial analytics are restricted to Admin users only. Contact your administrator if
+                  you need access to this information.
                 </p>
               </div>
             </div>
@@ -359,7 +475,7 @@ export default function DashboardPage() {
         )}
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
           {filteredStats.map((item, index) => (
             <Card
               key={index}
@@ -392,6 +508,7 @@ export default function DashboardPage() {
                       }`}
                     >
                       {item.changeType === "positive" && <TrendingUp className="h-3 w-3" />}
+                      {item.changeType === "negative" && <TrendingDown className="h-3 w-3" />}
                       {item.change}
                     </div>
                   </div>
@@ -454,12 +571,12 @@ export default function DashboardPage() {
                 </div>
                 <h3 className="text-xl font-semibold text-gray-700 mb-3">Revenue Analytics</h3>
                 <p className="text-gray-500 mb-6 max-w-sm leading-relaxed">
-                  This section contains sensitive financial data and is only accessible to Super Admin users.
+                  This section contains sensitive financial data and is only accessible to Admin users.
                 </p>
                 <div className="space-y-3">
                   <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 px-4 py-2">
                     <Shield className="h-4 w-4 mr-2" />
-                    Super Admin Access Required
+                    Admin Access Required
                   </Badge>
                   <p className="text-xs text-gray-400">Contact your system administrator for access</p>
                 </div>

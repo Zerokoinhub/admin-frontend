@@ -56,7 +56,7 @@ function SidebarContent({ onClose }) {
     <>
       {/* Logo and nav */}
       <div className="flex items-center gap-2 text-xl px-9 font-semibold text-cyan-700 mb-6">
-        <Image src="/logo.png" alt="Zerokoin Logo" width={33} height={33} />
+        <Image src="/logo.svg" alt="Zerokoin Logo" width={33} height={33} />
         <span className="text-3xl">Zerokoin</span>
       </div>
 
