@@ -11,19 +11,8 @@ import { GraduationCap, Edit, Target, X, ChevronDown, Trash2, Edit3, Bell, Uploa
 import Image from "next/image"
 import { useUsers } from "../../hooks/useUsers"
 import { userHelpers } from "@/lib/api"
-
-// Admin data for the table - keeping this as static since it's admin-specific
-const adminData = [
-  { email: "anas24@gmail.com", role: "Super Admin", id: 1 },
-  { email: "anas24@gmail.com", role: "Super Admin", id: 2 },
-  { email: "anas24@gmail.com", role: "Super Admin", id: 3 },
-  { email: "anas24@gmail.com", role: "Super Admin", id: 4 },
-  { email: "anas24@gmail.com", role: "Super Admin", id: 5 },
-  { email: "anas24@gmail.com", role: "Super Admin", id: 6 },
-  { email: "anas24@gmail.com", role: "Super Admin", id: 7 },
-  { email: "anas24@gmail.com", role: "Super Admin", id: 8 },
-  { email: "anas24@gmail.com", role: "Super Admin", id: 9 },
-]
+import { useAdmins } from "../../hooks/useAdmins"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export default function SettingPage() {
   const [currentView, setCurrentView] = useState("main")
@@ -35,13 +24,50 @@ export default function SettingPage() {
   const [showSendToDropdown, setShowSendToDropdown] = useState(false)
   const [selectedSendTo, setSelectedSendTo] = useState("Send to")
   const [uploadedImage, setUploadedImage] = useState(false)
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [notificationView, setNotificationView] = useState("empty")
+  const [userRole, setUserRole] = useState("viewer") // Default to most restrictive role
   const [formData, setFormData] = useState({
     name: "Fayhan",
     email: "Menog",
     role: "Super Admin",
     time: "1 Month",
   })
+
+  // Get user role from localStorage
+  useEffect(() => {
+  const storedUser = localStorage.getItem("user");
+
+  if (storedUser) {
+    try {
+      const parsedUser = JSON.parse(storedUser);
+      console.log("the role:", parsedUser.role);
+      
+      if (parsedUser.role) {
+        setUserRole(parsedUser.role);
+      }
+    } catch (error) {
+      console.error("Failed to parse stored user:", error);
+    }
+  }
+}, []);
+
+
+  // Fetch admins data
+  const { admins, loading: adminsLoading, error: adminsError, addAdmin, editAdmin, removeAdmin } = useAdmins()
+  const [editingAdmin, setEditingAdmin] = useState(null)
+  const [showAddAdminModal, setShowAddAdminModal] = useState(false)
+  const [showEditAdminModal, setShowEditAdminModal] = useState(false)
+  const [adminFormData, setAdminFormData] = useState({
+    username: "", // Change from 'name' to 'username'
+    email: "",
+    role: "",
+    password: "",
+  })
+  const [showPassword, setShowPassword] = useState(false)
+  const [currentAdminPassword, setCurrentAdminPassword] = useState("")
 
   // Fetch users data for statistics
   const { users, loading, error } = useUsers(1, 100)
@@ -58,9 +84,9 @@ export default function SettingPage() {
 
     const userStats = userHelpers.calculateStats(users)
     return {
-      learningRewards: users.length, // Total users as learning rewards
+      learningRewards: users.length,
       referralsRewards: userStats.totalReferrals,
-      adBaseRewards: Math.floor(users.length * 0.3), // Mock ad-based rewards
+      adBaseRewards: Math.floor(users.length * 0.3),
     }
   }, [users])
 
@@ -93,7 +119,15 @@ export default function SettingPage() {
   }, [currentView])
 
   const handleAddNewAdmin = () => {
-    setCurrentView("permissions")
+    if (userRole === "superadmin") {
+      setAdminFormData({
+        username: "",
+        email: "",
+        role: "",
+        password: "",
+      })
+      setShowAddAdminModal(true)
+    }
   }
 
   const handleViewControl = () => {
@@ -101,30 +135,132 @@ export default function SettingPage() {
   }
 
   const handleNotificationSettings = () => {
-    setCurrentView("notifications")
-    setNotificationView("empty")
+    // Only Super Admin and Editor can access notification settings
+    if (userRole === "superadmin" || userRole === "editor") {
+      setCurrentView("notifications")
+      setNotificationView("empty")
+    }
   }
 
   const handleCreateNotification = () => {
-    setNotificationView("create")
+    if (userRole === "superadmin" || userRole === "editor") {
+      setNotificationView("create")
+    }
   }
 
   const handleNext = () => {
-    setUploadedImage(true)
-    setNotificationView("send")
+    if (userRole === "superadmin" || userRole === "editor") {
+      setUploadedImage(true)
+      setNotificationView("send")
+    }
   }
 
   const handleSendNotification = () => {
-    setShowSuccessModal(true)
-    setTimeout(() => {
-      setShowSuccessModal(false)
-      setNotificationView("empty")
-      setShowNotificationList(true)
-    }, 3000)
+    if (userRole === "superadmin" || userRole === "editor") {
+      setShowSuccessModal(true)
+      setTimeout(() => {
+        setShowSuccessModal(false)
+        setNotificationView("empty")
+        setShowNotificationList(true)
+      }, 3000)
+    }
   }
 
   const handleUploadImage = () => {
-    setUploadedImage(true)
+    if (userRole === "superadmin" || userRole === "editor") {
+      setUploadedImage(true)
+    }
+  }
+
+  // Handle add admin form submission
+  const handleAddAdminSubmit = async () => {
+    if (!adminFormData.username || !adminFormData.email || !adminFormData.role || !adminFormData.password) {
+      alert("Please fill in all fields")
+      return
+    }
+
+    try {
+      const result = await addAdmin(adminFormData)
+      if (result.success) {
+        alert("Admin added successfully!")
+        setShowAddAdminModal(false)
+        setAdminFormData({ username: "", email: "", role: "", password: "" })
+      } else {
+        alert(`Failed to add admin: ${result.error}`)
+      }
+    } catch (error) {
+      alert(`Error: ${error.message}`)
+    }
+  }
+
+  const handleEditAdmin = (admin) => {
+    // Only Super Admin can edit admins
+    if (userRole === "superadmin") {
+      setEditingAdmin(admin)
+      setAdminFormData({
+        username: admin.username || "",
+        email: admin.email || "",
+        role: admin.role || "",
+        password: "",
+      })
+      // For super admin, show the current password (you might want to fetch this from API)
+      setCurrentAdminPassword(admin.password || "")
+      setShowEditAdminModal(true)
+    } else {
+      alert("You don't have permission to edit admins.")
+    }
+  }
+
+  // Handle edit admin form submission
+  const handleEditAdminSubmit = async () => {
+  if (!adminFormData.username || !adminFormData.email || !adminFormData.role) {
+    alert("Please fill in required fields");
+    return;
+  }
+
+  const updateData = {
+    username: adminFormData.username,
+    email: adminFormData.email,
+    role: adminFormData.role,
+  };
+
+  // ✅ Include password only if provided
+  if (adminFormData.password?.trim()) {
+    updateData.password = adminFormData.password.trim();
+  }
+
+  try {
+    const result = await editAdmin(editingAdmin._id, updateData);
+
+    if (result && result.success) {
+      alert("Admin updated successfully!");
+      setShowEditAdminModal(false);
+      setEditingAdmin(null);
+      setAdminFormData({ username: "", email: "", role: "", password: "" });
+    } else {
+      throw new Error(result?.error || "Unknown error");
+    }
+  } catch (error) {
+    console.error("Update failed:", error);
+    alert(`Failed to update admin: ${error.message}`);
+  }
+};
+
+
+  const handleRemoveAdmin = async (adminId) => {
+    // Only Super Admin can remove admins
+    if (userRole === "superadmin") {
+      if (confirm("Are you sure you want to remove this admin?")) {
+        const result = await removeAdmin(adminId)
+        if (result.success) {
+          alert("Admin removed successfully!")
+        } else {
+          alert(`Failed to remove admin: ${result.error}`)
+        }
+      }
+    } else {
+      alert("You don't have permission to remove admins.")
+    }
   }
 
   if (loading) {
@@ -137,8 +273,20 @@ export default function SettingPage() {
     )
   }
 
-  // Notification Settings View
+  // Notification Settings View - Add access control
   if (currentView === "notifications") {
+    // Check if user has permission to access notifications
+    if (userRole === "viewer") {
+      return (
+        <div className="p-6 text-center">
+          <h2 className="text-xl font-semibold text-red-600">Access Denied</h2>
+          <p className="text-gray-600 mt-2">You don't have permission to access notification settings.</p>
+          <Button onClick={() => setCurrentView("main")} className="mt-4">
+            Go Back
+          </Button>
+        </div>
+      )
+    }
     // Empty Notification State
     if (notificationView === "empty") {
       return (
@@ -159,12 +307,15 @@ export default function SettingPage() {
             <div className="text-center space-y-2">
               <h2 className="text-lg sm:text-xl font-medium text-gray-900">You have no Notification Yet!</h2>
             </div>
-            <Button
-              onClick={handleCreateNotification}
-              className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-md text-sm font-medium"
-            >
-              Create Notification
-            </Button>
+            {/* Only Super Admin and Editor can create notifications */}
+            {(userRole === "superadmin" || userRole === "editor") && (
+              <Button
+                onClick={handleCreateNotification}
+                className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-md text-sm font-medium"
+              >
+                Create Notification
+              </Button>
+            )}
           </div>
 
           {/* Notification Panel */}
@@ -285,7 +436,9 @@ export default function SettingPage() {
             {/* Upload Image Area */}
             <div
               onClick={handleUploadImage}
-              className="border-2 border-dashed border-gray-300 rounded-lg p-8 sm:p-12 text-center cursor-pointer hover:border-gray-400 transition-colors"
+              className={`border-2 border-dashed border-gray-300 rounded-lg p-8 sm:p-12 text-center transition-colors ${
+                userRole === "viewer" ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:border-gray-400"
+              }`}
             >
               <div className="space-y-4">
                 <div className="w-12 h-12 mx-auto bg-gray-100 rounded-lg flex items-center justify-center">
@@ -308,12 +461,14 @@ export default function SettingPage() {
 
             {/* Next Button */}
             <div className="flex justify-end">
-              <Button
-                onClick={handleNext}
-                className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-md text-sm font-medium"
-              >
-                Next
-              </Button>
+              {(userRole === "superadmin" || userRole === "editor") && (
+                <Button
+                  onClick={handleNext}
+                  className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-md text-sm font-medium"
+                >
+                  Next
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -331,12 +486,13 @@ export default function SettingPage() {
               <Button
                 onClick={() => setShowSendToDropdown(!showSendToDropdown)}
                 className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2"
+                disabled={userRole === "viewer"}
               >
                 <Bell className="h-4 w-4" />
                 {selectedSendTo}
                 <ChevronDown className="h-4 w-4" />
               </Button>
-              {showSendToDropdown && (
+              {showSendToDropdown && userRole !== "viewer" && (
                 <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10">
                   <div className="py-1">
                     {["New User", "Old User", "Top rated user"].map((option) => (
@@ -382,12 +538,14 @@ export default function SettingPage() {
 
             {/* Send Button */}
             <div className="flex justify-end">
-              <Button
-                onClick={handleSendNotification}
-                className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-md text-sm font-medium"
-              >
-                Send Notification
-              </Button>
+              {(userRole === "superadmin" || userRole === "editor") && (
+                <Button
+                  onClick={handleSendNotification}
+                  className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-md text-sm font-medium"
+                >
+                  Send Notification
+                </Button>
+              )}
             </div>
           </div>
 
@@ -452,7 +610,10 @@ export default function SettingPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Learning Rewards</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.learningRewards}</p>
+                  {/* Only Super Admin can see numbers */}
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
+                    {userRole === "superadmin" ? stats.learningRewards : "***"}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -480,43 +641,48 @@ export default function SettingPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Ad Base Rewards</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.adBaseRewards}</p>
+                  {/* Only Super Admin can see numbers */}
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
+                    {userRole === "superadmin" ? stats.adBaseRewards : "***"}
+                  </p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Expiry Dropdown */}
-        <div className="flex justify-center sm:justify-end">
-          <div className="relative">
-            <Button
-              onClick={() => setShowExpiryDropdown(!showExpiryDropdown)}
-              className="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1 h-8"
-            >
-              Expiry {selectedExpiry}
-              <ChevronDown className="h-3 w-3" />
-            </Button>
-            {showExpiryDropdown && (
-              <div className="absolute right-0 mt-1 w-24 bg-white border border-gray-200 rounded shadow-lg z-10">
-                <div className="py-1">
-                  {["1 Day", "2 Day", "3 Day", "4 Day", "5 Day"].map((option) => (
-                    <button
-                      key={option}
-                      onClick={() => {
-                        setSelectedExpiry(option.split(" ")[0] + ":00")
-                        setShowExpiryDropdown(false)
-                      }}
-                      className="block w-full text-left px-2 py-1 text-xs text-gray-700 hover:bg-gray-100"
-                    >
-                      {option}
-                    </button>
-                  ))}
+        {/* Expiry Dropdown - Only Super Admin and Editor */}
+        {(userRole === "superadmin" || userRole === "editor") && (
+          <div className="flex justify-center sm:justify-end">
+            <div className="relative">
+              <Button
+                onClick={() => setShowExpiryDropdown(!showExpiryDropdown)}
+                className="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1 h-8"
+              >
+                Expiry {selectedExpiry}
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+              {showExpiryDropdown && (
+                <div className="absolute right-0 mt-1 w-24 bg-white border border-gray-200 rounded shadow-lg z-10">
+                  <div className="py-1">
+                    {["1 Day", "2 Day", "3 Day", "4 Day", "5 Day"].map((option) => (
+                      <button
+                        key={option}
+                        onClick={() => {
+                          setSelectedExpiry(option.split(" ")[0] + ":00")
+                          setShowExpiryDropdown(false)
+                        }}
+                        className="block w-full text-left px-2 py-1 text-xs text-gray-700 hover:bg-gray-100"
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Navigation Buttons */}
         <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 pt-4 sm:pt-8">
@@ -526,12 +692,15 @@ export default function SettingPage() {
           >
             View Admin Control
           </Button>
-          <Button
-            onClick={handleNotificationSettings}
-            className="bg-teal-600 hover:bg-teal-700 text-white px-4 sm:px-6 py-2 rounded-md text-sm font-medium w-full sm:w-auto"
-          >
-            Notification Settings
-          </Button>
+          {/* Only Super Admin and Editor can access notification settings */}
+          {(userRole === "superadmin" || userRole === "editor") && (
+            <Button
+              onClick={handleNotificationSettings}
+              className="bg-teal-600 hover:bg-teal-700 text-white px-4 sm:px-6 py-2 rounded-md text-sm font-medium w-full sm:w-auto"
+            >
+              Notification Settings
+            </Button>
+          )}
         </div>
 
         {/* Notification Panel */}
@@ -587,12 +756,15 @@ export default function SettingPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Maintained control</h1>
-          <Button
-            onClick={handleAddNewAdmin}
-            className="bg-teal-600 hover:bg-teal-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium w-full sm:w-auto"
-          >
-            Add New Admin
-          </Button>
+          {/* Only Super Admin can add new admin */}
+          {userRole === "superadmin" && (
+            <Button
+              onClick={handleAddNewAdmin}
+              className="bg-teal-600 hover:bg-teal-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium w-full sm:w-auto"
+            >
+              Add New Admin
+            </Button>
+          )}
         </div>
 
         {/* Stats Cards */}
@@ -605,7 +777,10 @@ export default function SettingPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Learning Rewards</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.learningRewards}</p>
+                  {/* Only Super Admin can see numbers */}
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
+                    {userRole === "superadmin" ? stats.learningRewards : "***"}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -633,7 +808,10 @@ export default function SettingPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Ad Base Rewards</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.adBaseRewards}</p>
+                  {/* Only Super Admin can see numbers */}
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
+                    {userRole === "superadmin" ? stats.adBaseRewards : "***"}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -650,45 +828,336 @@ export default function SettingPage() {
                   <TableRow className="border-b border-gray-200">
                     <TableHead className="font-semibold text-gray-700 py-3 min-w-[200px]">Admin Email</TableHead>
                     <TableHead className="font-semibold text-gray-700 py-3 min-w-[120px]">Role</TableHead>
-                    <TableHead className="font-semibold text-gray-700 py-3 min-w-[160px]">Action</TableHead>
+                    {/* Only Super Admin can see Action column */}
+                    {userRole === "superadmin" && (
+                      <TableHead className="font-semibold text-gray-700 py-3 min-w-[160px]">Action</TableHead>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {adminData.map((admin) => (
-                    <TableRow key={admin.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <TableCell className="py-3 text-gray-900 text-sm">{admin.email}</TableCell>
-                      <TableCell className="py-3 text-gray-900 text-sm">{admin.role}</TableCell>
-                      <TableCell className="py-3">
-                        <div className="flex flex-col sm:flex-row gap-2">
-                          <Button
-                            size="sm"
-                            className="bg-teal-600 hover:bg-teal-700 text-white px-2 py-1 text-xs flex items-center gap-1 justify-center"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                            <span className="hidden sm:inline">Remove</span>
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="bg-teal-600 hover:bg-teal-700 text-white px-2 py-1 text-xs flex items-center gap-1 justify-center"
-                          >
-                            <Edit3 className="h-3 w-3" />
-                            <span className="hidden sm:inline">Edit</span>
-                          </Button>
+                  {adminsLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={userRole === "superadmin" ? 3 : 2} className="text-center py-8">
+                        <div className="flex justify-center">
+                          <div className="w-6 h-6 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : adminsError ? (
+                    <TableRow>
+                      <TableCell colSpan={userRole === "superadmin" ? 3 : 2} className="text-center py-8 text-red-600">
+                        Error loading admins: {adminsError}
+                      </TableCell>
+                    </TableRow>
+                  ) : admins.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={userRole === "superadmin" ? 3 : 2}
+                        className="text-center py-8 text-gray-500"
+                      >
+                        No admins found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    admins.map((admin) => (
+                      <TableRow key={admin._id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <TableCell className="py-3 text-gray-900 text-sm">{admin.email}</TableCell>
+                        <TableCell className="py-3 text-gray-900 text-sm">
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              admin.role === "superadmin"
+                                ? "bg-purple-100 text-purple-800"
+                                : admin.role === "editor"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : admin.role === "viewer"
+                                    ? "bg-green-100 text-green-800"
+                                    : "bg-gray-100 text-gray-800"
+                            }`}
+                          >
+                            {admin.role === "superadmin"
+                              ? "Super Admin"
+                              : admin.role === "editor"
+                                ? "Editor"
+                                : admin.role === "viewer"
+                                  ? "Viewer"
+                                  : admin.role}
+                          </span>
+                        </TableCell>
+                        {/* Only Super Admin can see and use action buttons */}
+                        {userRole === "superadmin" && (
+                          <TableCell className="py-3">
+                            <div className="flex flex-col sm:flex-row gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => handleRemoveAdmin(admin._id)}
+                                className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 text-xs flex items-center gap-1 justify-center"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                                <span className="hidden sm:inline">Remove</span>
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => handleEditAdmin(admin)}
+                                className="bg-teal-600 hover:bg-teal-700 text-white px-2 py-1 text-xs flex items-center gap-1 justify-center"
+                              >
+                                <Edit3 className="h-3 w-3" />
+                                <span className="hidden sm:inline">Edit</span>
+                              </Button>
+                            </div>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>
           </CardContent>
         </Card>
+        {/* Add Admin Modal */}
+        <Dialog open={showAddAdminModal} onOpenChange={setShowAddAdminModal}>
+          <DialogContent className="sm:max-w-md bg-white">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-semibold text-gray-900">Add New Admin</h2>
+                <Button variant="ghost" size="sm" onClick={() => setShowAddAdminModal(false)} className="h-6 w-6 p-0">
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="add-name" className="text-sm font-medium text-gray-700">
+                    Username *
+                  </Label>
+                  <Input
+                    id="add-name"
+                    value={adminFormData.username}
+                    onChange={(e) => setAdminFormData({ ...adminFormData, username: e.target.value })}
+                    className="border-gray-200"
+                    placeholder="Enter admin username"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="add-email" className="text-sm font-medium text-gray-700">
+                    Email *
+                  </Label>
+                  <Input
+                    id="add-email"
+                    type="email"
+                    value={adminFormData.email}
+                    onChange={(e) => setAdminFormData({ ...adminFormData, email: e.target.value })}
+                    className="border-gray-200"
+                    placeholder="Enter admin email"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="add-role" className="text-sm font-medium text-gray-700">
+                    Role *
+                  </Label>
+                  <Select
+                    value={adminFormData.role}
+                    onValueChange={(value) => setAdminFormData({ ...adminFormData, role: value })}
+                  >
+                    <SelectTrigger className="border-gray-200">
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="superadmin">Super Admin</SelectItem>
+                      <SelectItem value="editor">Editor</SelectItem>
+                      <SelectItem value="viewer">Viewer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="add-password" className="text-sm font-medium text-gray-700">
+                    Password *
+                  </Label>
+                  <Input
+                    id="add-password"
+                    type="password"
+                    value={adminFormData.password}
+                    onChange={(e) => setAdminFormData({ ...adminFormData, password: e.target.value })}
+                    className="border-gray-200"
+                    placeholder="Enter password"
+                  />
+                </div>
+                <div className="flex justify-end gap-3 pt-4">
+                  <Button variant="outline" onClick={() => setShowAddAdminModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleAddAdminSubmit} className="bg-teal-600 hover:bg-teal-700 text-white">
+                    Add Admin
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Admin Modal */}
+        <Dialog open={showEditAdminModal} onOpenChange={setShowEditAdminModal}>
+      <DialogContent className="sm:max-w-md bg-white">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-semibold text-gray-900">Edit Admin</h2>
+            <Button variant="ghost" size="sm" onClick={() => setShowEditAdminModal(false)} className="h-6 w-6 p-0">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="space-y-4">
+            {/* Username */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Username *</Label>
+              <Input
+                id="edit-name"
+                value={adminFormData.username}
+                onChange={(e) => setAdminFormData({ ...adminFormData, username: e.target.value })}
+                disabled={userRole !== "superadmin"}
+              />
+            </div>
+
+            {/* Email */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-email">Email *</Label>
+              <Input
+                id="edit-email"
+                type="email"
+                value={adminFormData.email}
+                onChange={(e) => setAdminFormData({ ...adminFormData, email: e.target.value })}
+                disabled={userRole !== "superadmin"}
+              />
+            </div>
+
+            {/* Role */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-role">Role *</Label>
+              <Select
+                value={adminFormData.role}
+                onValueChange={(value) => setAdminFormData({ ...adminFormData, role: value })}
+                disabled={userRole !== "superadmin"}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="superadmin">Super Admin</SelectItem>
+                  <SelectItem value="editor">Editor</SelectItem>
+                  <SelectItem value="viewer">Viewer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Current Password View (Only for Superadmin) */}
+            {userRole === "superadmin" && currentAdminPassword && (
+              <div className="space-y-2">
+                <Label>Current Password</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    value={currentAdminPassword}
+                    className="bg-gray-50"
+                    readOnly
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="px-3"
+                  >
+                    {showPassword ? "Hide" : "Show"}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Change Password Toggle */}
+            {userRole === "superadmin" && (
+              <div className="pt-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowChangePassword((prev) => !prev)}
+                >
+                  {showChangePassword ? "Cancel Password Change" : "Change Password"}
+                </Button>
+              </div>
+            )}
+
+            {/* New + Confirm Password Fields */}
+            {userRole === "superadmin" && showChangePassword && (
+              <>
+                <div className="space-y-2 pt-4">
+                  <Label htmlFor="new-password">New Password</Label>
+                  <Input
+                    id="new-password"
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-password">Confirm Password</Label>
+                  <Input
+                    id="confirm-password"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setConfirmPassword(value);
+
+                      // If confirm matches new, update form data
+                      if (value === newPassword) {
+                        setAdminFormData({ ...adminFormData, password: value });
+                      }
+                    }}
+                    className={`${
+                      confirmPassword && confirmPassword !== newPassword ? "border-red-500" : ""
+                    }`}
+                  />
+                  {confirmPassword && confirmPassword !== newPassword && (
+                    <p className="text-xs text-red-500">Passwords do not match.</p>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* Buttons */}
+            <div className="flex justify-end gap-3 pt-4">
+              <Button variant="outline" onClick={() => setShowEditAdminModal(false)}>
+                {userRole === "superadmin" ? "Cancel" : "Close"}
+              </Button>
+              {userRole === "superadmin" && (
+                <Button onClick={handleEditAdminSubmit} className="bg-teal-600 hover:bg-teal-700 text-white">
+                  Update Admin
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+
       </div>
     )
   }
 
-  // Permissions new Admin View
+  // Permissions new Admin View - Super Admin Only
   if (currentView === "permissions") {
+    if (userRole !== "superadmin") {
+      return (
+        <div className="p-6 text-center">
+          <h2 className="text-xl font-semibold text-red-600">Access Denied</h2>
+          <p className="text-gray-600 mt-2">You don't have permission to assign permissions.</p>
+          <Button onClick={() => setCurrentView("control")} className="mt-4">
+            Go Back
+          </Button>
+        </div>
+      )
+    }
+
     return (
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
         {/* Header */}
@@ -778,6 +1247,3 @@ export default function SettingPage() {
     )
   }
 }
-
-
-

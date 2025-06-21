@@ -137,9 +137,21 @@ const Page = () => {
               Status User Range per Year
             </h3>
             <ResponsiveContainer width="100%" height={350}>
-              <LineChart data={chartData}>
-                <XAxis dataKey="year" />
-                <YAxis allowDecimals={false} />
+              <LineChart
+                data={chartData}
+                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+              >
+                <XAxis
+                  dataKey="year"
+                 // type="category"
+                  tick={{ fontSize: 12 }}
+                  allowDuplicatedCategory={false}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  domain={[0, "auto"]} // Force Y-axis to start from 0
+                  tick={{ fontSize: 12 }}
+                />
                 <Tooltip />
                 <Legend />
                 <Line
@@ -150,6 +162,7 @@ const Page = () => {
                   name="User Count"
                   animationDuration={800}
                   isAnimationActive={true}
+                  dot={{ r: 4 }}
                 />
               </LineChart>
             </ResponsiveContainer>

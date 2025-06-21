@@ -1,55 +1,51 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import {
+  getCurrentUser,
+  isAuthenticated,
+  hasPermission,
+  getRoleDisplayName,
+  getPermissionsList,
+  makeAuthenticatedRequest,
+  debugAuthState,
+} from "@/lib/auth"
 
 export const useCourses = () => {
   const [courses, setCourses] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  // Get auth token from localStorage
-  const getAuthToken = () => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("token")
-    }
-    return null
-  }
-
-  // Get user role from localStorage
-  const getUserRole = () => {
-    if (typeof window !== "undefined") {
-      const role = localStorage.getItem("role")
-      return role?.toLowerCase() // Convert to lowercase for consistency
-    }
-    return null
-  }
-
-  // Create headers with auth token
-  const getAuthHeaders = () => {
-    const token = getAuthToken()
-    return {
-      "Content-Type": "application/json",
-      ...(token && { Authorization: `Bearer ${token}` }),
-    }
-  }
-
-  // Fetch all courses
+  // Fetch all courses using authenticated request
   const fetchCourses = async () => {
     try {
       setLoading(true)
-      const res = await fetch("http://localhost:5000/api/courses", {
-        method: "GET",
-        headers: getAuthHeaders(),
-      })
 
-      if (!res.ok) {
-        throw new Error(`Failed to fetch courses: ${res.status}`)
+      if (!isAuthenticated()) {
+        throw new Error("User not authenticated. Please log in again.")
       }
 
-      const data = await res.json()
-      setCourses(data)
+      const currentUser = getCurrentUser()
+      console.log("Fetching courses for user:", currentUser?.email, "with role:", currentUser?.role)
+
+      const response = await makeAuthenticatedRequest("http://localhost:5000/api/courses", {
+        method: "GET",
+      })
+
+      const data = await response.json()
+      console.log("Courses data received:", data)
+
+      // Backend returns { success: true, courses: [...] }
+      if (data.success && data.courses) {
+        setCourses(data.courses)
+        console.log("Successfully loaded", data.courses.length, "courses")
+      } else {
+        setCourses([])
+        console.log("No courses found in response")
+      }
       setError(null)
     } catch (err) {
+      console.error("Error fetching courses:", err)
       setError(err instanceof Error ? err.message : "An error occurred")
       setCourses([])
     } finally {
@@ -57,130 +53,123 @@ export const useCourses = () => {
     }
   }
 
-  // Create new course
+  // Create new course with current user as uploader
   const createCourse = async (courseData) => {
     try {
-      const res = await fetch("http://localhost:5000/api/courses", {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify(courseData),
-      })
-
-      if (!res.ok) {
-        throw new Error(`Failed to create course: ${res.status}`)
+      if (!isAuthenticated()) {
+        throw new Error("User not authenticated. Please log in again.")
       }
 
-      const newCourse = await res.json()
-      setCourses((prev) => [...prev, newCourse])
-      return { success: true, data: newCourse }
+      const currentUser = getCurrentUser()
+      console.log("Creating course for user:", currentUser?.email)
+
+      // Add current user context to course data
+      const coursePayload = {
+        ...courseData,
+        uploadedBy: currentUser?.id, // Ensure current user is set as uploader
+      }
+
+      console.log("Course payload:", coursePayload)
+
+      const response = await makeAuthenticatedRequest("http://localhost:5000/api/courses", {
+        method: "POST",
+        body: JSON.stringify(coursePayload),
+      })
+
+      const data = await response.json()
+      console.log("Create course response:", data)
+
+      // Backend returns { success: true, course: {...} }
+      if (data.success && data.course) {
+        setCourses((prev) => [...prev, data.course])
+        console.log("Course created successfully:", data.course.courseName)
+        return { success: true, data: data.course }
+      } else {
+        throw new Error(data.message || "Failed to create course")
+      }
     } catch (err) {
+      console.error("Error creating course:", err)
       const errorMessage = err instanceof Error ? err.message : "Failed to create course"
       setError(errorMessage)
       return { success: false, error: errorMessage }
     }
   }
 
-  // Update existing course
+  // Update existing course with current user authorization
   const updateCourse = async (courseId, courseData) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/courses/${courseId}`, {
+      if (!isAuthenticated()) {
+        throw new Error("User not authenticated. Please log in again.")
+      }
+
+      const currentUser = getCurrentUser()
+      console.log("Updating course for user:", currentUser?.email)
+
+      const response = await makeAuthenticatedRequest(`http://localhost:5000/api/courses/${courseId}`, {
         method: "PUT",
-        headers: getAuthHeaders(),
         body: JSON.stringify(courseData),
       })
 
-      if (!res.ok) {
-        throw new Error(`Failed to update course: ${res.status}`)
-      }
+      const data = await response.json()
+      console.log("Update course response:", data)
 
-      const updatedCourse = await res.json()
-      setCourses((prev) => prev.map((course) => (course._id === courseId ? updatedCourse : course)))
-      return { success: true, data: updatedCourse }
+      // Backend returns { success: true, course: {...} }
+      if (data.success && data.course) {
+        setCourses((prev) => prev.map((course) => (course._id === courseId ? data.course : course)))
+        console.log("Course updated successfully:", data.course.courseName)
+        return { success: true, data: data.course }
+      } else {
+        throw new Error(data.message || "Failed to update course")
+      }
     } catch (err) {
+      console.error("Error updating course:", err)
       const errorMessage = err instanceof Error ? err.message : "Failed to update course"
       setError(errorMessage)
       return { success: false, error: errorMessage }
     }
   }
 
-  // Delete course
+  // Delete course with current user authorization
   const deleteCourse = async (courseId) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/courses/${courseId}`, {
-        method: "DELETE",
-        headers: getAuthHeaders(),
-      })
-
-      if (!res.ok) {
-        throw new Error(`Failed to delete course: ${res.status}`)
+      if (!isAuthenticated()) {
+        throw new Error("User not authenticated. Please log in again.")
       }
 
-      setCourses((prev) => prev.filter((course) => course._id !== courseId))
-      return { success: true }
+      const currentUser = getCurrentUser()
+      console.log("Deleting course for user:", currentUser?.email)
+
+      const response = await makeAuthenticatedRequest(`http://localhost:5000/api/courses/${courseId}`, {
+        method: "DELETE",
+      })
+
+      const data = await response.json()
+      console.log("Delete course response:", data)
+
+      // Backend returns { success: true, message: "Course deleted" }
+      if (data.success) {
+        setCourses((prev) => prev.filter((course) => course._id !== courseId))
+        console.log("Course deleted successfully")
+        return { success: true }
+      } else {
+        throw new Error(data.message || "Failed to delete course")
+      }
     } catch (err) {
+      console.error("Error deleting course:", err)
       const errorMessage = err instanceof Error ? err.message : "Failed to delete course"
       setError(errorMessage)
       return { success: false, error: errorMessage }
     }
   }
 
-  // Check if user has permission for action based on role
-  const hasPermission = (action) => {
-    const role = getUserRole()
-    if (!role) return false
-
-    switch (role) {
-      case "superadmin":
-        // Super admin has full access to everything
-        return ["view", "create", "edit", "delete"].includes(action)
-
-      case "editor":
-        // Editor can view, create, and edit but cannot delete
-        return ["view", "create", "edit"].includes(action)
-
-      case "viewer":
-        // Viewer can only view courses and analytics
-        return action === "view"
-
-      default:
-        return false
-    }
-  }
-
-  // Get user role display name
-  const getRoleDisplayName = () => {
-    const role = getUserRole()
-    switch (role) {
-      case "superadmin":
-        return "Super Admin"
-      case "editor":
-        return "Editor"
-      case "viewer":
-        return "Viewer"
-      default:
-        return "Unknown"
-    }
-  }
-
-  // Get permissions list for display
-  const getPermissionsList = () => {
-    const role = getUserRole()
-    switch (role) {
-      case "superadmin":
-        return "Full Access (View, Create, Edit, Delete)"
-      case "editor":
-        return "Limited Access (View, Create, Edit)"
-      case "viewer":
-        return "Read Only (View Only)"
-      default:
-        return "No Permissions"
-    }
-  }
-
-  // Initial fetch
+  // Initial fetch when component mounts
   useEffect(() => {
+    console.log("useCourses hook initialized")
+    debugAuthState() // Debug authentication state
     fetchCourses()
   }, [])
+
+  const currentUser = getCurrentUser()
 
   return {
     courses,
@@ -191,8 +180,10 @@ export const useCourses = () => {
     deleteCourse,
     refreshCourses: fetchCourses,
     hasPermission,
-    userRole: getUserRole(),
+    userRole: currentUser?.role || "",
     roleDisplayName: getRoleDisplayName(),
     permissionsList: getPermissionsList(),
+    userData: currentUser,
+    isAuthenticated: isAuthenticated(),
   }
 }

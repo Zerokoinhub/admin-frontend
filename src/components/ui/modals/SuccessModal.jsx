@@ -1,44 +1,49 @@
 "use client"
 
-import { User } from "lucide-react"
+import { CheckCircle, X, Star } from "lucide-react"
 
-export default function SuccessModal({ onClose }) {
+export default function SuccessModal({ onClose, approvedCount = 1, totalCoins = 0, allApproved = false }) {
   return (
-    <div className="bg-white rounded-2xl p-6 sm:p-8 w-full max-w-sm sm:max-w-md mx-4 text-center shadow-2xl border border-gray-200">
-      {/* Success Icon with Decorative Dots */}
-      <div className="relative mb-6 sm:mb-8">
-        <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-teal-500 to-green-500 rounded-full flex items-center justify-center mx-auto shadow-lg">
-          <User className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
+    <div className="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full mx-4 relative">
+      <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors">
+        <X className="w-5 h-5" />
+      </button>
+
+      <div className="text-center">
+        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 relative">
+          <CheckCircle className="w-8 h-8 text-green-600" />
+          {allApproved && (
+            <div className="absolute -top-1 -right-1 w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center">
+              <Star className="w-3 h-3 text-white" />
+            </div>
+          )}
         </div>
 
-        {/* Decorative dots around the icon */}
-        <div className="absolute -top-1 -left-1 w-3 h-3 bg-teal-500 rounded-full"></div>
-        <div className="absolute top-3 -right-2 w-2 h-2 bg-teal-400 rounded-full"></div>
-        <div className="absolute -bottom-1 left-3 w-2 h-2 bg-green-400 rounded-full"></div>
-        <div className="absolute bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full"></div>
-        <div className="absolute top-6 left-1 w-1 h-1 bg-teal-300 rounded-full"></div>
-        <div className="absolute -top-0 right-5 w-1 h-1 bg-teal-600 rounded-full"></div>
-        <div className="absolute top-8 -right-3 w-2 h-2 bg-teal-400 rounded-full"></div>
-        <div className="absolute bottom-6 -left-2 w-1 h-1 bg-green-300 rounded-full"></div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          {allApproved ? "All Screenshots Approved!" : "Screenshots Approved!"}
+        </h3>
+
+        <div className="text-gray-600 mb-6 space-y-1">
+          <p>
+            {approvedCount} screenshot{approvedCount > 1 ? "s" : ""} approved
+          </p>
+          <p className="font-medium text-green-600">{totalCoins} coins ready for transfer</p>
+          {allApproved && (
+            <p className="text-sm text-green-700 bg-green-50 px-3 py-1 rounded-full inline-block mt-2">
+              ✓ All requirements met
+            </p>
+          )}
+        </div>
+
+        <button
+          onClick={onClose}
+          className={`w-full px-4 py-2 rounded-lg transition-colors font-medium ${
+            allApproved ? "bg-green-600 text-white hover:bg-green-700" : "bg-teal-600 text-white hover:bg-teal-700"
+          }`}
+        >
+          {allApproved ? "Proceed to Transfer" : "Continue to Transfer"}
+        </button>
       </div>
-
-      <h2 className="text-lg sm:text-xl font-semibold text-teal-600 mb-1">Your Coin is</h2>
-      <h3 className="text-lg sm:text-xl font-semibold text-teal-600 mb-4 sm:mb-6">Successfully Transfer</h3>
-
-      <p className="text-gray-600 mb-1 text-sm sm:text-base">Please wait...</p>
-      <p className="text-gray-600 mb-6 sm:mb-8 text-sm sm:text-base">You will be directed to the homepage soon.</p>
-
-      {/* Loading Spinner */}
-      <div className="flex justify-center mb-6 sm:mb-8">
-        <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-teal-600"></div>
-      </div>
-
-      <button
-        onClick={onClose}
-        className="text-gray-500 hover:text-gray-700 transition-colors font-medium text-sm sm:text-base"
-      >
-        Close
-      </button>
     </div>
   )
 }

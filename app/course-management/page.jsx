@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
@@ -10,10 +10,18 @@ import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts"
-import { X, User, Clock, FileText, Edit, Trash2, Plus, Eye, BarChart3 } from "lucide-react"
+import { X, User, Clock, FileText, Edit, Trash2, Plus, Eye, BarChart3, AlertCircle } from "lucide-react"
 import Image from "next/image"
 import { useUsers } from "../../hooks/useUsers"
 import { useCourses } from "../../hooks/useCourses"
+import {
+  isAuthenticated,
+  hasPermission,
+  getRoleDisplayName,
+  getPermissionsList,
+  handleAuthError,
+  debugAuthState,
+} from "@/lib/auth"
 
 export default function CourseManagementPage() {
   const [currentView, setCurrentView] = useState("main")
@@ -35,13 +43,21 @@ export default function CourseManagementPage() {
     updateCourse,
     deleteCourse,
     refreshCourses,
-    hasPermission,
-    userRole,
-    roleDisplayName,
-    permissionsList,
+    userData,
   } = useCourses()
 
   const { users, loading, error } = useUsers(1, 100)
+
+  // Check authentication status on component mount
+  useEffect(() => {
+    console.log("Course Management Page - Current user:", userData)
+    console.log("Course Management Page - Is authenticated:", isAuthenticated())
+    debugAuthState() // This is now imported from @/lib/auth
+
+    if (!isAuthenticated()) {
+      console.warn("User not authenticated in Course Management")
+    }
+  }, [userData, isAuthenticated])
 
   const handleViewCourse = () => {
     setCurrentView("course")
@@ -52,19 +68,33 @@ export default function CourseManagementPage() {
   }
 
   const handleUploadCourse = () => {
+    if (!isAuthenticated()) {
+      alert("Please log in to create courses")
+      return
+    }
+
     if (!hasPermission("create")) {
       alert("You don't have permission to create courses")
       return
     }
+
+    console.log("Starting course creation for user:", userData?.email)
     setCurrentView("upload")
     setFormData({
       courseName: "",
       pages: [{ title: "", content: "", time: 0 }],
     })
     setIsEditing(false)
+    setSelectedCourse(null)
   }
 
   const handleSubmitCourse = async () => {
+    if (!isAuthenticated()) {
+      alert("Please log in to create courses")
+      return
+    }
+
+    // Validate form data
     if (!formData.courseName.trim()) {
       alert("Please enter a course name")
       return
@@ -75,50 +105,54 @@ export default function CourseManagementPage() {
       return
     }
 
+    if (formData.pages.some((page) => page.time < 0)) {
+      alert("Duration must be a positive number")
+      return
+    }
+
     setIsSubmitting(true)
+    console.log("Submitting course with user context:", userData?.email)
 
     try {
       let result
       if (isEditing && selectedCourse) {
+        console.log("Updating existing course:", selectedCourse._id)
         result = await updateCourse(selectedCourse._id, formData)
       } else {
+        console.log("Creating new course")
         result = await createCourse(formData)
       }
 
       if (result.success) {
+        console.log("Course operation successful")
         setIsSuccessModalOpen(true)
         setTimeout(() => {
           setIsSuccessModalOpen(false)
           setCurrentView("main")
           setSelectedCourse(null)
           setIsEditing(false)
+          // Reset form
+          setFormData({
+            courseName: "",
+            pages: [{ title: "", content: "", time: 0 }],
+          })
         }, 2000)
       } else {
-        alert(`Error: ${result.error}`)
+        handleAuthError(result.error)
       }
     } catch (error) {
-      alert(`Error: ${error.message}`)
+      handleAuthError(error.message)
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  const handleEditCourse = (course) => {
-    if (!hasPermission("edit")) {
-      alert("You don't have permission to edit courses")
+  const handleDeleteCourse = async (courseId) => {
+    if (!isAuthenticated()) {
+      alert("Please log in to delete courses")
       return
     }
 
-    setSelectedCourse(course)
-    setFormData({
-      courseName: course.courseName,
-      pages: [...course.pages],
-    })
-    setIsEditing(true)
-    setCurrentView("upload")
-  }
-
-  const handleDeleteCourse = async (courseId) => {
     if (!hasPermission("delete")) {
       alert("You don't have permission to delete courses")
       return
@@ -128,12 +162,41 @@ export default function CourseManagementPage() {
       return
     }
 
+    console.log("Deleting course:", courseId, "by user:", userData?.email)
     const result = await deleteCourse(courseId)
+
     if (result.success) {
       alert("Course deleted successfully")
+      // Refresh the courses list
+      await refreshCourses()
     } else {
-      alert(`Error deleting course: ${result.error}`)
+      handleAuthError(result.error)
     }
+  }
+
+  const handleEditCourse = (course) => {
+    if (!isAuthenticated()) {
+      alert("Please log in to edit courses")
+      return
+    }
+
+    if (!hasPermission("edit")) {
+      alert("You don't have permission to edit courses")
+      return
+    }
+
+    console.log("Editing course:", course.courseName, "by user:", userData?.email)
+    setSelectedCourse(course)
+    setFormData({
+      courseName: course.courseName,
+      pages: course.pages.map((page) => ({
+        title: page.title,
+        content: page.content,
+        time: page.time,
+      })),
+    })
+    setIsEditing(true)
+    setCurrentView("upload")
   }
 
   const handleCourseClick = (course) => {
@@ -179,19 +242,23 @@ export default function CourseManagementPage() {
   const generateAnalyticsData = () => {
     if (!courses || courses.length === 0) {
       return [
-        { name: "Active Courses", value: 0, color: "#0d9488" },
-        { name: "Inactive Courses", value: 0, color: "#ef4444" },
-        { name: "Total Pages", value: 0, color: "#22c55e" },
-        { name: "Total Duration", value: 0, color: "#a855f7" },
+        { name: "Active Courses", value: 25, color: "#0d9488" },
+        { name: "Inactive Courses", value: 25, color: "#ef4444" },
+        { name: "Total Pages", value: 25, color: "#22c55e" },
+        { name: "Total Duration", value: 25, color: "#a855f7" },
       ]
     }
 
-    const activeCourses = courses.filter((course) => course.isActive).length
+    const activeCourses = courses.filter((course) => course.isActive !== false).length
     const inactiveCourses = courses.length - activeCourses
     const totalPages = courses.reduce((total, course) => total + course.pages.length, 0)
     const totalDuration = courses.reduce((total, course) => total + getTotalDuration(course.pages), 0)
 
     const total = activeCourses + inactiveCourses + totalPages + Math.floor(totalDuration / 60)
+
+    if (total === 0) {
+      return [{ name: "No Data", value: 100, color: "#9ca3af" }]
+    }
 
     return [
       { name: "Active Courses", value: Math.round((activeCourses / total) * 100) || 1, color: "#0d9488" },
@@ -207,6 +274,25 @@ export default function CourseManagementPage() {
 
   const analyticsData = generateAnalyticsData()
 
+  // Show authentication warning if not authenticated
+  if (!isAuthenticated()) {
+    return (
+      <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
+        <Card className="bg-white border border-red-200">
+          <CardContent className="p-6 text-center">
+            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-red-600 mb-2">Authentication Required</h2>
+            <p className="text-gray-600 mb-4">You need to be logged in to access the Course Management system.</p>
+            <p className="text-sm text-gray-500 mb-4">Current user: {userData?.email || "Not logged in"}</p>
+            <Button onClick={() => window.location.reload()} className="bg-blue-600 hover:bg-blue-700 text-white">
+              Refresh Page
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   // Upload Course View
   if (currentView === "upload") {
     return (
@@ -218,7 +304,7 @@ export default function CourseManagementPage() {
               {isEditing ? "Edit Course" : "Create New Course"}
             </h1>
             <p className="text-sm text-gray-600 mt-1">
-              {roleDisplayName} • {isEditing ? "Editing existing course" : "Adding new course"}
+              {getRoleDisplayName()} • {userData?.email} • {isEditing ? "Editing existing course" : "Adding new course"}
             </p>
           </div>
           <Button variant="ghost" onClick={() => setCurrentView("main")} className="self-start sm:self-center">
@@ -233,7 +319,7 @@ export default function CourseManagementPage() {
               <div className="space-y-6">
                 {/* Course Name */}
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-700">Course Name</Label>
+                  <Label className="text-sm font-medium text-gray-700">Course Name *</Label>
                   <Input
                     value={formData.courseName}
                     onChange={(e) => setFormData({ ...formData, courseName: e.target.value })}
@@ -279,7 +365,7 @@ export default function CourseManagementPage() {
 
                         <div className="space-y-4">
                           <div className="space-y-2">
-                            <Label className="text-sm font-medium text-gray-700">Page Title</Label>
+                            <Label className="text-sm font-medium text-gray-700">Page Title *</Label>
                             <Input
                               value={page.title}
                               onChange={(e) => updatePage(index, "title", e.target.value)}
@@ -290,7 +376,7 @@ export default function CourseManagementPage() {
                           </div>
 
                           <div className="space-y-2">
-                            <Label className="text-sm font-medium text-gray-700">Content</Label>
+                            <Label className="text-sm font-medium text-gray-700">Content *</Label>
                             <Textarea
                               value={page.content}
                               onChange={(e) => updatePage(index, "content", e.target.value)}
@@ -301,11 +387,13 @@ export default function CourseManagementPage() {
                           </div>
 
                           <div className="space-y-2">
-                            <Label className="text-sm font-medium text-gray-700">Duration (minutes)</Label>
+                            <Label className="text-sm font-medium text-gray-700">Duration (minutes) *</Label>
                             <Input
                               type="number"
                               value={page.time}
-                              onChange={(e) => updatePage(index, "time", Number.parseInt(e.target.value) || 0)}
+                              onChange={(e) =>
+                                updatePage(index, "time", Math.max(0, Number.parseInt(e.target.value) || 0))
+                              }
                               className="border-gray-200"
                               placeholder="Enter duration in minutes..."
                               min="0"
@@ -347,7 +435,7 @@ export default function CourseManagementPage() {
             <div className="py-6 sm:py-8 px-4">
               <div className="relative mx-auto w-20 sm:w-24 h-20 sm:h-24 mb-6 sm:mb-8">
                 <div className="w-20 sm:w-24 h-20 sm:h-24 bg-gradient-to-br from-teal-500 to-green-600 rounded-full flex items-center justify-center relative z-10">
-                  <User className="h-8 sm:h-10 w-8 sm:w-10 text-white" />
+                  <FileText className="h-8 sm:h-10 w-8 sm:w-10 text-white" />
                 </div>
               </div>
               <h3 className="text-lg sm:text-xl font-semibold text-teal-600 mb-1">Course Successfully</h3>
@@ -374,9 +462,10 @@ export default function CourseManagementPage() {
             <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Course Management</h1>
             <div className="flex items-center gap-4 mt-1">
               <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                {roleDisplayName}
+                {getRoleDisplayName()}
               </Badge>
-              <p className="text-sm text-gray-600">{permissionsList}</p>
+              <p className="text-sm text-gray-600">{userData?.email}</p>
+              <p className="text-sm text-gray-600">{getPermissionsList()}</p>
             </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
@@ -438,6 +527,7 @@ export default function CourseManagementPage() {
                     <TableHead className="font-semibold text-gray-700 py-3 min-w-[120px]">Duration</TableHead>
                     <TableHead className="font-semibold text-gray-700 py-3 min-w-[80px]">Status</TableHead>
                     <TableHead className="font-semibold text-gray-700 py-3 min-w-[120px]">Created</TableHead>
+                    <TableHead className="font-semibold text-gray-700 py-3 min-w-[120px]">Uploaded By</TableHead>
                     {(hasPermission("edit") || hasPermission("delete")) && (
                       <TableHead className="font-semibold text-gray-700 py-3 min-w-[120px]">Actions</TableHead>
                     )}
@@ -446,7 +536,7 @@ export default function CourseManagementPage() {
                 <TableBody>
                   {coursesLoading ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8">
+                      <TableCell colSpan={7} className="text-center py-8">
                         <div className="flex justify-center items-center">
                           <div className="w-6 h-6 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
                           <span className="ml-2 text-gray-600">Loading courses...</span>
@@ -455,13 +545,18 @@ export default function CourseManagementPage() {
                     </TableRow>
                   ) : coursesError ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-red-600">
+                      <TableCell colSpan={7} className="text-center py-8 text-red-600">
                         Error loading courses: {coursesError}
+                        <div className="mt-2">
+                          <Button onClick={refreshCourses} size="sm" variant="outline">
+                            Retry
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ) : courses.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                      <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                         <div className="flex flex-col items-center gap-2">
                           <FileText className="h-12 w-12 text-gray-300" />
                           <p>No courses found</p>
@@ -481,28 +576,31 @@ export default function CourseManagementPage() {
                         <TableCell className="py-3 text-gray-900 text-sm">
                           <div className="flex items-center gap-1">
                             <FileText className="h-4 w-4 text-gray-500" />
-                            {course.pages.length}
+                            {course.pages?.length || 0}
                           </div>
                         </TableCell>
                         <TableCell className="py-3 text-gray-900 text-sm">
                           <div className="flex items-center gap-1">
                             <Clock className="h-4 w-4 text-gray-500" />
-                            {formatDuration(getTotalDuration(course.pages))}
+                            {formatDuration(getTotalDuration(course.pages || []))}
                           </div>
                         </TableCell>
                         <TableCell className="py-3">
                           <Badge
                             className={
-                              course.isActive
+                              course.isActive !== false
                                 ? "bg-green-100 text-green-800 hover:bg-green-100 border-0 text-xs"
                                 : "bg-red-100 text-red-800 hover:bg-red-100 border-0 text-xs"
                             }
                           >
-                            {course.isActive ? "Active" : "Inactive"}
+                            {course.isActive !== false ? "Active" : "Inactive"}
                           </Badge>
                         </TableCell>
                         <TableCell className="py-3 text-gray-900 text-sm">
-                          {new Date(course.createdAt).toLocaleDateString()}
+                          {course.createdAt ? new Date(course.createdAt).toLocaleDateString() : "N/A"}
+                        </TableCell>
+                        <TableCell className="py-3 text-gray-900 text-sm">
+                          {course.uploadedBy?.username || course.uploadedBy?.email || "Unknown"}
                         </TableCell>
                         {(hasPermission("edit") || hasPermission("delete")) && (
                           <TableCell className="py-3">
@@ -544,7 +642,7 @@ export default function CourseManagementPage() {
     )
   }
 
-  // Course View
+  // Course View (keeping the rest of the views the same but with authentication checks)
   if (currentView === "course") {
     return (
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
@@ -552,7 +650,9 @@ export default function CourseManagementPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <div>
             <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Course Viewer</h1>
-            <p className="text-sm text-gray-600 mt-1">{roleDisplayName} • Browse and view course details</p>
+            <p className="text-sm text-gray-600 mt-1">
+              {getRoleDisplayName()} • {userData?.email} • Browse and view course details
+            </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
             {hasPermission("create") && (
@@ -634,15 +734,17 @@ export default function CourseManagementPage() {
                             {course.courseName}
                           </h4>
                           <p className="text-xs sm:text-sm text-gray-500 truncate">
-                            {course.pages.length} pages • {formatDuration(getTotalDuration(course.pages))}
+                            {course.pages?.length || 0} pages • {formatDuration(getTotalDuration(course.pages || []))}
                           </p>
                         </div>
                         <Badge
                           className={
-                            course.isActive ? "bg-green-100 text-green-800 text-xs" : "bg-red-100 text-red-800 text-xs"
+                            course.isActive !== false
+                              ? "bg-green-100 text-green-800 text-xs"
+                              : "bg-red-100 text-red-800 text-xs"
                           }
                         >
-                          {course.isActive ? "Active" : "Inactive"}
+                          {course.isActive !== false ? "Active" : "Inactive"}
                         </Badge>
                       </div>
                     ))
@@ -666,22 +768,25 @@ export default function CourseManagementPage() {
                     <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-2">
                       <h4 className="font-semibold text-gray-900">{selectedCourse.courseName}</h4>
                       <span className="text-sm text-gray-500">
-                        Created: {new Date(selectedCourse.createdAt).toLocaleDateString()}
+                        Created:{" "}
+                        {selectedCourse.createdAt ? new Date(selectedCourse.createdAt).toLocaleDateString() : "N/A"}
                       </span>
                     </div>
                     <div className="flex items-center gap-4 mb-3 text-sm text-gray-600">
                       <div className="flex items-center gap-1">
                         <FileText className="h-4 w-4" />
-                        {selectedCourse.pages.length} pages
+                        {selectedCourse.pages?.length || 0} pages
                       </div>
                       <div className="flex items-center gap-1">
                         <Clock className="h-4 w-4" />
-                        {formatDuration(getTotalDuration(selectedCourse.pages))}
+                        {formatDuration(getTotalDuration(selectedCourse.pages || []))}
                       </div>
                       <Badge
-                        className={selectedCourse.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}
+                        className={
+                          selectedCourse.isActive !== false ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                        }
                       >
-                        {selectedCourse.isActive ? "Active" : "Inactive"}
+                        {selectedCourse.isActive !== false ? "Active" : "Inactive"}
                       </Badge>
                     </div>
                   </div>
@@ -700,20 +805,26 @@ export default function CourseManagementPage() {
               {/* Course Pages */}
               <div className="space-y-4">
                 <h5 className="font-medium text-gray-900">Course Content:</h5>
-                {selectedCourse.pages.map((page, index) => (
-                  <div key={index} className="border border-gray-200 rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <h6 className="font-medium text-gray-900">
-                        Page {index + 1}: {page.title}
-                      </h6>
-                      <span className="text-sm text-gray-500 flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {page.time} minutes
-                      </span>
+                {selectedCourse.pages && selectedCourse.pages.length > 0 ? (
+                  selectedCourse.pages.map((page, index) => (
+                    <div key={index} className="border border-gray-200 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h6 className="font-medium text-gray-900">
+                          Page {index + 1}: {page.title}
+                        </h6>
+                        <span className="text-sm text-gray-500 flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {page.time || 0} minutes
+                        </span>
+                      </div>
+                      <p className="text-gray-700 text-sm leading-relaxed">{page.content}</p>
                     </div>
-                    <p className="text-gray-700 text-sm leading-relaxed">{page.content}</p>
+                  ))
+                ) : (
+                  <div className="text-center py-4 text-gray-500">
+                    <p>No pages available for this course</p>
                   </div>
-                ))}
+                )}
               </div>
             </CardContent>
           </Card>
@@ -730,7 +841,9 @@ export default function CourseManagementPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <div>
             <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Course Analytics</h1>
-            <p className="text-sm text-gray-600 mt-1">{roleDisplayName} • View course statistics and insights</p>
+            <p className="text-sm text-gray-600 mt-1">
+              {getRoleDisplayName()} • {userData?.email} • View course statistics and insights
+            </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
             {hasPermission("create") && (
@@ -773,7 +886,7 @@ export default function CourseManagementPage() {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Active Courses</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {courses.filter((course) => course.isActive).length}
+                    {courses.filter((course) => course.isActive !== false).length}
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -789,7 +902,7 @@ export default function CourseManagementPage() {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Total Pages</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {courses.reduce((total, course) => total + course.pages.length, 0)}
+                    {courses.reduce((total, course) => total + (course.pages?.length || 0), 0)}
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -805,7 +918,7 @@ export default function CourseManagementPage() {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Total Duration</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {formatDuration(courses.reduce((total, course) => total + getTotalDuration(course.pages), 0))}
+                    {formatDuration(courses.reduce((total, course) => total + getTotalDuration(course.pages || []), 0))}
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -827,6 +940,9 @@ export default function CourseManagementPage() {
           ) : coursesError ? (
             <div className="text-center text-red-600 p-4">
               <p>Error loading analytics: {coursesError}</p>
+              <Button onClick={refreshCourses} size="sm" variant="outline" className="mt-2">
+                Retry
+              </Button>
             </div>
           ) : (
             <Card className="bg-white border border-gray-200 max-w-lg mx-auto">

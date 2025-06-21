@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -8,13 +8,82 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from "recharts"
-import { TrendingUp, BarChart3, Shield, X } from "lucide-react"
+import { TrendingUp, BarChart3, Shield, X, Eye, EyeOff, Lock } from "lucide-react"
 import { useUsers } from "../../hooks/useUsers"
 import { userHelpers } from "@/lib/api"
 
 export default function RewardsSystemPage() {
   const [currentView, setCurrentView] = useState("distribution")
   const [selectedUser, setSelectedUser] = useState(null)
+  const [userData, setUserData] = useState({
+    username: "",
+    email: "",
+    role: "",
+    id: "",
+  })
+  const [roleDisplayName, setRoleDisplayName] = useState("")
+
+  // Get user data from localStorage
+  const getUserData = () => {
+    if (typeof window !== "undefined") {
+      try {
+        const userStr = localStorage.getItem("user")
+        if (userStr) {
+          const user = JSON.parse(userStr)
+          return {
+            id: user.id || "",
+            username: user.username || "",
+            email: user.email || "",
+            role: user.role?.toLowerCase() || "",
+          }
+        }
+      } catch (error) {
+        console.error("Error parsing user data from localStorage:", error)
+      }
+    }
+    return {
+      id: "",
+      username: "",
+      email: "",
+      role: "",
+    }
+  }
+
+  // Get role display name
+  const getRoleDisplayName = (role) => {
+    switch (role) {
+      case "superadmin":
+        return "Super Admin"
+      case "editor":
+        return "Editor"
+      case "viewer":
+        return "Viewer"
+      default:
+        return "Unknown"
+    }
+  }
+
+  // Check permissions based on role
+  const hasPermission = (action) => {
+    const role = userData.role
+    switch (role) {
+      case "superadmin":
+        return ["view", "edit", "viewDetails", "viewProfile", "viewSensitiveData"].includes(action)
+      case "editor":
+        return ["view", "viewDetails"].includes(action)
+      case "viewer":
+        return ["view"].includes(action)
+      default:
+        return false
+    }
+  }
+
+  // Load user data on component mount
+  useEffect(() => {
+    const user = getUserData()
+    setUserData(user)
+    setRoleDisplayName(getRoleDisplayName(user.role))
+  }, [])
 
   // Fetch users data
   const { users, loading, error, pagination } = useUsers(1, 100)
@@ -54,7 +123,7 @@ export default function RewardsSystemPage() {
     return users.slice(0, 7).map((user, index) => ({
       id: user._id,
       name: user.name || "Unknown User",
-      referrals: Math.floor(Math.random() * 50) + 10, // Mock referral count
+      referrals: Math.floor(Math.random() * 50) + 10,
       fraudRisk: Math.random() > 0.5 ? "Low" : "Medium",
       email: user.email,
       balance: user.balance || 0,
@@ -87,22 +156,51 @@ export default function RewardsSystemPage() {
     const userStats = userHelpers.calculateStats(users)
     return {
       trackReferrals: userStats.totalReferrals,
-      dailyReports: users.length * 10, // Mock daily reports
-      fraudDetection: Math.floor(users.length * 0.1), // Mock fraud detection
+      dailyReports: users.length * 10,
+      fraudDetection: Math.floor(users.length * 0.1),
     }
   }, [users])
 
   const handleViewUser = (user) => {
+    if (!hasPermission("viewProfile")) {
+      alert("You don't have permission to view user profiles")
+      return
+    }
     setSelectedUser(user)
     setCurrentView("profile")
   }
 
   const handleViewUserDetails = () => {
+    if (!hasPermission("viewDetails")) {
+      alert("You don't have permission to view detailed user information")
+      return
+    }
     setCurrentView("distribution")
   }
 
   const handleViewReferralsLog = () => {
+    if (!hasPermission("viewDetails")) {
+      alert("You don't have permission to view referrals log")
+      return
+    }
     setCurrentView("log")
+  }
+
+  // Show authentication error if no user data
+  if (!userData.username || !userData.role) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+            <Shield className="h-8 w-8 text-red-600" />
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900">Authentication Required</h2>
+          <p className="text-gray-600 max-w-md">
+            Unable to load user data. Please log in again to access the rewards system.
+          </p>
+        </div>
+      </div>
+    )
   }
 
   if (loading) {
@@ -125,8 +223,29 @@ export default function RewardsSystemPage() {
     )
   }
 
-  // User Profile Screen View
+  // User Profile Screen View (Super Admin Only)
   if (currentView === "profile") {
+    if (!hasPermission("viewProfile")) {
+      return (
+        <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
+          <Card className="border-2 border-dashed border-gray-200 bg-gray-50/50">
+            <CardContent className="p-8 h-[400px] flex flex-col items-center justify-center text-center">
+              <div className="w-20 h-20 bg-gray-100 rounded-2xl flex items-center justify-center mb-6">
+                <Lock className="h-10 w-10 text-gray-400" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-700 mb-3">Access Restricted</h3>
+              <p className="text-gray-500 mb-6 max-w-sm leading-relaxed">
+                User profile access is restricted to Super Admin users only.
+              </p>
+              <Button onClick={() => setCurrentView("distribution")} className="bg-teal-600 hover:bg-teal-700">
+                Back to Dashboard
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )
+    }
+
     const user = selectedUser || (tableData.length > 0 ? tableData[0] : null)
 
     if (!user) {
@@ -143,12 +262,20 @@ export default function RewardsSystemPage() {
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Referrals Profile Screen</h1>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">User Profile</h1>
+            <div className="flex items-center gap-2 mt-1">
+              <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                {roleDisplayName}
+              </Badge>
+              <span className="text-sm text-gray-600">Full Access</span>
+            </div>
+          </div>
           <Button
             onClick={handleViewReferralsLog}
             className="bg-teal-600 hover:bg-teal-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium w-full sm:w-auto"
           >
-            View Referrals Log table
+            View Referrals Log
           </Button>
         </div>
 
@@ -157,7 +284,7 @@ export default function RewardsSystemPage() {
           <Card className="bg-white border border-gray-200 w-full max-w-md">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between mb-4 sm:mb-6">
-                <h2 className="text-lg font-semibold text-gray-900">User Profile</h2>
+                <h2 className="text-lg font-semibold text-gray-900">User Details</h2>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -172,13 +299,13 @@ export default function RewardsSystemPage() {
                   <Label htmlFor="name" className="text-sm font-medium text-gray-700">
                     Name
                   </Label>
-                  <Input id="name" value={user.name} readOnly className="bg-gray-50 border-gray-200 text-gray-900" />
+                  <Input id="name" value={user.name} className="border-gray-200 text-gray-900" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="email" className="text-sm font-medium text-gray-700">
                     Email
                   </Label>
-                  <Input id="email" value={user.email} readOnly className="bg-gray-50 border-gray-200 text-gray-900" />
+                  <Input id="email" value={user.email} className="border-gray-200 text-gray-900" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="wallet" className="text-sm font-medium text-gray-700">
@@ -187,8 +314,7 @@ export default function RewardsSystemPage() {
                   <Input
                     id="wallet"
                     value={user.walletAddress}
-                    readOnly
-                    className="bg-gray-50 border-gray-200 text-gray-900 text-xs font-mono"
+                    className="border-gray-200 text-gray-900 text-xs font-mono"
                   />
                 </div>
                 <div className="space-y-2">
@@ -210,13 +336,47 @@ export default function RewardsSystemPage() {
     )
   }
 
-  // Referrals Log Table View
+  // Referrals Log Table View (Super Admin and Editor Only)
   if (currentView === "log") {
+    if (!hasPermission("viewDetails")) {
+      return (
+        <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
+          <Card className="border-2 border-dashed border-gray-200 bg-gray-50/50">
+            <CardContent className="p-8 h-[400px] flex flex-col items-center justify-center text-center">
+              <div className="w-20 h-20 bg-gray-100 rounded-2xl flex items-center justify-center mb-6">
+                <EyeOff className="h-10 w-10 text-gray-400" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-700 mb-3">Access Restricted</h3>
+              <p className="text-gray-500 mb-6 max-w-sm leading-relaxed">
+                Referrals log access requires Editor or Super Admin permissions.
+              </p>
+              <Button onClick={() => setCurrentView("distribution")} className="bg-teal-600 hover:bg-teal-700">
+                Back to Dashboard
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )
+    }
+
     return (
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Referrals Log table</h1>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Referrals Log</h1>
+            <div className="flex items-center gap-2 mt-1">
+              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                {roleDisplayName}
+              </Badge>
+              <span className="text-sm text-gray-600">
+                {userData.role === "superadmin" ? "Full Access" : "Limited Access"}
+              </span>
+            </div>
+          </div>
+          <Button onClick={() => setCurrentView("distribution")} variant="outline" className="w-full sm:w-auto">
+            Back to Dashboard
+          </Button>
         </div>
 
         {/* Stats Cards */}
@@ -243,7 +403,10 @@ export default function RewardsSystemPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Daily Reports</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.dailyReports}</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
+                    {hasPermission("viewSensitiveData") ? stats.dailyReports : "***"}
+                  </p>
+                  {!hasPermission("viewSensitiveData") && <p className="text-xs text-gray-400">Super Admin Only</p>}
                 </div>
               </div>
             </CardContent>
@@ -273,7 +436,7 @@ export default function RewardsSystemPage() {
                   <TableRow className="border-b border-gray-200">
                     <TableHead className="font-semibold text-gray-700 py-4 px-3 sm:px-6 min-w-[100px]">Date</TableHead>
                     <TableHead className="font-semibold text-gray-700 py-4 px-3 sm:px-6 min-w-[200px]">
-                      Referral email
+                      Referrals Email
                     </TableHead>
                     <TableHead className="font-semibold text-gray-700 py-4 px-3 sm:px-6 min-w-[120px]">UID</TableHead>
                   </TableRow>
@@ -295,21 +458,56 @@ export default function RewardsSystemPage() {
     )
   }
 
-  // Main Distribution View
+  // Main Distribution View (All Roles)
   return (
     <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-        <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Reward Distribution History</h1>
+        <div>
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Reward Distribution History</h1>
+          <div className="flex items-center gap-2 mt-1">
+            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+              {roleDisplayName}
+            </Badge>
+            <span className="text-sm text-gray-600">
+              {userData.role === "superadmin"
+                ? "Full Access"
+                : userData.role === "editor"
+                  ? "Limited Access"
+                  : "View Only"}
+            </span>
+          </div>
+        </div>
         <div className="flex gap-3">
-          <Button
-            onClick={handleViewUserDetails}
-            className="bg-teal-600 hover:bg-teal-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium w-full sm:w-auto"
-          >
-            View User Details
-          </Button>
+          {hasPermission("viewDetails") && (
+            <Button
+              onClick={handleViewReferralsLog}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium w-full sm:w-auto"
+            >
+              <BarChart3 className="h-4 w-4 mr-2" />
+              View Log
+            </Button>
+          )}
         </div>
       </div>
+
+      {/* Access Notice for Limited Users */}
+      {!hasPermission("viewDetails") && (
+        <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl p-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+              <EyeOff className="h-4 w-4 text-amber-600" />
+            </div>
+            <div>
+              <h3 className="font-medium text-amber-900 mb-1">Limited Access</h3>
+              <p className="text-sm text-amber-800">
+                You have view-only access to charts and basic user data. Contact your administrator for additional
+                permissions.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Chart Section */}
       <Card className="bg-white border border-gray-200">
@@ -341,7 +539,7 @@ export default function RewardsSystemPage() {
       {/* Table Section */}
       <Card className="bg-white border border-gray-200">
         <CardContent className="p-3 sm:p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Table View</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">User Overview</h3>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -369,13 +567,26 @@ export default function RewardsSystemPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="py-3">
-                      <Button
-                        size="sm"
-                        onClick={() => handleViewUser(user)}
-                        className="bg-teal-600 hover:bg-teal-700 text-white px-3 sm:px-4 py-1 text-sm w-full sm:w-auto"
-                      >
-                        View
-                      </Button>
+                      {hasPermission("viewProfile") ? (
+                        <Button
+                          size="sm"
+                          onClick={() => handleViewUser(user)}
+                          className="bg-teal-600 hover:bg-teal-700 text-white px-3 sm:px-4 py-1 text-sm w-full sm:w-auto"
+                        >
+                          <Eye className="h-3 w-3 mr-1" />
+                          View
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          disabled
+                          className="bg-gray-300 text-gray-500 px-3 sm:px-4 py-1 text-sm w-full sm:w-auto cursor-not-allowed"
+                          title="Requires Super Admin access"
+                        >
+                          <Lock className="h-3 w-3 mr-1" />
+                          Restricted
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -387,5 +598,3 @@ export default function RewardsSystemPage() {
     </div>
   )
 }
-
-
