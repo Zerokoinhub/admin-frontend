@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
-import { GraduationCap, Edit, Target, X, ChevronDown, Trash2, Edit3, Bell, Upload } from "lucide-react"
+import { GraduationCap, Edit, Target, X, ChevronDown, Trash2, Edit3, Bell, Upload, ArrowLeft } from "lucide-react"
 import Image from "next/image"
 import { useUsers } from "../../hooks/useUsers"
 import { userHelpers } from "@/lib/api"
@@ -23,12 +23,19 @@ export default function SettingPage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [showSendToDropdown, setShowSendToDropdown] = useState(false)
   const [selectedSendTo, setSelectedSendTo] = useState("Send to")
-  const [uploadedImage, setUploadedImage] = useState(false)
-  const [showChangePassword, setShowChangePassword] = useState(false);
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [uploadedImage, setUploadedImage] = useState(null)
+  const [showChangePassword, setShowChangePassword] = useState(false)
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
   const [notificationView, setNotificationView] = useState("empty")
-  const [userRole, setUserRole] = useState("viewer") // Default to most restrictive role
+  const [userRole, setUserRole] = useState("viewer")
+  const [notificationData, setNotificationData] = useState({
+    title: "Upcoming Zero Koin",
+    description:
+      "Zero Koin mining is the process of validating transactions and securing the Zero Koin blockchain by solving complex mathematical problems, typically using computing power, to earn rewards in Zero Koin.",
+  })
+  const [isUploading, setIsUploading] = useState(false)
+  const [isSending, setIsSending] = useState(false)
   const [formData, setFormData] = useState({
     name: "Fayhan",
     email: "Menog",
@@ -38,22 +45,19 @@ export default function SettingPage() {
 
   // Get user role from localStorage
   useEffect(() => {
-  const storedUser = localStorage.getItem("user");
-
-  if (storedUser) {
-    try {
-      const parsedUser = JSON.parse(storedUser);
-      console.log("the role:", parsedUser.role);
-      
-      if (parsedUser.role) {
-        setUserRole(parsedUser.role);
+    const storedUser = localStorage.getItem("user")
+    if (storedUser) {
+      try {
+        const parsedUser = JSON.parse(storedUser)
+        console.log("the role:", parsedUser.role)
+        if (parsedUser.role) {
+          setUserRole(parsedUser.role)
+        }
+      } catch (error) {
+        console.error("Failed to parse stored user:", error)
       }
-    } catch (error) {
-      console.error("Failed to parse stored user:", error);
     }
-  }
-}, []);
-
+  }, [])
 
   // Fetch admins data
   const { admins, loading: adminsLoading, error: adminsError, addAdmin, editAdmin, removeAdmin } = useAdmins()
@@ -61,7 +65,7 @@ export default function SettingPage() {
   const [showAddAdminModal, setShowAddAdminModal] = useState(false)
   const [showEditAdminModal, setShowEditAdminModal] = useState(false)
   const [adminFormData, setAdminFormData] = useState({
-    username: "", // Change from 'name' to 'username'
+    username: "",
     email: "",
     role: "",
     password: "",
@@ -90,33 +94,95 @@ export default function SettingPage() {
     }
   }, [users])
 
-  // Generate notification data from real users
-  const notificationData = useMemo(() => {
-    if (!users || users.length === 0) return []
+  // Handle image upload
+  const handleImageUpload = async (event) => {
+    const file = event.target.files[0]
+    if (!file) return
 
-    return users.slice(0, 5).map((user, index) => ({
-      id: user._id,
-      title: "New Update",
-      message: "Watch the full episode to learn zero koin video",
-      time: `${(index + 1) * 2} hours ago`,
-      avatar: "/placeholder.svg?height=32&width=32",
-      network: "Zerokoin Network",
-      userName: user.name || "Unknown User",
-      userEmail: user.email,
-    }))
-  }, [users])
-
-  // Listen for notification clicks from header
-  useEffect(() => {
-    const handleNotificationClick = () => {
-      if (currentView === "main") {
-        setShowNotificationPanel(true)
-      }
+    if (userRole === "viewer") {
+      alert("You don't have permission to upload images.")
+      return
     }
 
-    window.addEventListener("notificationClick", handleNotificationClick)
-    return () => window.removeEventListener("notificationClick", handleNotificationClick)
-  }, [currentView])
+    setIsUploading(true)
+    try {
+      // Create FormData for file upload
+      const formData = new FormData()
+      formData.append("image", file)
+
+      // In a real app, you would upload to your server or cloud storage
+      // For now, we'll create a local URL
+      const imageUrl = URL.createObjectURL(file)
+      setUploadedImage(imageUrl)
+
+      console.log("Image uploaded successfully")
+    } catch (error) {
+      console.error("Failed to upload image:", error)
+      alert("Failed to upload image. Please try again.")
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  // Handle notification sending
+  const handleSendNotification = async () => {
+    if (userRole === "viewer") {
+      alert("You don't have permission to send notifications.")
+      return
+    }
+
+    setIsSending(true)
+    try {
+      let endpoint = ""
+      const payload = {
+        title: notificationData.title,
+        message: notificationData.description,
+      }
+
+      // Determine API endpoint based on selected recipient
+      switch (selectedSendTo) {
+        case "New User":
+          endpoint = "http://localhost:3000/api/notification/general"
+          break
+        case "Old User":
+          endpoint = "http://localhost:3000/api/notification/general"
+          break
+        case "Top rated user":
+          endpoint = "http://localhost:3000/api/notification/top-users"
+          payload.limit = 10
+          break
+        default:
+          endpoint = "http://localhost:3000/api/notification/general"
+      }
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        setShowSuccessModal(true)
+        setTimeout(() => {
+          setShowSuccessModal(false)
+          setNotificationView("empty")
+          setUploadedImage(null)
+          setSelectedSendTo("Send to")
+        }, 3000)
+      } else {
+        throw new Error(result.message || "Failed to send notification")
+      }
+    } catch (error) {
+      console.error("Failed to send notification:", error)
+      alert(`Failed to send notification: ${error.message}`)
+    } finally {
+      setIsSending(false)
+    }
+  }
 
   const handleAddNewAdmin = () => {
     if (userRole === "superadmin") {
@@ -135,7 +201,6 @@ export default function SettingPage() {
   }
 
   const handleNotificationSettings = () => {
-    // Only Super Admin and Editor can access notification settings
     if (userRole === "superadmin" || userRole === "editor") {
       setCurrentView("notifications")
       setNotificationView("empty")
@@ -150,26 +215,16 @@ export default function SettingPage() {
 
   const handleNext = () => {
     if (userRole === "superadmin" || userRole === "editor") {
-      setUploadedImage(true)
       setNotificationView("send")
     }
   }
 
-  const handleSendNotification = () => {
-    if (userRole === "superadmin" || userRole === "editor") {
-      setShowSuccessModal(true)
-      setTimeout(() => {
-        setShowSuccessModal(false)
-        setNotificationView("empty")
-        setShowNotificationList(true)
-      }, 3000)
+  const handleUploadClick = () => {
+    if (userRole === "viewer") {
+      alert("You don't have permission to upload images.")
+      return
     }
-  }
-
-  const handleUploadImage = () => {
-    if (userRole === "superadmin" || userRole === "editor") {
-      setUploadedImage(true)
-    }
+    document.getElementById("image-upload").click()
   }
 
   // Handle add admin form submission
@@ -194,7 +249,6 @@ export default function SettingPage() {
   }
 
   const handleEditAdmin = (admin) => {
-    // Only Super Admin can edit admins
     if (userRole === "superadmin") {
       setEditingAdmin(admin)
       setAdminFormData({
@@ -203,7 +257,6 @@ export default function SettingPage() {
         role: admin.role || "",
         password: "",
       })
-      // For super admin, show the current password (you might want to fetch this from API)
       setCurrentAdminPassword(admin.password || "")
       setShowEditAdminModal(true)
     } else {
@@ -211,44 +264,40 @@ export default function SettingPage() {
     }
   }
 
-  // Handle edit admin form submission
   const handleEditAdminSubmit = async () => {
-  if (!adminFormData.username || !adminFormData.email || !adminFormData.role) {
-    alert("Please fill in required fields");
-    return;
-  }
-
-  const updateData = {
-    username: adminFormData.username,
-    email: adminFormData.email,
-    role: adminFormData.role,
-  };
-
-  // ✅ Include password only if provided
-  if (adminFormData.password?.trim()) {
-    updateData.password = adminFormData.password.trim();
-  }
-
-  try {
-    const result = await editAdmin(editingAdmin._id, updateData);
-
-    if (result && result.success) {
-      alert("Admin updated successfully!");
-      setShowEditAdminModal(false);
-      setEditingAdmin(null);
-      setAdminFormData({ username: "", email: "", role: "", password: "" });
-    } else {
-      throw new Error(result?.error || "Unknown error");
+    if (!adminFormData.username || !adminFormData.email || !adminFormData.role) {
+      alert("Please fill in required fields")
+      return
     }
-  } catch (error) {
-    console.error("Update failed:", error);
-    alert(`Failed to update admin: ${error.message}`);
-  }
-};
 
+    const updateData = {
+      username: adminFormData.username,
+      email: adminFormData.email,
+      role: adminFormData.role,
+    }
+
+    if (adminFormData.password?.trim()) {
+      updateData.password = adminFormData.password.trim()
+    }
+
+    try {
+      const result = await editAdmin(editingAdmin._id, updateData)
+
+      if (result && result.success) {
+        alert("Admin updated successfully!")
+        setShowEditAdminModal(false)
+        setEditingAdmin(null)
+        setAdminFormData({ username: "", email: "", role: "", password: "" })
+      } else {
+        throw new Error(result?.error || "Unknown error")
+      }
+    } catch (error) {
+      console.error("Update failed:", error)
+      alert(`Failed to update admin: ${error.message}`)
+    }
+  }
 
   const handleRemoveAdmin = async (adminId) => {
-    // Only Super Admin can remove admins
     if (userRole === "superadmin") {
       if (confirm("Are you sure you want to remove this admin?")) {
         const result = await removeAdmin(adminId)
@@ -273,9 +322,8 @@ export default function SettingPage() {
     )
   }
 
-  // Notification Settings View - Add access control
+  // Notification Settings View
   if (currentView === "notifications") {
-    // Check if user has permission to access notifications
     if (userRole === "viewer") {
       return (
         <div className="p-6 text-center">
@@ -287,11 +335,11 @@ export default function SettingPage() {
         </div>
       )
     }
+
     // Empty Notification State
     if (notificationView === "empty") {
       return (
         <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen relative">
-          {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
             <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Hye Admin!</h1>
             <Button onClick={() => setCurrentView("main")} variant="outline" className="w-full sm:w-auto">
@@ -299,7 +347,6 @@ export default function SettingPage() {
             </Button>
           </div>
 
-          {/* Empty State */}
           <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6">
             <div className="w-24 sm:w-32 h-24 sm:h-32 bg-teal-100 rounded-full flex items-center justify-center">
               <Bell className="h-12 sm:h-16 w-12 sm:w-16 text-teal-600" />
@@ -307,7 +354,6 @@ export default function SettingPage() {
             <div className="text-center space-y-2">
               <h2 className="text-lg sm:text-xl font-medium text-gray-900">You have no Notification Yet!</h2>
             </div>
-            {/* Only Super Admin and Editor can create notifications */}
             {(userRole === "superadmin" || userRole === "editor") && (
               <Button
                 onClick={handleCreateNotification}
@@ -317,104 +363,6 @@ export default function SettingPage() {
               </Button>
             )}
           </div>
-
-          {/* Notification Panel */}
-          {showNotificationPanel && (
-            <div className="fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-50 border-l border-gray-200">
-              <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold text-gray-900">Notifications</h3>
-                  <span className="bg-teal-600 text-white text-xs px-2 py-1 rounded-full">
-                    {notificationData.length}
-                  </span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowNotificationPanel(false)}
-                  className="h-6 w-6 p-0"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="p-4">
-                {notificationData.length > 0 ? (
-                  <div className="flex items-center gap-3 mb-4">
-                    <Image
-                      src="/placeholder.svg?height=40&width=40"
-                      alt="User"
-                      width={40}
-                      height={40}
-                      className="rounded-full"
-                    />
-                    <div>
-                      <p className="font-medium text-gray-900">Hi {notificationData[0].userName}</p>
-                      <p className="text-sm text-gray-500">Here Sign up to Zero Koin</p>
-                      <p className="text-xs text-gray-400">2 May 12:5 PM</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center text-gray-500 py-4">
-                    <p>No notifications available</p>
-                  </div>
-                )}
-                <div className="space-y-2">
-                  <p className="text-sm text-gray-600">
-                    View on Admin: <span className="font-medium">Abdul Salam</span>
-                  </p>
-                  <p className="text-xs text-gray-500">On 5th May, 2:30 PM</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Notification List */}
-          {showNotificationList && (
-            <div className="fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-50 border-l border-gray-200">
-              <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-                <h3 className="font-semibold text-gray-900">Notifications</h3>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowNotificationList(false)}
-                  className="h-6 w-6 p-0"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="flex-1 overflow-y-auto">
-                {notificationData.map((notification) => (
-                  <div key={notification.id} className="p-4 border-b border-gray-100 hover:bg-gray-50">
-                    <div className="flex items-start gap-3">
-                      <Image
-                        src={notification.avatar || "/placeholder.svg?height=32&width=32"}
-                        alt="Zerokoin"
-                        width={32}
-                        height={32}
-                        className="rounded-full flex-shrink-0"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <p className="font-medium text-gray-900 text-sm">{notification.network}</p>
-                          <Button variant="ghost" size="sm" className="h-4 w-4 p-0">
-                            <X className="h-3 w-3 text-gray-400" />
-                          </Button>
-                        </div>
-                        <p className="font-medium text-gray-800 text-sm mb-1">{notification.title}</p>
-                        <p className="text-xs text-gray-600 mb-2">{notification.message}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="p-4 border-t border-gray-200 flex gap-2">
-                <Button className="flex-1 bg-teal-600 hover:bg-teal-700 text-white text-sm">Manage</Button>
-                <Button variant="outline" className="flex-1 text-sm">
-                  Clear All
-                </Button>
-              </div>
-            </div>
-          )}
         </div>
       )
     }
@@ -423,7 +371,6 @@ export default function SettingPage() {
     if (notificationView === "create") {
       return (
         <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
-          {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
             <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Create Notification</h1>
             <Button onClick={() => setNotificationView("empty")} variant="outline" className="w-full sm:w-auto">
@@ -431,40 +378,87 @@ export default function SettingPage() {
             </Button>
           </div>
 
-          {/* Create Form */}
           <div className="max-w-2xl mx-auto space-y-6">
             {/* Upload Image Area */}
             <div
-              onClick={handleUploadImage}
+              onClick={handleUploadClick}
               className={`border-2 border-dashed border-gray-300 rounded-lg p-8 sm:p-12 text-center transition-colors ${
                 userRole === "viewer" ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:border-gray-400"
-              }`}
+              } ${uploadedImage ? "border-teal-500 bg-teal-50" : ""}`}
             >
+              <input
+                id="image-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+                disabled={userRole === "viewer"}
+              />
               <div className="space-y-4">
-                <div className="w-12 h-12 mx-auto bg-gray-100 rounded-lg flex items-center justify-center">
-                  <Upload className="h-6 w-6 text-gray-600" />
-                </div>
-                <div>
-                  <p className="text-gray-600 font-medium">Upload Image</p>
-                </div>
+                {uploadedImage ? (
+                  <div className="space-y-4">
+                    <Image
+                      src={uploadedImage || "/placeholder.svg"}
+                      alt="Uploaded notification image"
+                      width={200}
+                      height={120}
+                      className="mx-auto rounded-lg object-cover"
+                    />
+                    <p className="text-teal-600 font-medium">Image uploaded successfully!</p>
+                    <p className="text-sm text-gray-500">Click to change image</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="w-12 h-12 mx-auto bg-gray-100 rounded-lg flex items-center justify-center">
+                      {isUploading ? (
+                        <div className="w-6 h-6 border-2 border-gray-300 border-t-teal-600 rounded-full animate-spin"></div>
+                      ) : (
+                        <Upload className="h-6 w-6 text-gray-600" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-gray-600 font-medium">{isUploading ? "Uploading..." : "Upload Image"}</p>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
-            {/* Static Content */}
+            {/* Editable Content */}
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900">Upcoming Zero Koin</h3>
-              <p className="text-gray-700 text-sm leading-relaxed">
-                Zero Koin mining is the process of validating transactions and securing the Zero Koin blockchain by
-                solving complex mathematical problems, typically using computing power, to earn rewards in Zero Koin.
-              </p>
+              <div className="space-y-2">
+                <Label htmlFor="notification-title" className="text-sm font-medium text-gray-700">
+                  Notification Title
+                </Label>
+                <Input
+                  id="notification-title"
+                  value={notificationData.title}
+                  onChange={(e) => setNotificationData({ ...notificationData, title: e.target.value })}
+                  className="border-gray-200"
+                  disabled={userRole === "viewer"}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="notification-description" className="text-sm font-medium text-gray-700">
+                  Description
+                </Label>
+                <textarea
+                  id="notification-description"
+                  value={notificationData.description}
+                  onChange={(e) => setNotificationData({ ...notificationData, description: e.target.value })}
+                  className="w-full p-3 border border-gray-200 rounded-md text-sm leading-relaxed resize-none"
+                  rows={4}
+                  disabled={userRole === "viewer"}
+                />
+              </div>
             </div>
 
-            {/* Next Button */}
             <div className="flex justify-end">
               {(userRole === "superadmin" || userRole === "editor") && (
                 <Button
                   onClick={handleNext}
                   className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-md text-sm font-medium"
+                  disabled={!notificationData.title.trim() || !notificationData.description.trim()}
                 >
                   Next
                 </Button>
@@ -479,7 +473,6 @@ export default function SettingPage() {
     if (notificationView === "send") {
       return (
         <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
-          {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
             <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Filter & Send Notification</h1>
             <div className="relative">
@@ -514,36 +507,41 @@ export default function SettingPage() {
             </div>
           </div>
 
-          {/* Content */}
           <div className="max-w-2xl mx-auto space-y-6">
             {/* Notification Preview */}
             <div className="relative rounded-lg overflow-hidden">
-              <Image
-                src="/notification-bg.png"
-                alt="Notification Background"
-                width={600}
-                height={200}
-                className="w-full h-48 sm:h-56 object-cover"
-              />
+              {uploadedImage ? (
+                <Image
+                  src={uploadedImage || "/placeholder.svg"}
+                  alt="Notification Preview"
+                  width={600}
+                  height={200}
+                  className="w-full h-48 sm:h-56 object-cover"
+                />
+              ) : (
+                <div className="w-full h-48 sm:h-56 bg-gradient-to-r from-teal-400 to-blue-500 flex items-center justify-center">
+                  <div className="text-white text-center">
+                    <Bell className="h-12 w-12 mx-auto mb-2" />
+                    <p className="text-lg font-medium">No Image Uploaded</p>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Static Content */}
+            {/* Content Preview */}
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900">Upcoming Zero Koin</h3>
-              <p className="text-gray-700 text-sm leading-relaxed">
-                Zero Koin mining is the process of validating transactions and securing the Zero Koin blockchain by
-                solving complex mathematical problems, typically using computing power, to earn rewards in Zero Koin.
-              </p>
+              <h3 className="text-lg font-semibold text-gray-900">{notificationData.title}</h3>
+              <p className="text-gray-700 text-sm leading-relaxed">{notificationData.description}</p>
             </div>
 
-            {/* Send Button */}
             <div className="flex justify-end">
               {(userRole === "superadmin" || userRole === "editor") && (
                 <Button
                   onClick={handleSendNotification}
                   className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-md text-sm font-medium"
+                  disabled={isSending || selectedSendTo === "Send to"}
                 >
-                  Send Notification
+                  {isSending ? "Sending..." : "Send Notification"}
                 </Button>
               )}
             </div>
@@ -553,14 +551,10 @@ export default function SettingPage() {
           <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
             <DialogContent className="sm:max-w-md bg-white text-center border-0 shadow-2xl mx-4">
               <div className="py-8 px-6">
-                {/* Success Icon with Animation */}
                 <div className="relative mx-auto w-24 h-24 mb-8">
-                  {/* Main Circle */}
                   <div className="w-24 h-24 bg-gradient-to-br from-teal-500 to-green-600 rounded-full flex items-center justify-center relative z-10">
                     <Bell className="h-10 w-10 text-white" />
                   </div>
-
-                  {/* Animated Dots */}
                   <div className="absolute inset-0 animate-spin" style={{ animationDuration: "3s" }}>
                     <div className="absolute w-3 h-3 bg-teal-500 rounded-full -top-1 left-1/2 transform -translate-x-1/2"></div>
                     <div className="absolute w-2 h-2 bg-green-500 rounded-full top-2 -right-1"></div>
@@ -572,16 +566,10 @@ export default function SettingPage() {
                     <div className="absolute w-3 h-3 bg-green-400 rounded-full top-2 left-2"></div>
                   </div>
                 </div>
-
-                {/* Success Text */}
                 <h3 className="text-xl font-semibold text-teal-600 mb-2">Your Notification</h3>
                 <h3 className="text-xl font-semibold text-teal-600 mb-6">has Successfully Send!</h3>
-
-                {/* Wait Text */}
                 <p className="text-sm text-gray-600 mb-2">Please wait</p>
                 <p className="text-sm text-gray-600 mb-8">You will be directed to the homepage soon</p>
-
-                {/* Loading Spinner */}
                 <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
               </div>
             </DialogContent>
@@ -595,7 +583,6 @@ export default function SettingPage() {
   if (currentView === "main") {
     return (
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
-        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Setting</h1>
         </div>
@@ -610,7 +597,6 @@ export default function SettingPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Learning Rewards</p>
-                  {/* Only Super Admin can see numbers */}
                   <p className="text-2xl sm:text-3xl font-bold text-gray-900">
                     {userRole === "superadmin" ? stats.learningRewards : "***"}
                   </p>
@@ -641,7 +627,6 @@ export default function SettingPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Ad Base Rewards</p>
-                  {/* Only Super Admin can see numbers */}
                   <p className="text-2xl sm:text-3xl font-bold text-gray-900">
                     {userRole === "superadmin" ? stats.adBaseRewards : "***"}
                   </p>
@@ -651,7 +636,7 @@ export default function SettingPage() {
           </Card>
         </div>
 
-        {/* Expiry Dropdown - Only Super Admin and Editor */}
+        {/* Expiry Dropdown */}
         {(userRole === "superadmin" || userRole === "editor") && (
           <div className="flex justify-center sm:justify-end">
             <div className="relative">
@@ -692,7 +677,6 @@ export default function SettingPage() {
           >
             View Admin Control
           </Button>
-          {/* Only Super Admin and Editor can access notification settings */}
           {(userRole === "superadmin" || userRole === "editor") && (
             <Button
               onClick={handleNotificationSettings}
@@ -702,61 +686,28 @@ export default function SettingPage() {
             </Button>
           )}
         </div>
-
-        {/* Notification Panel */}
-        {showNotificationPanel && (
-          <div className="fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-50 border-l border-gray-200">
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-gray-900">Notifications</h3>
-                <span className="bg-teal-600 text-white text-xs px-2 py-1 rounded-full">{notificationData.length}</span>
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => setShowNotificationPanel(false)} className="h-6 w-6 p-0">
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="p-4">
-              {notificationData.length > 0 ? (
-                <div className="flex items-center gap-3 mb-4">
-                  <Image
-                    src="/placeholder.svg?height=40&width=40"
-                    alt="User"
-                    width={40}
-                    height={40}
-                    className="rounded-full"
-                  />
-                  <div>
-                    <p className="font-medium text-gray-900">Hi {notificationData[0].userName}</p>
-                    <p className="text-sm text-gray-500">Here Sign up to Zero Koin</p>
-                    <p className="text-xs text-gray-400">2 May 12:5 PM</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center text-gray-500 py-4">
-                  <p>No notifications available</p>
-                </div>
-              )}
-              <div className="space-y-2">
-                <p className="text-sm text-gray-600">
-                  View on Admin: <span className="font-medium">Abdul Salam</span>
-                </p>
-                <p className="text-xs text-gray-500">On 5th May, 2:30 PM</p>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     )
   }
 
-  // Maintained Control View
+  // Admin Control View with Back to Settings button
   if (currentView === "control") {
     return (
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
-        {/* Header */}
+        {/* Header with Back to Settings */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Maintained control</h1>
-          {/* Only Super Admin can add new admin */}
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={() => setCurrentView("main")}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Settings
+            </Button>
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Maintained control</h1>
+          </div>
           {userRole === "superadmin" && (
             <Button
               onClick={handleAddNewAdmin}
@@ -777,7 +728,6 @@ export default function SettingPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Learning Rewards</p>
-                  {/* Only Super Admin can see numbers */}
                   <p className="text-2xl sm:text-3xl font-bold text-gray-900">
                     {userRole === "superadmin" ? stats.learningRewards : "***"}
                   </p>
@@ -808,7 +758,6 @@ export default function SettingPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Ad Base Rewards</p>
-                  {/* Only Super Admin can see numbers */}
                   <p className="text-2xl sm:text-3xl font-bold text-gray-900">
                     {userRole === "superadmin" ? stats.adBaseRewards : "***"}
                   </p>
@@ -828,7 +777,6 @@ export default function SettingPage() {
                   <TableRow className="border-b border-gray-200">
                     <TableHead className="font-semibold text-gray-700 py-3 min-w-[200px]">Admin Email</TableHead>
                     <TableHead className="font-semibold text-gray-700 py-3 min-w-[120px]">Role</TableHead>
-                    {/* Only Super Admin can see Action column */}
                     {userRole === "superadmin" && (
                       <TableHead className="font-semibold text-gray-700 py-3 min-w-[160px]">Action</TableHead>
                     )}
@@ -851,10 +799,7 @@ export default function SettingPage() {
                     </TableRow>
                   ) : admins.length === 0 ? (
                     <TableRow>
-                      <TableCell
-                        colSpan={userRole === "superadmin" ? 3 : 2}
-                        className="text-center py-8 text-gray-500"
-                      >
+                      <TableCell colSpan={userRole === "superadmin" ? 3 : 2} className="text-center py-8 text-gray-500">
                         No admins found
                       </TableCell>
                     </TableRow>
@@ -883,7 +828,6 @@ export default function SettingPage() {
                                   : admin.role}
                           </span>
                         </TableCell>
-                        {/* Only Super Admin can see and use action buttons */}
                         {userRole === "superadmin" && (
                           <TableCell className="py-3">
                             <div className="flex flex-col sm:flex-row gap-2">
@@ -914,6 +858,7 @@ export default function SettingPage() {
             </div>
           </CardContent>
         </Card>
+
         {/* Add Admin Modal */}
         <Dialog open={showAddAdminModal} onOpenChange={setShowAddAdminModal}>
           <DialogContent className="sm:max-w-md bg-white">
@@ -996,254 +941,140 @@ export default function SettingPage() {
 
         {/* Edit Admin Modal */}
         <Dialog open={showEditAdminModal} onOpenChange={setShowEditAdminModal}>
-      <DialogContent className="sm:max-w-md bg-white">
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-gray-900">Edit Admin</h2>
-            <Button variant="ghost" size="sm" onClick={() => setShowEditAdminModal(false)} className="h-6 w-6 p-0">
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-
-          <div className="space-y-4">
-            {/* Username */}
-            <div className="space-y-2">
-              <Label htmlFor="edit-name">Username *</Label>
-              <Input
-                id="edit-name"
-                value={adminFormData.username}
-                onChange={(e) => setAdminFormData({ ...adminFormData, username: e.target.value })}
-                disabled={userRole !== "superadmin"}
-              />
-            </div>
-
-            {/* Email */}
-            <div className="space-y-2">
-              <Label htmlFor="edit-email">Email *</Label>
-              <Input
-                id="edit-email"
-                type="email"
-                value={adminFormData.email}
-                onChange={(e) => setAdminFormData({ ...adminFormData, email: e.target.value })}
-                disabled={userRole !== "superadmin"}
-              />
-            </div>
-
-            {/* Role */}
-            <div className="space-y-2">
-              <Label htmlFor="edit-role">Role *</Label>
-              <Select
-                value={adminFormData.role}
-                onValueChange={(value) => setAdminFormData({ ...adminFormData, role: value })}
-                disabled={userRole !== "superadmin"}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="superadmin">Super Admin</SelectItem>
-                  <SelectItem value="editor">Editor</SelectItem>
-                  <SelectItem value="viewer">Viewer</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Current Password View (Only for Superadmin) */}
-            {userRole === "superadmin" && currentAdminPassword && (
-              <div className="space-y-2">
-                <Label>Current Password</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type={showPassword ? "text" : "password"}
-                    value={currentAdminPassword}
-                    className="bg-gray-50"
-                    readOnly
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="px-3"
-                  >
-                    {showPassword ? "Hide" : "Show"}
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* Change Password Toggle */}
-            {userRole === "superadmin" && (
-              <div className="pt-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setShowChangePassword((prev) => !prev)}
-                >
-                  {showChangePassword ? "Cancel Password Change" : "Change Password"}
+          <DialogContent className="sm:max-w-md bg-white">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-semibold text-gray-900">Edit Admin</h2>
+                <Button variant="ghost" size="sm" onClick={() => setShowEditAdminModal(false)} className="h-6 w-6 p-0">
+                  <X className="h-4 w-4" />
                 </Button>
               </div>
-            )}
 
-            {/* New + Confirm Password Fields */}
-            {userRole === "superadmin" && showChangePassword && (
-              <>
-                <div className="space-y-2 pt-4">
-                  <Label htmlFor="new-password">New Password</Label>
-                  <Input
-                    id="new-password"
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirm-password">Confirm Password</Label>
-                  <Input
-                    id="confirm-password"
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setConfirmPassword(value);
-
-                      // If confirm matches new, update form data
-                      if (value === newPassword) {
-                        setAdminFormData({ ...adminFormData, password: value });
-                      }
-                    }}
-                    className={`${
-                      confirmPassword && confirmPassword !== newPassword ? "border-red-500" : ""
-                    }`}
-                  />
-                  {confirmPassword && confirmPassword !== newPassword && (
-                    <p className="text-xs text-red-500">Passwords do not match.</p>
-                  )}
-                </div>
-              </>
-            )}
-
-            {/* Buttons */}
-            <div className="flex justify-end gap-3 pt-4">
-              <Button variant="outline" onClick={() => setShowEditAdminModal(false)}>
-                {userRole === "superadmin" ? "Cancel" : "Close"}
-              </Button>
-              {userRole === "superadmin" && (
-                <Button onClick={handleEditAdminSubmit} className="bg-teal-600 hover:bg-teal-700 text-white">
-                  Update Admin
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-
-      </div>
-    )
-  }
-
-  // Permissions new Admin View - Super Admin Only
-  if (currentView === "permissions") {
-    if (userRole !== "superadmin") {
-      return (
-        <div className="p-6 text-center">
-          <h2 className="text-xl font-semibold text-red-600">Access Denied</h2>
-          <p className="text-gray-600 mt-2">You don't have permission to assign permissions.</p>
-          <Button onClick={() => setCurrentView("control")} className="mt-4">
-            Go Back
-          </Button>
-        </div>
-      )
-    }
-
-    return (
-      <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Permissions new Admin</h1>
-          <Button
-            onClick={() => setCurrentView("control")}
-            className="bg-teal-600 hover:bg-teal-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium w-full sm:w-auto"
-          >
-            Add New Admin
-          </Button>
-        </div>
-
-        {/* Add New Admin Detail Card */}
-        <div className="flex justify-center px-3 sm:px-0">
-          <Card className="bg-white border border-gray-200 w-full max-w-md">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-4 sm:mb-6">
-                <h2 className="text-lg font-semibold text-gray-900">Add New Admin Detail</h2>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setCurrentView("control")}
-                  className="h-6 w-6 p-0 hover:bg-gray-100 flex-shrink-0"
-                >
-                  <X className="h-4 w-4 text-gray-500" />
-                </Button>
-              </div>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name" className="text-sm font-medium text-gray-700">
-                    Name
-                  </Label>
+                  <Label htmlFor="edit-name">Username *</Label>
                   <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="border-gray-200 text-gray-900"
+                    id="edit-name"
+                    value={adminFormData.username}
+                    onChange={(e) => setAdminFormData({ ...adminFormData, username: e.target.value })}
+                    disabled={userRole !== "superadmin"}
                   />
                 </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-sm font-medium text-gray-700">
-                    Email
-                  </Label>
+                  <Label htmlFor="edit-email">Email *</Label>
                   <Input
-                    id="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="border-gray-200 text-gray-900"
+                    id="edit-email"
+                    type="email"
+                    value={adminFormData.email}
+                    onChange={(e) => setAdminFormData({ ...adminFormData, email: e.target.value })}
+                    disabled={userRole !== "superadmin"}
                   />
                 </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="role" className="text-sm font-medium text-gray-700">
-                    Role
-                  </Label>
-                  <Input
-                    id="role"
-                    value={formData.role}
-                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                    className="border-gray-200 text-gray-900"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="time" className="text-sm font-medium text-gray-700">
-                    Time
-                  </Label>
-                  <Input
-                    id="time"
-                    value={formData.time}
-                    onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-                    className="border-gray-200 text-gray-900"
-                  />
-                </div>
-                <div className="flex justify-end pt-4">
-                  <Button
-                    onClick={() => setCurrentView("control")}
-                    className="bg-teal-600 hover:bg-teal-700 text-white px-4 sm:px-6 py-2 rounded-md text-sm font-medium w-full sm:w-auto"
+                  <Label htmlFor="edit-role">Role *</Label>
+                  <Select
+                    value={adminFormData.role}
+                    onValueChange={(value) => setAdminFormData({ ...adminFormData, role: value })}
+                    disabled={userRole !== "superadmin"}
                   >
-                    Confirm
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="superadmin">Super Admin</SelectItem>
+                      <SelectItem value="editor">Editor</SelectItem>
+                      <SelectItem value="viewer">Viewer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {userRole === "superadmin" && currentAdminPassword && (
+                  <div className="space-y-2">
+                    <Label>Current Password</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type={showPassword ? "text" : "password"}
+                        value={currentAdminPassword}
+                        className="bg-gray-50"
+                        readOnly
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="px-3"
+                      >
+                        {showPassword ? "Hide" : "Show"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {userRole === "superadmin" && (
+                  <div className="pt-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setShowChangePassword((prev) => !prev)}
+                    >
+                      {showChangePassword ? "Cancel Password Change" : "Change Password"}
+                    </Button>
+                  </div>
+                )}
+
+                {userRole === "superadmin" && showChangePassword && (
+                  <>
+                    <div className="space-y-2 pt-4">
+                      <Label htmlFor="new-password">New Password</Label>
+                      <Input
+                        id="new-password"
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="confirm-password">Confirm Password</Label>
+                      <Input
+                        id="confirm-password"
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => {
+                          const value = e.target.value
+                          setConfirmPassword(value)
+                          if (value === newPassword) {
+                            setAdminFormData({ ...adminFormData, password: value })
+                          }
+                        }}
+                        className={`${confirmPassword && confirmPassword !== newPassword ? "border-red-500" : ""}`}
+                      />
+                      {confirmPassword && confirmPassword !== newPassword && (
+                        <p className="text-xs text-red-500">Passwords do not match.</p>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                <div className="flex justify-end gap-3 pt-4">
+                  <Button variant="outline" onClick={() => setShowEditAdminModal(false)}>
+                    {userRole === "superadmin" ? "Cancel" : "Close"}
                   </Button>
+                  {userRole === "superadmin" && (
+                    <Button onClick={handleEditAdminSubmit} className="bg-teal-600 hover:bg-teal-700 text-white">
+                      Update Admin
+                    </Button>
+                  )}
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     )
   }
 }
+
