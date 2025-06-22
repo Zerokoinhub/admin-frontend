@@ -1,12 +1,28 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ArrowLeft, Loader2, Search, Download, Calendar, Coins, User, Clock, RefreshCw } from "lucide-react"
+import {
+  ArrowLeft,
+  Loader2,
+  Search,
+  Download,
+  Calendar,
+  Coins,
+  User,
+  Clock,
+  RefreshCw,
+  Filter,
+  TrendingUp,
+  Activity,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { userAPI } from "@/lib/api"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { transferAPI } from "../../src/lib/transferAPI"
+import { userHelpers } from "../../src/lib/api"
 
 export default function TransferHistory({ onBack, transferHistory = [], onRefresh }) {
   const [transfers, setTransfers] = useState(transferHistory)
@@ -19,6 +35,10 @@ export default function TransferHistory({ onBack, transferHistory = [], onRefres
   const [filterStatus, setFilterStatus] = useState("all")
   const [dateRange, setDateRange] = useState("all")
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [stats, setStats] = useState(null)
+  const [selectedUserId, setSelectedUserId] = useState("")
+  const [startDate, setStartDate] = useState("")
+  const [endDate, setEndDate] = useState("")
   const itemsPerPage = 10
 
   // Update local transfers when prop changes
@@ -27,33 +47,88 @@ export default function TransferHistory({ onBack, transferHistory = [], onRefres
       setTransfers(transferHistory)
       setTotalTransfers(transferHistory.length)
       setTotalPages(Math.ceil(transferHistory.length / itemsPerPage))
+
+      // Calculate stats from local data
+      const transferStats = userHelpers.calculateTransferStats(transferHistory)
+      setStats(transferStats)
     }
   }, [transferHistory])
 
-  // Fetch transfer history from API with better error handling
-  const fetchTransferHistory = async (page = 1, search = "", status = "all", dateFilter = "all") => {
+  // Enhanced fetch transfer history using transferAPI
+  const fetchTransferHistory = async (page = 1, search = "", status = "all", dateFilter = "all", userId = "") => {
     try {
       setLoading(true)
       setError("")
 
-      // Try to fetch from API first
+      // Prepare filters for the new transferAPI
+      const filters = {
+        page,
+        limit: itemsPerPage,
+        ...(search && { search }),
+        ...(status !== "all" && { status }),
+        ...(userId && { userId }),
+        ...(startDate && { startDate }),
+        ...(endDate && { endDate }),
+      }
+
+      // Handle date range filters
+      if (dateFilter !== "all" && !startDate && !endDate) {
+        const now = new Date()
+        const filterStartDate = new Date()
+
+        switch (dateFilter) {
+          case "today":
+            filterStartDate.setHours(0, 0, 0, 0)
+            filters.startDate = filterStartDate.toISOString()
+            filters.endDate = now.toISOString()
+            break
+          case "week":
+            filterStartDate.setDate(now.getDate() - 7)
+            filters.startDate = filterStartDate.toISOString()
+            filters.endDate = now.toISOString()
+            break
+          case "month":
+            filterStartDate.setMonth(now.getMonth() - 1)
+            filters.startDate = filterStartDate.toISOString()
+            filters.endDate = now.toISOString()
+            break
+        }
+      }
+
       try {
-        const response = await userAPI.getTransferHistory({
-          page,
-          limit: itemsPerPage,
-          search,
-          status: status !== "all" ? status : undefined,
-          dateRange: dateFilter !== "all" ? dateFilter : undefined,
-        })
+        // Use the dedicated transferAPI for better handling
+        const response = await transferAPI.getHistory(filters)
 
         if (response.success && response.data) {
-          setTransfers(response.data.transfers || [])
+          const formattedTransfers = response.data.transfers.map((transfer) => ({
+            id: transfer.id || transfer._id,
+            userId: transfer.userId,
+            userName: transfer.userName || transfer.user?.name || "Unknown User",
+            userEmail: transfer.userEmail || transfer.user?.email || "No email",
+            amount: Number(transfer.amount) || 0,
+            reason: transfer.reason || "No reason provided",
+            status: transfer.status || "completed",
+            createdAt: transfer.createdAt || transfer.timestamp,
+            date: transfer.date || new Date(transfer.createdAt || transfer.timestamp).toLocaleDateString(),
+            time: transfer.time || new Date(transfer.createdAt || transfer.timestamp).toLocaleTimeString(),
+            transferredBy: transfer.transferredBy || transfer.adminName || "System",
+            transactionId: transfer.transactionId || `TXN${Date.now()}`,
+            balanceBefore: transfer.balanceBefore || 0,
+            balanceAfter: transfer.balanceAfter || 0,
+          }))
+
+          setTransfers(formattedTransfers)
           setTotalPages(response.data.totalPages || 1)
           setTotalTransfers(response.data.total || 0)
+
+          // Calculate comprehensive stats
+          const transferStats = userHelpers.calculateTransferStats(formattedTransfers)
+          setStats(transferStats)
           return
         }
       } catch (apiError) {
-        console.warn("API call failed, using local/fallback data:", apiError)
+        console.warn("TransferAPI call failed, using fallback:", apiError)
+        setError("Unable to connect to transfer service. Using local data.")
       }
 
       // Fallback: use provided transferHistory or generate mock data if needed
@@ -90,27 +165,40 @@ export default function TransferHistory({ onBack, transferHistory = [], onRefres
         filteredTransfers = filteredTransfers.filter((transfer) => transfer.status === status)
       }
 
-      // Date filter
-      if (dateFilter !== "all") {
-        const now = new Date()
-        let filterDate = new Date()
+      // User filter
+      if (userId) {
+        filteredTransfers = filteredTransfers.filter((transfer) => transfer.userId === userId)
+      }
 
-        switch (dateFilter) {
-          case "today":
-            filterDate.setHours(0, 0, 0, 0)
-            break
-          case "week":
-            filterDate.setDate(now.getDate() - 7)
-            break
-          case "month":
-            filterDate.setMonth(now.getMonth() - 1)
-            break
-          default:
-            filterDate = null
+      // Date filter
+      if (dateFilter !== "all" || startDate || endDate) {
+        const now = new Date()
+        let filterStartDate = startDate ? new Date(startDate) : null
+        let filterEndDate = endDate ? new Date(endDate) : null
+
+        if (dateFilter !== "all" && !startDate && !endDate) {
+          filterStartDate = new Date()
+          switch (dateFilter) {
+            case "today":
+              filterStartDate.setHours(0, 0, 0, 0)
+              break
+            case "week":
+              filterStartDate.setDate(now.getDate() - 7)
+              break
+            case "month":
+              filterStartDate.setMonth(now.getMonth() - 1)
+              break
+          }
+          filterEndDate = now
         }
 
-        if (filterDate) {
-          filteredTransfers = filteredTransfers.filter((transfer) => new Date(transfer.createdAt) >= filterDate)
+        if (filterStartDate || filterEndDate) {
+          filteredTransfers = filteredTransfers.filter((transfer) => {
+            const transferDate = new Date(transfer.createdAt)
+            if (filterStartDate && transferDate < filterStartDate) return false
+            if (filterEndDate && transferDate > filterEndDate) return false
+            return true
+          })
         }
       }
 
@@ -127,6 +215,10 @@ export default function TransferHistory({ onBack, transferHistory = [], onRefres
       setTransfers(paginatedData)
       setTotalPages(Math.max(totalPages, 1))
       setTotalTransfers(total)
+
+      // Calculate stats from filtered data
+      const transferStats = userHelpers.calculateTransferStats(filteredTransfers)
+      setStats(transferStats)
     } catch (err) {
       console.error("Error in fetchTransferHistory:", err)
       setError("Unable to load transfer history. Please try again later.")
@@ -137,81 +229,16 @@ export default function TransferHistory({ onBack, transferHistory = [], onRefres
 
   // Generate fallback transfer history when API is not available
   const generateFallbackTransferHistory = async () => {
-    try {
-      // Try to get users for realistic data
-      const usersResponse = await userAPI.getUsers(1, 100)
-      const users = usersResponse.data?.users || []
-
-      if (users.length === 0) {
-        // Return empty array if no users - transfers will be added as they're made
-        return []
-      }
-
-      return generateTransferHistoryFromUsers(users)
-    } catch (error) {
-      console.warn("Could not fetch users for fallback data:", error)
-      // Return empty array - real transfers will populate the history
-      return []
-    }
-  }
-
-  // Generate realistic transfer history data from users
-  const generateTransferHistoryFromUsers = (users) => {
-    const transferReasons = [
-      "Screenshot approval reward",
-      "Manual admin transfer",
-      "Bonus for milestone achievement",
-      "Referral reward",
-      "Course completion bonus",
-      "Daily login bonus",
-      "Achievement unlock reward",
-      "Contest participation reward",
-      "Community contribution bonus",
-      "Special event reward",
-    ]
-
-    const transferAmounts = [500, 400, 350, 300, 250, 200, 150, 100, 75, 50]
-    const statuses = ["completed", "pending", "failed"]
-    const adminNames = ["Admin User", "System Admin", "Super Admin", "Editor Admin"]
-
-    const allTransfers = []
-    users.forEach((user, userIndex) => {
-      // Generate 1-3 transfers per user
-      const transferCount = Math.floor(Math.random() * 3) + 1
-
-      for (let i = 0; i < transferCount; i++) {
-        const transferDate = new Date(Date.now() - Math.random() * 90 * 24 * 60 * 60 * 1000) // Last 90 days
-        const transferStatus = statuses[Math.floor(Math.random() * statuses.length)]
-        const amount = transferAmounts[Math.floor(Math.random() * transferAmounts.length)]
-
-        allTransfers.push({
-          id: `transfer_${userIndex}_${i}`,
-          userId: user._id,
-          userName: user.name || user.username || "Unknown User",
-          userEmail: user.email || "No email",
-          amount: amount,
-          reason: transferReasons[Math.floor(Math.random() * transferReasons.length)],
-          status: transferStatus,
-          createdAt: transferDate.toISOString(),
-          date: transferDate.toLocaleDateString(),
-          time: transferDate.toLocaleTimeString(),
-          transferredBy: adminNames[Math.floor(Math.random() * adminNames.length)],
-          transactionId: `TXN${Date.now()}${Math.random().toString(36).substr(2, 9)}`.toUpperCase(),
-          balanceBefore: Math.floor(Math.random() * 1000),
-          balanceAfter: Math.floor(Math.random() * 1000) + amount,
-        })
-      }
-    })
-
-    return allTransfers
+    // Return empty array - real transfers will populate the history
+    return []
   }
 
   // Load data on component mount and when filters change
   useEffect(() => {
-    fetchTransferHistory(currentPage, searchTerm, filterStatus, dateRange)
-  }, [currentPage, searchTerm, filterStatus, dateRange])
+    fetchTransferHistory(currentPage, searchTerm, filterStatus, dateRange, selectedUserId)
+  }, [currentPage, searchTerm, filterStatus, dateRange, selectedUserId, startDate, endDate])
 
-  // Handle search
+  // Handle search with debouncing
   const handleSearch = (value) => {
     setSearchTerm(value)
     setCurrentPage(1) // Reset to first page when searching
@@ -226,6 +253,16 @@ export default function TransferHistory({ onBack, transferHistory = [], onRefres
   const handleDateFilter = (range) => {
     setDateRange(range)
     setCurrentPage(1)
+    // Clear custom date range when using preset filters
+    if (range !== "custom") {
+      setStartDate("")
+      setEndDate("")
+    }
+  }
+
+  const handleUserFilter = (userId) => {
+    setSelectedUserId(userId)
+    setCurrentPage(1)
   }
 
   // Handle pagination
@@ -235,52 +272,131 @@ export default function TransferHistory({ onBack, transferHistory = [], onRefres
     }
   }
 
-  // Handle refresh
+  // Enhanced refresh with transferAPI
   const handleRefresh = async () => {
     setIsRefreshing(true)
     try {
       if (onRefresh) {
         await onRefresh()
       }
-      await fetchTransferHistory(currentPage, searchTerm, filterStatus, dateRange)
+      await fetchTransferHistory(currentPage, searchTerm, filterStatus, dateRange, selectedUserId)
     } catch (error) {
       console.error("Error refreshing transfer history:", error)
+      setError("Failed to refresh transfer history")
     } finally {
       setIsRefreshing(false)
     }
   }
 
-  // Get status badge color
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case "completed":
-        return <Badge className="bg-green-100 text-green-800 border-green-200">Completed</Badge>
-      case "pending":
-        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Pending</Badge>
-      case "failed":
-        return <Badge className="bg-red-100 text-red-800 border-red-200">Failed</Badge>
-      default:
-        return <Badge variant="secondary">{status}</Badge>
+  // Update transfer status using transferAPI
+  const updateTransferStatus = async (transferId, newStatus) => {
+    try {
+      const result = await transferAPI.updateTransferStatus(transferId, newStatus)
+
+      if (result.success) {
+        // Update local transfer list
+        setTransfers((prev) =>
+          prev.map((transfer) => (transfer.id === transferId ? { ...transfer, status: newStatus } : transfer)),
+        )
+
+        // Refresh the full list to get updated data
+        await fetchTransferHistory(currentPage, searchTerm, filterStatus, dateRange, selectedUserId)
+      }
+    } catch (error) {
+      console.error("Failed to update transfer status:", error)
+      setError(`Failed to update transfer status: ${error.message}`)
     }
   }
 
-  // Export functionality
-  const handleExport = () => {
+  // Get status badge color
+  const getStatusBadge = (status, transferId) => {
+    const badgeProps = {
+      completed: { className: "bg-green-100 text-green-800 border-green-200", label: "Completed" },
+      pending: { className: "bg-yellow-100 text-yellow-800 border-yellow-200", label: "Pending" },
+      failed: { className: "bg-red-100 text-red-800 border-red-200", label: "Failed" },
+    }
+
+    const config = badgeProps[status] || { className: "bg-gray-100 text-gray-800", label: status }
+
+    return (
+      <div className="flex items-center gap-2">
+        <Badge className={config.className}>{config.label}</Badge>
+        {/* Add status update dropdown for pending transfers */}
+        {status === "pending" && (
+          <Select onValueChange={(newStatus) => updateTransferStatus(transferId, newStatus)}>
+            <SelectTrigger className="w-24 h-6 text-xs">
+              <SelectValue placeholder="Update" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="completed">Complete</SelectItem>
+              <SelectItem value="failed">Mark Failed</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+    )
+  }
+
+  // Enhanced export functionality
+  const handleExport = async () => {
     try {
-      // Create CSV content
-      const headers = ["Date", "User Name", "Email", "Amount", "Reason", "Status", "Transaction ID", "Admin"]
+      setLoading(true)
+
+      // Get all transfers for export (not just current page)
+      const exportFilters = {
+        page: 1,
+        limit: 1000, // Large limit to get all transfers
+        ...(searchTerm && { search: searchTerm }),
+        ...(filterStatus !== "all" && { status: filterStatus }),
+        ...(selectedUserId && { userId: selectedUserId }),
+        ...(startDate && { startDate }),
+        ...(endDate && { endDate }),
+      }
+
+      let allTransfersForExport = []
+
+      try {
+        const response = await transferAPI.getHistory(exportFilters)
+        if (response.success && response.data) {
+          allTransfersForExport = response.data.transfers
+        }
+      } catch (apiError) {
+        // Fallback to current transfers if API fails
+        allTransfersForExport = transfers
+      }
+
+      // Create enhanced CSV content
+      const headers = [
+        "Date",
+        "Time",
+        "User Name",
+        "Email",
+        "Amount",
+        "Reason",
+        "Status",
+        "Transaction ID",
+        "Admin",
+        "Balance Before",
+        "Balance After",
+        "User ID",
+      ]
+
       const csvContent = [
         headers.join(","),
-        ...transfers.map((transfer) =>
+        ...allTransfersForExport.map((transfer) =>
           [
-            transfer.date,
-            `"${transfer.userName}"`,
-            `"${transfer.userEmail}"`,
-            transfer.amount,
-            `"${transfer.reason}"`,
-            transfer.status,
-            transfer.transactionId,
-            `"${transfer.transferredBy}"`,
+            `"${transfer.date || new Date(transfer.createdAt).toLocaleDateString()}"`,
+            `"${transfer.time || new Date(transfer.createdAt).toLocaleTimeString()}"`,
+            `"${transfer.userName || transfer.user?.name || "Unknown"}"`,
+            `"${transfer.userEmail || transfer.user?.email || "No email"}"`,
+            transfer.amount || 0,
+            `"${transfer.reason || "No reason"}"`,
+            transfer.status || "completed",
+            `"${transfer.transactionId || ""}"`,
+            `"${transfer.transferredBy || transfer.adminName || "System"}"`,
+            transfer.balanceBefore || 0,
+            transfer.balanceAfter || 0,
+            `"${transfer.userId || ""}"`,
           ].join(","),
         ),
       ].join("\n")
@@ -297,13 +413,15 @@ export default function TransferHistory({ onBack, transferHistory = [], onRefres
       document.body.removeChild(link)
     } catch (error) {
       console.error("Error exporting data:", error)
-      alert("Failed to export data. Please try again.")
+      setError("Failed to export data. Please try again.")
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header with Stats */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -326,7 +444,7 @@ export default function TransferHistory({ onBack, transferHistory = [], onRefres
                 <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
                 Refresh
               </Button>
-              <Button onClick={handleExport} variant="outline" size="sm" disabled={transfers.length === 0}>
+              <Button onClick={handleExport} variant="outline" size="sm" disabled={transfers.length === 0 || loading}>
                 <Download className="w-4 h-4 mr-2" />
                 Export CSV
               </Button>
@@ -335,89 +453,132 @@ export default function TransferHistory({ onBack, transferHistory = [], onRefres
         </CardHeader>
       </Card>
 
-      {/* Filters */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col lg:flex-row gap-4">
-            {/* Search */}
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search by name, email, reason, or transaction ID..."
-                  value={searchTerm}
-                  onChange={(e) => handleSearch(e.target.value)}
-                  className="pl-10"
-                />
+      {/* Statistics Cards */}
+      {stats && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Total Transfers</p>
+                  <p className="text-2xl font-bold">{stats.totalTransfers}</p>
+                </div>
+                <Activity className="h-8 w-8 text-blue-500" />
               </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Total Amount</p>
+                  <p className="text-2xl font-bold">{stats.totalAmount.toLocaleString()}</p>
+                </div>
+                <Coins className="h-8 w-8 text-green-500" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Completed</p>
+                  <p className="text-2xl font-bold text-green-600">{stats.completedTransfers}</p>
+                </div>
+                <TrendingUp className="h-8 w-8 text-green-500" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Average Amount</p>
+                  <p className="text-2xl font-bold">{Math.round(stats.averageAmount)}</p>
+                </div>
+                <TrendingUp className="h-8 w-8 text-purple-500" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Enhanced Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            Filters & Search
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search by name, email, reason, or transaction ID..."
+              value={searchTerm}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+
+          {/* Filter Row 1: Status and Date Range */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+              <Select value={filterStatus} onValueChange={handleStatusFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
-            {/* Status Filter */}
-            <div className="flex gap-2">
-              <Button
-                variant={filterStatus === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => handleStatusFilter("all")}
-              >
-                All Status
-              </Button>
-              <Button
-                variant={filterStatus === "completed" ? "default" : "outline"}
-                size="sm"
-                onClick={() => handleStatusFilter("completed")}
-              >
-                Completed
-              </Button>
-              <Button
-                variant={filterStatus === "pending" ? "default" : "outline"}
-                size="sm"
-                onClick={() => handleStatusFilter("pending")}
-              >
-                Pending
-              </Button>
-              <Button
-                variant={filterStatus === "failed" ? "default" : "outline"}
-                size="sm"
-                onClick={() => handleStatusFilter("failed")}
-              >
-                Failed
-              </Button>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
+              <Select value={dateRange} onValueChange={handleDateFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filter by date" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Time</SelectItem>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="week">This Week</SelectItem>
+                  <SelectItem value="month">This Month</SelectItem>
+                  <SelectItem value="custom">Custom Range</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
-            {/* Date Filter */}
-            <div className="flex gap-2">
-              <Button
-                variant={dateRange === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => handleDateFilter("all")}
-              >
-                All Time
-              </Button>
-              <Button
-                variant={dateRange === "today" ? "default" : "outline"}
-                size="sm"
-                onClick={() => handleDateFilter("today")}
-              >
-                Today
-              </Button>
-              <Button
-                variant={dateRange === "week" ? "default" : "outline"}
-                size="sm"
-                onClick={() => handleDateFilter("week")}
-              >
-                This Week
-              </Button>
-              <Button
-                variant={dateRange === "month" ? "default" : "outline"}
-                size="sm"
-                onClick={() => handleDateFilter("month")}
-              >
-                This Month
-              </Button>
-            </div>
+            {/* Custom Date Range */}
+            {dateRange === "custom" && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+                  <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+                  <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                </div>
+              </>
+            )}
           </div>
         </CardContent>
       </Card>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert className="border-amber-200 bg-amber-50">
+          <AlertDescription className="text-amber-800">{error}</AlertDescription>
+        </Alert>
+      )}
 
       {/* Transfer History Table */}
       <Card>
@@ -429,20 +590,6 @@ export default function TransferHistory({ onBack, transferHistory = [], onRefres
                 <p className="text-gray-600">Loading transfer history...</p>
               </div>
             </div>
-          ) : error ? (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 m-4 text-center">
-              <p className="text-amber-700 mb-2">Transfer history is currently unavailable</p>
-              <p className="text-sm text-amber-600 mb-4">
-                The system is running in offline mode. New transfers will appear here once they are made.
-              </p>
-              <Button
-                onClick={() => fetchTransferHistory(currentPage, searchTerm, filterStatus, dateRange)}
-                variant="outline"
-                size="sm"
-              >
-                Try Again
-              </Button>
-            </div>
           ) : transfers.length === 0 ? (
             <div className="text-center py-12">
               <Coins className="w-12 h-12 text-gray-300 mx-auto mb-4" />
@@ -452,6 +599,22 @@ export default function TransferHistory({ onBack, transferHistory = [], onRefres
                   ? "No transfer history matches your current filters."
                   : "No transfer history available yet. Transfers will appear here once they are made."}
               </p>
+              {(searchTerm || filterStatus !== "all" || dateRange !== "all") && (
+                <Button
+                  onClick={() => {
+                    setSearchTerm("")
+                    setFilterStatus("all")
+                    setDateRange("all")
+                    setSelectedUserId("")
+                    setStartDate("")
+                    setEndDate("")
+                  }}
+                  variant="outline"
+                  className="mt-4"
+                >
+                  Clear Filters
+                </Button>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -522,7 +685,7 @@ export default function TransferHistory({ onBack, transferHistory = [], onRefres
                           {transfer.time}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(transfer.status)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(transfer.status, transfer.id)}</td>
                       <td className="hidden xl:table-cell px-6 py-4 whitespace-nowrap">
                         <div className="text-xs font-mono text-gray-600">{transfer.transactionId}</div>
                       </td>
@@ -538,8 +701,8 @@ export default function TransferHistory({ onBack, transferHistory = [], onRefres
         </CardContent>
       </Card>
 
-      {/* Pagination */}
-      {!loading && !error && transfers.length > 0 && totalPages > 1 && (
+      {/* Enhanced Pagination */}
+      {!loading && transfers.length > 0 && totalPages > 1 && (
         <Card>
           <CardContent className="p-4">
             <div className="flex flex-col sm:flex-row items-center justify-between space-y-3 sm:space-y-0">

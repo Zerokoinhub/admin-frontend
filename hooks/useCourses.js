@@ -55,45 +55,54 @@ export const useCourses = () => {
 
   // Create new course with current user as uploader
   const createCourse = async (courseData) => {
-    try {
-      if (!isAuthenticated()) {
-        throw new Error("User not authenticated. Please log in again.")
-      }
-
-      const currentUser = getCurrentUser()
-      console.log("Creating course for user:", currentUser?.email)
-
-      // Add current user context to course data
-      const coursePayload = {
-        ...courseData,
-        uploadedBy: currentUser?.id, // Ensure current user is set as uploader
-      }
-
-      console.log("Course payload:", coursePayload)
-
-      const response = await makeAuthenticatedRequest("http://localhost:5000/api/courses", {
-        method: "POST",
-        body: JSON.stringify(coursePayload),
-      })
-
-      const data = await response.json()
-      console.log("Create course response:", data)
-
-      // Backend returns { success: true, course: {...} }
-      if (data.success && data.course) {
-        setCourses((prev) => [...prev, data.course])
-        console.log("Course created successfully:", data.course.courseName)
-        return { success: true, data: data.course }
-      } else {
-        throw new Error(data.message || "Failed to create course")
-      }
-    } catch (err) {
-      console.error("Error creating course:", err)
-      const errorMessage = err instanceof Error ? err.message : "Failed to create course"
-      setError(errorMessage)
-      return { success: false, error: errorMessage }
+  try {
+    if (!isAuthenticated()) {
+      throw new Error("User not authenticated. Please log in again.")
     }
+
+    const currentUser = getCurrentUser()
+    console.log("Creating course for user:", currentUser?.email)
+
+    if (!currentUser?.id) {
+      throw new Error("Current user ID is missing.")
+    }
+
+    // Ensure correct payload structure
+    const coursePayload = {
+      courseName: courseData.courseName,
+      pages: courseData.pages,
+      uploadedBy: currentUser.id, // MUST be a valid ObjectId
+    }
+
+    console.log("Sending course payload:", coursePayload)
+
+    const response = await fetch("http://localhost:5000/api/courses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${localStorage.getItem("token") || ""}`,
+      },
+      body: JSON.stringify(coursePayload),
+    })
+
+    const data = await response.json()
+    console.log("Create course response:", data)
+
+    if (data.success && data.course) {
+      setCourses((prev) => [...prev, data.course])
+      console.log("Course created successfully:", data.course.courseName)
+      return { success: true, data: data.course }
+    } else {
+      throw new Error(data.message || "Failed to create course")
+    }
+  } catch (err) {
+    console.error("Error creating course:", err)
+    const errorMessage = err instanceof Error ? err.message : "Failed to create course"
+    setError(errorMessage)
+    return { success: false, error: errorMessage }
   }
+}
+
 
   // Update existing course with current user authorization
   const updateCourse = async (courseId, courseData) => {

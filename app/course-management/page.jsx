@@ -10,18 +10,10 @@ import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts"
-import { X, User, Clock, FileText, Edit, Trash2, Plus, Eye, BarChart3, AlertCircle } from "lucide-react"
+import { X, User, Clock, FileText, Edit, Trash2, Plus, Eye, BarChart3, AlertCircle, Lock } from "lucide-react"
 import Image from "next/image"
 import { useUsers } from "../../hooks/useUsers"
 import { useCourses } from "../../hooks/useCourses"
-import {
-  isAuthenticated,
-  hasPermission,
-  getRoleDisplayName,
-  getPermissionsList,
-  handleAuthError,
-  debugAuthState,
-} from "@/lib/auth"
 
 export default function CourseManagementPage() {
   const [currentView, setCurrentView] = useState("main")
@@ -43,7 +35,12 @@ export default function CourseManagementPage() {
     updateCourse,
     deleteCourse,
     refreshCourses,
+    hasPermission,
+    userRole,
+    roleDisplayName,
+    permissionsList,
     userData,
+    isAuthenticated,
   } = useCourses()
 
   const { users, loading, error } = useUsers(1, 100)
@@ -51,13 +48,14 @@ export default function CourseManagementPage() {
   // Check authentication status on component mount
   useEffect(() => {
     console.log("Course Management Page - Current user:", userData)
-    console.log("Course Management Page - Is authenticated:", isAuthenticated())
-    debugAuthState() // This is now imported from @/lib/auth
+    console.log("Course Management Page - Is authenticated:", isAuthenticated)
+    console.log("Course Management Page - User role:", userRole)
+    console.log("Course Management Page - Permissions:", permissionsList)
 
-    if (!isAuthenticated()) {
+    if (!isAuthenticated) {
       console.warn("User not authenticated in Course Management")
     }
-  }, [userData, isAuthenticated])
+  }, [userData, isAuthenticated, userRole, permissionsList])
 
   const handleViewCourse = () => {
     setCurrentView("course")
@@ -68,7 +66,7 @@ export default function CourseManagementPage() {
   }
 
   const handleUploadCourse = () => {
-    if (!isAuthenticated()) {
+    if (!isAuthenticated) {
       alert("Please log in to create courses")
       return
     }
@@ -78,7 +76,7 @@ export default function CourseManagementPage() {
       return
     }
 
-    console.log("Starting course creation for user:", userData?.email)
+    console.log("Starting course creation for user:", userData?.email, "Role:", userRole)
     setCurrentView("upload")
     setFormData({
       courseName: "",
@@ -89,7 +87,7 @@ export default function CourseManagementPage() {
   }
 
   const handleSubmitCourse = async () => {
-    if (!isAuthenticated()) {
+    if (!isAuthenticated) {
       alert("Please log in to create courses")
       return
     }
@@ -138,7 +136,8 @@ export default function CourseManagementPage() {
           })
         }, 2000)
       } else {
-        handleAuthError(result.error)
+        console.error("Course operation failed:", result.error)
+        alert(`Failed to ${isEditing ? "update" : "create"} course: ${result.error}`)
       }
     } catch (error) {
       handleAuthError(error.message)
@@ -148,7 +147,7 @@ export default function CourseManagementPage() {
   }
 
   const handleDeleteCourse = async (courseId) => {
-    if (!isAuthenticated()) {
+    if (!isAuthenticated) {
       alert("Please log in to delete courses")
       return
     }
@@ -175,7 +174,7 @@ export default function CourseManagementPage() {
   }
 
   const handleEditCourse = (course) => {
-    if (!isAuthenticated()) {
+    if (!isAuthenticated) {
       alert("Please log in to edit courses")
       return
     }
@@ -275,7 +274,7 @@ export default function CourseManagementPage() {
   const analyticsData = generateAnalyticsData()
 
   // Show authentication warning if not authenticated
-  if (!isAuthenticated()) {
+  if (!isAuthenticated) {
     return (
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
         <Card className="bg-white border border-red-200">
@@ -283,7 +282,11 @@ export default function CourseManagementPage() {
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-red-600 mb-2">Authentication Required</h2>
             <p className="text-gray-600 mb-4">You need to be logged in to access the Course Management system.</p>
-            <p className="text-sm text-gray-500 mb-4">Current user: {userData?.email || "Not logged in"}</p>
+            <div className="space-y-2 text-sm text-gray-500 mb-4">
+              <p>Current user: {userData?.email || "Not logged in"}</p>
+              <p>Role: {userRole || "No role assigned"}</p>
+              <p>Permissions: {permissionsList || "No permissions"}</p>
+            </div>
             <Button onClick={() => window.location.reload()} className="bg-blue-600 hover:bg-blue-700 text-white">
               Refresh Page
             </Button>
@@ -303,9 +306,24 @@ export default function CourseManagementPage() {
             <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">
               {isEditing ? "Edit Course" : "Create New Course"}
             </h1>
-            <p className="text-sm text-gray-600 mt-1">
-              {getRoleDisplayName()} • {userData?.email} • {isEditing ? "Editing existing course" : "Adding new course"}
-            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                {roleDisplayName}
+              </Badge>
+              <p className="text-sm text-gray-600">{userData?.email}</p>
+              {!hasPermission("create") && !isEditing && (
+                <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                  <Lock className="h-3 w-3 mr-1" />
+                  No Create Permission
+                </Badge>
+              )}
+              {!hasPermission("edit") && isEditing && (
+                <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                  <Lock className="h-3 w-3 mr-1" />
+                  No Edit Permission
+                </Badge>
+              )}
+            </div>
           </div>
           <Button variant="ghost" onClick={() => setCurrentView("main")} className="self-start sm:self-center">
             ← Back to Courses
@@ -461,11 +479,20 @@ export default function CourseManagementPage() {
           <div>
             <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Course Management</h1>
             <div className="flex items-center gap-4 mt-1">
-              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                {getRoleDisplayName()}
+              <Badge
+                variant="outline"
+                className={`${
+                  userRole === "superadmin"
+                    ? "bg-green-50 text-green-700 border-green-200"
+                    : userRole === "editor"
+                      ? "bg-blue-50 text-blue-700 border-blue-200"
+                      : "bg-orange-50 text-orange-700 border-orange-200"
+                }`}
+              >
+                {roleDisplayName}
               </Badge>
               <p className="text-sm text-gray-600">{userData?.email}</p>
-              <p className="text-sm text-gray-600">{getPermissionsList()}</p>
+              <p className="text-sm text-gray-600">{permissionsList}</p>
             </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
@@ -651,7 +678,7 @@ export default function CourseManagementPage() {
           <div>
             <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Course Viewer</h1>
             <p className="text-sm text-gray-600 mt-1">
-              {getRoleDisplayName()} • {userData?.email} • Browse and view course details
+              {roleDisplayName} • {userData?.email} • Browse and view course details
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
@@ -842,7 +869,7 @@ export default function CourseManagementPage() {
           <div>
             <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Course Analytics</h1>
             <p className="text-sm text-gray-600 mt-1">
-              {getRoleDisplayName()} • {userData?.email} • View course statistics and insights
+              {roleDisplayName} • {userData?.email} • View course statistics and insights
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">

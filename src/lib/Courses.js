@@ -19,18 +19,7 @@ export async function getCourses(token) {
   return res.json();
 }
 
-// 2. Get course by ID (requires: viewer/editor/superadmin)
-export async function getCourseById(id, token) {
-  const res = await fetch(`${API_BASE}/${id}`, {
-    method: 'GET',
-    headers: getAuthHeaders(token),
-  });
-
-  if (!res.ok) throw new Error('Failed to fetch course');
-  return res.json();
-}
-
-// 3. Create a new course (requires: editor/superadmin)
+// 2. Create a new course (requires: editor/superadmin)
 export async function createCourse(courseData, token) {
   const res = await fetch(API_BASE, {
     method: 'POST',
@@ -42,7 +31,7 @@ export async function createCourse(courseData, token) {
   return res.json();
 }
 
-// 4. Update course by ID (requires: editor/superadmin)
+// 3. Update course by ID (requires: editor/superadmin)
 export async function updateCourse(id, updatedData, token) {
   const res = await fetch(`${API_BASE}/${id}`, {
     method: 'PUT',
@@ -54,7 +43,7 @@ export async function updateCourse(id, updatedData, token) {
   return res.json();
 }
 
-// 5. Delete course by ID (requires: superadmin only)
+// 4. Delete course by ID (requires: superadmin only)
 export async function deleteCourse(id, token) {
   const res = await fetch(`${API_BASE}/${id}`, {
     method: 'DELETE',
