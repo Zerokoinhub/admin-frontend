@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 
 export const metadata = {
   title: "Course Management",
-  description: "ZeroKoin admin panel",
+  description: "ZeroKoin Course Managment Facility",
 };
 
 export default function CourseLayout({ children }) {

@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
+import { useEffect, useState } from "react";
 import {
   getCurrentUser,
   isAuthenticated,
@@ -9,176 +9,165 @@ import {
   getPermissionsList,
   makeAuthenticatedRequest,
   debugAuthState,
-} from "@/lib/auth"
+} from "@/lib/auth";
+
+// Use environment variable for base URL
+const API_BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL}/courses`;
 
 export const useCourses = () => {
-  const [courses, setCourses] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [courses, setCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Fetch all courses using authenticated request
+  // Fetch all courses
   const fetchCourses = async () => {
     try {
-      setLoading(true)
+      setLoading(true);
 
       if (!isAuthenticated()) {
-        throw new Error("User not authenticated. Please log in again.")
+        throw new Error("User not authenticated. Please log in again.");
       }
 
-      const currentUser = getCurrentUser()
-      console.log("Fetching courses for user:", currentUser?.email, "with role:", currentUser?.role)
+      const currentUser = getCurrentUser();
+      console.log("Fetching courses for:", currentUser?.email, currentUser?.role);
 
-      const response = await makeAuthenticatedRequest("http://localhost:5000/api/courses", {
+      const response = await makeAuthenticatedRequest(API_BASE, {
         method: "GET",
-      })
+      });
 
-      const data = await response.json()
-      console.log("Courses data received:", data)
+      const data = await response.json();
+      console.log("Courses data received:", data);
 
-      // Backend returns { success: true, courses: [...] }
       if (data.success && data.courses) {
-        setCourses(data.courses)
-        console.log("Successfully loaded", data.courses.length, "courses")
+        setCourses(data.courses);
       } else {
-        setCourses([])
-        console.log("No courses found in response")
+        setCourses([]);
+        console.warn("No courses returned from server.");
       }
-      setError(null)
+
+      setError(null);
     } catch (err) {
-      console.error("Error fetching courses:", err)
-      setError(err instanceof Error ? err.message : "An error occurred")
-      setCourses([])
+      console.error("Error fetching courses:", err);
+      setError(err instanceof Error ? err.message : "An error occurred");
+      setCourses([]);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  // Create new course with current user as uploader
+  // Create a new course
   const createCourse = async (courseData) => {
-  try {
-    if (!isAuthenticated()) {
-      throw new Error("User not authenticated. Please log in again.")
+    try {
+      if (!isAuthenticated()) {
+        throw new Error("User not authenticated. Please log in again.");
+      }
+
+      const currentUser = getCurrentUser();
+      if (!currentUser?.id) {
+        throw new Error("User ID not found.");
+      }
+
+      const coursePayload = {
+        courseName: courseData.courseName,
+        pages: courseData.pages,
+        uploadedBy: currentUser.id,
+      };
+
+      console.log("Creating course:", coursePayload);
+
+      const response = await fetch(API_BASE, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("token") || ""}`,
+        },
+        body: JSON.stringify(coursePayload),
+      });
+
+      const data = await response.json();
+      console.log("Create response:", data);
+
+      if (data.success && data.course) {
+        setCourses((prev) => [...prev, data.course]);
+        return { success: true, data: data.course };
+      } else {
+        throw new Error(data.message || "Failed to create course");
+      }
+    } catch (err) {
+      console.error("Error creating course:", err);
+      const errorMessage = err instanceof Error ? err.message : "Failed to create course";
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
     }
+  };
 
-    const currentUser = getCurrentUser()
-    console.log("Creating course for user:", currentUser?.email)
-
-    if (!currentUser?.id) {
-      throw new Error("Current user ID is missing.")
-    }
-
-    // Ensure correct payload structure
-    const coursePayload = {
-      courseName: courseData.courseName,
-      pages: courseData.pages,
-      uploadedBy: currentUser.id, // MUST be a valid ObjectId
-    }
-
-    console.log("Sending course payload:", coursePayload)
-
-    const response = await fetch("http://localhost:5000/api/courses", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${localStorage.getItem("token") || ""}`,
-      },
-      body: JSON.stringify(coursePayload),
-    })
-
-    const data = await response.json()
-    console.log("Create course response:", data)
-
-    if (data.success && data.course) {
-      setCourses((prev) => [...prev, data.course])
-      console.log("Course created successfully:", data.course.courseName)
-      return { success: true, data: data.course }
-    } else {
-      throw new Error(data.message || "Failed to create course")
-    }
-  } catch (err) {
-    console.error("Error creating course:", err)
-    const errorMessage = err instanceof Error ? err.message : "Failed to create course"
-    setError(errorMessage)
-    return { success: false, error: errorMessage }
-  }
-}
-
-
-  // Update existing course with current user authorization
+  // Edit/update course
   const updateCourse = async (courseId, courseData) => {
     try {
       if (!isAuthenticated()) {
-        throw new Error("User not authenticated. Please log in again.")
+        throw new Error("User not authenticated. Please log in again.");
       }
 
-      const currentUser = getCurrentUser()
-      console.log("Updating course for user:", currentUser?.email)
-
-      const response = await makeAuthenticatedRequest(`http://localhost:5000/api/courses/${courseId}`, {
+      const response = await makeAuthenticatedRequest(`${API_BASE}/${courseId}`, {
         method: "PUT",
         body: JSON.stringify(courseData),
-      })
+      });
 
-      const data = await response.json()
-      console.log("Update course response:", data)
+      const data = await response.json();
+      console.log("Update response:", data);
 
-      // Backend returns { success: true, course: {...} }
       if (data.success && data.course) {
-        setCourses((prev) => prev.map((course) => (course._id === courseId ? data.course : course)))
-        console.log("Course updated successfully:", data.course.courseName)
-        return { success: true, data: data.course }
+        setCourses((prev) =>
+          prev.map((course) => (course._id === courseId ? data.course : course))
+        );
+        return { success: true, data: data.course };
       } else {
-        throw new Error(data.message || "Failed to update course")
+        throw new Error(data.message || "Failed to update course");
       }
     } catch (err) {
-      console.error("Error updating course:", err)
-      const errorMessage = err instanceof Error ? err.message : "Failed to update course"
-      setError(errorMessage)
-      return { success: false, error: errorMessage }
+      console.error("Error updating course:", err);
+      const errorMessage = err instanceof Error ? err.message : "Failed to update course";
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
     }
-  }
+  };
 
-  // Delete course with current user authorization
+  // Delete a course
   const deleteCourse = async (courseId) => {
     try {
       if (!isAuthenticated()) {
-        throw new Error("User not authenticated. Please log in again.")
+        throw new Error("User not authenticated. Please log in again.");
       }
 
-      const currentUser = getCurrentUser()
-      console.log("Deleting course for user:", currentUser?.email)
-
-      const response = await makeAuthenticatedRequest(`http://localhost:5000/api/courses/${courseId}`, {
+      const response = await makeAuthenticatedRequest(`${API_BASE}/${courseId}`, {
         method: "DELETE",
-      })
+      });
 
-      const data = await response.json()
-      console.log("Delete course response:", data)
+      const data = await response.json();
+      console.log("Delete response:", data);
 
-      // Backend returns { success: true, message: "Course deleted" }
       if (data.success) {
-        setCourses((prev) => prev.filter((course) => course._id !== courseId))
-        console.log("Course deleted successfully")
-        return { success: true }
+        setCourses((prev) => prev.filter((course) => course._id !== courseId));
+        return { success: true };
       } else {
-        throw new Error(data.message || "Failed to delete course")
+        throw new Error(data.message || "Failed to delete course");
       }
     } catch (err) {
-      console.error("Error deleting course:", err)
-      const errorMessage = err instanceof Error ? err.message : "Failed to delete course"
-      setError(errorMessage)
-      return { success: false, error: errorMessage }
+      console.error("Error deleting course:", err);
+      const errorMessage = err instanceof Error ? err.message : "Failed to delete course";
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
     }
-  }
+  };
 
-  // Initial fetch when component mounts
+  // Initial fetch
   useEffect(() => {
-    console.log("useCourses hook initialized")
-    debugAuthState() // Debug authentication state
-    fetchCourses()
-  }, [])
+    console.log("useCourses hook initialized");
+    debugAuthState();
+    fetchCourses();
+  }, []);
 
-  const currentUser = getCurrentUser()
+  const currentUser = getCurrentUser();
 
   return {
     courses,
@@ -194,5 +183,5 @@ export const useCourses = () => {
     permissionsList: getPermissionsList(),
     userData: currentUser,
     isAuthenticated: isAuthenticated(),
-  }
-}
+  };
+};
