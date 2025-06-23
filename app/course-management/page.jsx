@@ -115,7 +115,16 @@ export default function CourseManagementPage() {
       let result
       if (isEditing && selectedCourse) {
         console.log("Updating existing course:", selectedCourse._id)
-        result = await updateCourse(selectedCourse._id, formData)
+        // Create a clean payload for editing
+        const editPayload = {
+          courseName: formData.courseName.trim(),
+          pages: formData.pages.map((page) => ({
+            title: page.title.trim(),
+            content: page.content.trim(),
+            time: Number(page.time) || 0,
+          })),
+        }
+        result = await updateCourse(selectedCourse._id, editPayload)
       } else {
         console.log("Creating new course")
         result = await createCourse(formData)
@@ -140,7 +149,8 @@ export default function CourseManagementPage() {
         alert(`Failed to ${isEditing ? "update" : "create"} course: ${result.error}`)
       }
     } catch (error) {
-      handleAuthError(error.message)
+      console.error("Error during course submission:", error)
+      alert(`Error ${isEditing ? "updating" : "creating"} course: ${error.message}`)
     } finally {
       setIsSubmitting(false)
     }
@@ -169,7 +179,7 @@ export default function CourseManagementPage() {
       // Refresh the courses list
       await refreshCourses()
     } else {
-      handleAuthError(result.error)
+      alert(`Error deleting course: ${result.error}`)
     }
   }
 
@@ -186,14 +196,20 @@ export default function CourseManagementPage() {
 
     console.log("Editing course:", course.courseName, "by user:", userData?.email)
     setSelectedCourse(course)
+
+    // Properly set form data for editing
     setFormData({
-      courseName: course.courseName,
-      pages: course.pages.map((page) => ({
-        title: page.title,
-        content: page.content,
-        time: page.time,
-      })),
+      courseName: course.courseName || "",
+      pages:
+        course.pages && course.pages.length > 0
+          ? course.pages.map((page) => ({
+              title: page.title || "",
+              content: page.content || "",
+              time: Number(page.time) || 0,
+            }))
+          : [{ title: "", content: "", time: 0 }],
     })
+
     setIsEditing(true)
     setCurrentView("upload")
   }
@@ -220,7 +236,9 @@ export default function CourseManagementPage() {
   }
 
   const updatePage = (index, field, value) => {
-    const updatedPages = formData.pages.map((page, i) => (i === index ? { ...page, [field]: value } : page))
+    const updatedPages = formData.pages.map((page, i) =>
+      i === index ? { ...page, [field]: field === "time" ? Number(value) || 0 : value } : page,
+    )
     setFormData({ ...formData, pages: updatedPages })
   }
 
@@ -409,9 +427,7 @@ export default function CourseManagementPage() {
                             <Input
                               type="number"
                               value={page.time}
-                              onChange={(e) =>
-                                updatePage(index, "time", Math.max(0, Number.parseInt(e.target.value) || 0))
-                              }
+                              onChange={(e) => updatePage(index, "time", e.target.value)}
                               className="border-gray-200"
                               placeholder="Enter duration in minutes..."
                               min="0"
@@ -1020,3 +1036,4 @@ export default function CourseManagementPage() {
     )
   }
 }
+

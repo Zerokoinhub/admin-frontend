@@ -24,6 +24,7 @@ export default function SettingPage() {
   const [showSendToDropdown, setShowSendToDropdown] = useState(false)
   const [selectedSendTo, setSelectedSendTo] = useState("Send to")
   const [uploadedImage, setUploadedImage] = useState(null)
+  const [uploadedImageFile, setUploadedImageFile] = useState(null) // Store the actual file
   const [showChangePassword, setShowChangePassword] = useState(false)
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -106,12 +107,10 @@ export default function SettingPage() {
 
     setIsUploading(true)
     try {
-      // Create FormData for file upload
-      const formData = new FormData()
-      formData.append("image", file)
+      // Store the actual file for later use
+      setUploadedImageFile(file)
 
-      // In a real app, you would upload to your server or cloud storage
-      // For now, we'll create a local URL
+      // Create a local URL for preview
       const imageUrl = URL.createObjectURL(file)
       setUploadedImage(imageUrl)
 
@@ -131,50 +130,86 @@ export default function SettingPage() {
       return
     }
 
+    if (!notificationData.title.trim() || !notificationData.description.trim()) {
+      alert("Please fill in both title and description.")
+      return
+    }
+
+    if (selectedSendTo === "Send to") {
+      alert("Please select who to send the notification to.")
+      return
+    }
+
     setIsSending(true)
     try {
       let endpoint = ""
-      const payload = {
-        title: notificationData.title,
-        message: notificationData.description,
-      }
+      let requestBody = null
+      const headers = {}
 
-      // Determine API endpoint based on selected recipient
+      // Determine API endpoint and prepare request based on selected recipient
       switch (selectedSendTo) {
         case "New User":
-          endpoint = "http://localhost:3000/api/notification/general"
-          break
         case "Old User":
-          endpoint = "http://localhost:3000/api/notification/general"
+          // Use general-with-image endpoint for general notifications
+          endpoint = "http://localhost:3000/api/notification/general-with-image"
+
+          // Create FormData for multipart/form-data
+          const formData = new FormData()
+          formData.append("title", notificationData.title)
+          formData.append("message", notificationData.description)
+
+          if (uploadedImageFile) {
+            formData.append("image", uploadedImageFile)
+          }
+
+          requestBody = formData
+          // Don't set Content-Type header, let browser set it with boundary
           break
+
         case "Top rated user":
           endpoint = "http://localhost:3000/api/notification/top-users"
-          payload.limit = 10
+          headers["Content-Type"] = "application/json"
+          requestBody = JSON.stringify({
+            title: notificationData.title,
+            message: notificationData.description,
+            imageUrl: uploadedImage || null,
+            limit: 10,
+          })
           break
+
         default:
-          endpoint = "http://localhost:3000/api/notification/general"
+          throw new Error("Invalid recipient selection")
       }
+
+      console.log("Sending notification to:", endpoint)
+      console.log("Request body type:", requestBody instanceof FormData ? "FormData" : "JSON")
 
       const response = await fetch(endpoint, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
+        headers: headers,
+        body: requestBody,
       })
 
       const result = await response.json()
+      console.log("Response:", result)
 
-      if (result.success) {
+      if (response.ok && result.success) {
         setShowSuccessModal(true)
         setTimeout(() => {
           setShowSuccessModal(false)
           setNotificationView("empty")
           setUploadedImage(null)
+          setUploadedImageFile(null)
           setSelectedSendTo("Send to")
+          // Reset notification data
+          setNotificationData({
+            title: "Upcoming Zero Koin",
+            description:
+              "Zero Koin mining is the process of validating transactions and securing the Zero Koin blockchain by solving complex mathematical problems, typically using computing power, to earn rewards in Zero Koin.",
+          })
         }, 3000)
       } else {
-        throw new Error(result.message || "Failed to send notification")
+        throw new Error(result.message || `Server error: ${response.status}`)
       }
     } catch (error) {
       console.error("Failed to send notification:", error)
@@ -1077,4 +1112,5 @@ export default function SettingPage() {
     )
   }
 }
+
 
