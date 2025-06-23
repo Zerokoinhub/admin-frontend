@@ -1,4 +1,6 @@
+
 'use client';
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -21,7 +23,7 @@ export default function useLogin() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('http://localhost:5000/api/admin/login', {
+      const res = await fetch(API_BASE+'/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -48,7 +50,7 @@ export default function useLogin() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('http://localhost:5000/api/admin/register', {
+      const res = await fetch(API_BASE+'/admin/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, password }),

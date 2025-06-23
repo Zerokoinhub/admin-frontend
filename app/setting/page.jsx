@@ -671,7 +671,7 @@ export default function SettingPage() {
           </Card>
         </div>
 
-        {/* Expiry Dropdown */}
+        {/* Expiry Dropdown
         {(userRole === "superadmin" || userRole === "editor") && (
           <div className="flex justify-center sm:justify-end">
             <div className="relative">
@@ -702,7 +702,7 @@ export default function SettingPage() {
               )}
             </div>
           </div>
-        )}
+        )} */}
 
         {/* Navigation Buttons */}
         <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 pt-4 sm:pt-8">
