@@ -139,6 +139,60 @@ export const userAPI = {
     }
   },
 
+  // NEW: Edit user balance directly using the edit-balance endpoint
+  editUserBalance: async (firebaseUid, newBalance) => {
+  try {
+    // Input validation
+    if (!firebaseUid || typeof newBalance !== "number") {
+      throw new Error("Invalid input: firebaseUid and numeric newBalance are required.");
+    }
+
+    // API request
+    const response = await fetch(`${API_BASE_URL}/users/edit-balance`, {
+      method: "PUT",
+      headers: {
+        ...getAuthHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        firebaseUid,
+        newBalance: Number(newBalance),
+      }),
+    });
+
+    // Handle non-200 response
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || "Failed to update user balance");
+    }
+
+    // Parse response
+    const result = await response.json();
+
+    return {
+      success: true,
+      data: {
+        user: result.user,
+        newBalance: result.user.balance,
+        message: result.message,
+        balanceAfter: result.user.balance,
+        // Optional fallback fields
+        balanceBefore: null,
+        transactionId: null,
+        timestamp: new Date().toISOString(),
+      },
+    };
+  } catch (error) {
+    console.error("Error updating user balance:", error);
+    return {
+      success: false,
+      message: error.message,
+    };
+  }
+}
+,
+
+
   // Get transfer history - New method
   async getTransferHistory(filters = {}) {
     try {
