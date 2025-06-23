@@ -113,7 +113,7 @@ export default function LoginSignup() {
         <p className="text-xs text-center text-gray-600 mt-6">
           By signing in, you agree to ZeroKoin Terms of Service and confirm that
           you have read and understood our{' '}
-          <a href="https://zerokoin.com/privacypolicy" className="text-blue-600 underline">
+          <a href="https://zerokoin.com/privacypolicy" target='_blank' className="text-blue-600 underline">
             Privacy Policy
           </a>
           .

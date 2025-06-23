@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: 'Admin Panel',
-  description: 'ZeroKoin admin panel',
+  title: 'Sign in | ZeroKoin',
+  description: 'Sign in into ZeroKoin admin panel',
 };
 
 export default function RootLayout({ children }) {

@@ -46,7 +46,7 @@ export async function createCourse(courseData, token) {
 // 3. Update course by ID (requires: editor/superadmin)
 export async function updateCourse(id, updatedData, token) {
   try {
-    const res = await fetch(`${API_BASE}/${id}`, {
+    const res = await fetch(`${API_BASE}/api/courses/${id}`, {
       method: 'PUT',
       headers: getAuthHeaders(token),
       body: JSON.stringify(updatedData),
