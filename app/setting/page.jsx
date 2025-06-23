@@ -43,6 +43,7 @@ export default function SettingPage() {
     role: "Super Admin",
     time: "1 Month",
   })
+  const [sentNotifications, setSentNotifications] = useState([])
 
   // Get user role from localStorage
   useEffect(() => {
@@ -123,7 +124,7 @@ export default function SettingPage() {
     }
   }
 
-  // Handle notification sending
+  // Handle notification sending - FIXED VERSION
   const handleSendNotification = async () => {
     if (userRole === "viewer") {
       alert("You don't have permission to send notifications.")
@@ -146,12 +147,15 @@ export default function SettingPage() {
       let requestBody = null
       const headers = {}
 
+      // Base URL for backend API - FIXED: Using correct port and path
+      const BASE_API_URL = "http://localhost:5000/api/notifications"
+
       // Determine API endpoint and prepare request based on selected recipient
       switch (selectedSendTo) {
         case "New User":
         case "Old User":
           // Use general-with-image endpoint for general notifications
-          endpoint = "http://localhost:3000/api/notification/general-with-image"
+          endpoint = `${BASE_API_URL}/general-with-image`
 
           // Create FormData for multipart/form-data
           const formData = new FormData()
@@ -167,7 +171,7 @@ export default function SettingPage() {
           break
 
         case "Top rated user":
-          endpoint = "http://localhost:3000/api/notification/top-users"
+          endpoint = `${BASE_API_URL}/top-users`
           headers["Content-Type"] = "application/json"
           requestBody = JSON.stringify({
             title: notificationData.title,
@@ -190,14 +194,33 @@ export default function SettingPage() {
         body: requestBody,
       })
 
+      // Check if response is JSON
+      const contentType = response.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        const textResponse = await response.text()
+        console.error("Non-JSON response received:", textResponse)
+        throw new Error(`Server returned non-JSON response. Status: ${response.status}`)
+      }
+
       const result = await response.json()
       console.log("Response:", result)
 
       if (response.ok && result.success) {
+        // Add the sent notification to the list
+        const newNotification = {
+          id: Date.now(),
+          title: notificationData.title,
+          description: notificationData.description,
+          image: uploadedImage,
+          timestamp: new Date().toISOString(),
+          sentTo: selectedSendTo,
+        }
+        setSentNotifications((prev) => [newNotification, ...prev])
+
         setShowSuccessModal(true)
         setTimeout(() => {
           setShowSuccessModal(false)
-          setNotificationView("empty")
+          setNotificationView("list") // Show notification list instead of going to empty
           setUploadedImage(null)
           setUploadedImageFile(null)
           setSelectedSendTo("Send to")
@@ -612,6 +635,98 @@ export default function SettingPage() {
         </div>
       )
     }
+
+    // Notification List View
+    if (notificationView === "list") {
+      return (
+        <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen relative">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Notifications</h1>
+            <Button onClick={() => setNotificationView("empty")} variant="outline" className="w-full sm:w-auto">
+              Back
+            </Button>
+          </div>
+
+          <div className="max-w-md mx-auto bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            {/* Notification List */}
+            <div className="max-h-96 overflow-y-auto">
+              {sentNotifications.length === 0 ? (
+                <div className="p-6 text-center text-gray-500">
+                  <Bell className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                  <p>No notifications sent yet</p>
+                </div>
+              ) : (
+                sentNotifications.map((notification) => (
+                  <div key={notification.id} className="p-4 border-b border-gray-100 last:border-b-0">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 bg-teal-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-1">
+                        <div className="w-4 h-4 bg-teal-600 rounded-sm flex items-center justify-center">
+                          <span className="text-white text-xs font-bold">Z</span>
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <h3 className="text-sm font-semibold text-gray-900 truncate">Zerokoin Network</h3>
+                          <button className="text-gray-400 hover:text-gray-600 flex-shrink-0">
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                        <p className="text-sm font-medium text-gray-800 mb-1">{notification.title}</p>
+                        <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed">{notification.description}</p>
+                        <p className="text-xs text-gray-400 mt-2">
+                          Sent to: {notification.sentTo} • {new Date(notification.timestamp).toLocaleTimeString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            {sentNotifications.length > 0 && (
+              <div className="p-4 bg-gray-50 border-t border-gray-200">
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    className="flex-1 bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                    onClick={() => {
+                      // Add manage functionality here if needed
+                      console.log("Manage notifications")
+                    }}
+                  >
+                    Manage
+                  </Button>
+                  <Button
+                    className="flex-1 bg-teal-600 hover:bg-teal-700 text-white"
+                    onClick={() => {
+                      if (confirm("Are you sure you want to clear all notifications?")) {
+                        setSentNotifications([])
+                        setNotificationView("empty")
+                      }
+                    }}
+                  >
+                    Clear All
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Create New Notification Button */}
+          <div className="flex justify-center pt-4">
+            {(userRole === "superadmin" || userRole === "editor") && (
+              <Button
+                onClick={handleCreateNotification}
+                className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-md text-sm font-medium"
+              >
+                Create New Notification
+              </Button>
+            )}
+          </div>
+        </div>
+      )
+    }
   }
 
   // Main Settings View
@@ -671,7 +786,7 @@ export default function SettingPage() {
           </Card>
         </div>
 
-        {/* Expiry Dropdown
+        {/* Expiry Dropdown */}
         {(userRole === "superadmin" || userRole === "editor") && (
           <div className="flex justify-center sm:justify-end">
             <div className="relative">
@@ -702,7 +817,7 @@ export default function SettingPage() {
               )}
             </div>
           </div>
-        )} */}
+        )}
 
         {/* Navigation Buttons */}
         <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 pt-4 sm:pt-8">
@@ -1112,5 +1227,12 @@ export default function SettingPage() {
     )
   }
 }
+
+
+
+
+
+
+
 
 
