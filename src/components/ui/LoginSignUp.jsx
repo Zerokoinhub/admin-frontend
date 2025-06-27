@@ -46,7 +46,7 @@ export default function LoginSignup() {
       <div className="relative z-10 bg-white rounded-2xl shadow-xl w-full max-w-md p-8 md:p-10">
         {/* Logo */}
         <div className="flex items-center justify-center gap-2 text-xl font-semibold text-cyan-700 mb-6">
-          <Image src="/logo.png" alt="Zerokoin Logo" width={33} height={33} />
+          <Image src="/logo.svg" alt="Zerokoin Logo" width={33} height={33} />
           <span className="text-3xl">Zerokoin</span>
         </div>
 

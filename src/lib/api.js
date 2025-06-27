@@ -142,44 +142,35 @@ export const userAPI = {
   // NEW: Edit user balance directly using the edit-balance endpoint
   editUserBalance: async (firebaseUid, newBalance) => {
   try {
-    // Input validation
     if (!firebaseUid || typeof newBalance !== "number") {
       throw new Error("Invalid input: firebaseUid and numeric newBalance are required.");
     }
 
-    // API request
     const response = await fetch(`${API_BASE_URL}/users/edit-balance`, {
       method: "PUT",
       headers: {
         ...getAuthHeaders(),
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        firebaseUid,
-        newBalance: Number(newBalance),
-      }),
+      body: JSON.stringify({ firebaseUid, newBalance }),
     });
 
-    // Handle non-200 response
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.message || "Failed to update user balance");
     }
 
-    // Parse response
     const result = await response.json();
 
     return {
       success: true,
       data: {
         user: result.user,
-        newBalance: result.user.balance,
+        newBalance: result.transaction.newBalance,
+        previousBalance: result.transaction.previousBalance,
         message: result.message,
-        balanceAfter: result.user.balance,
-        // Optional fallback fields
-        balanceBefore: null,
-        transactionId: null,
-        timestamp: new Date().toISOString(),
+        transactionLogged: true, // ✅ Implied by backend success
+        timestamp: result.transaction.timestamp,
       },
     };
   } catch (error) {
@@ -189,32 +180,33 @@ export const userAPI = {
       message: error.message,
     };
   }
-}
-,
+},
 
-
-  // Get transfer history - New method
+  // ✅ 1. Get Transfer History
   async getTransferHistory(filters = {}) {
     try {
-      const params = new URLSearchParams()
+      const params = new URLSearchParams();
 
-      if (filters.page) params.append("page", filters.page.toString())
-      if (filters.limit) params.append("limit", filters.limit.toString())
-      if (filters.search) params.append("search", filters.search)
-      if (filters.status) params.append("status", filters.status)
-      if (filters.dateRange) params.append("dateRange", filters.dateRange)
-      if (filters.userId) params.append("userId", filters.userId)
+      if (filters.page) params.append("page", filters.page);
+      if (filters.limit) params.append("limit", filters.limit);
+      if (filters.search) params.append("search", filters.search);
+      if (filters.status) params.append("status", filters.status);
+      if (filters.dateRange) params.append("dateRange", filters.dateRange);
+      if (filters.userId) params.append("userId", filters.userId);
 
-      const response = await fetch(`${API_BASE_URL}/transfers/history?${params}`, {
+      const url = `${API_BASE_URL}/transfers/history?${params.toString()}`;
+      const response = await fetch(url, {
         method: "GET",
         headers: getAuthHeaders(),
-      })
+      });
 
       if (!response.ok) {
-        throw new Error("Failed to fetch transfer history")
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to fetch transfer history");
       }
 
-      const result = await response.json()
+      const result = await response.json();
+
       return {
         success: true,
         data: {
@@ -223,9 +215,9 @@ export const userAPI = {
           totalPages: result.totalPages || 1,
           currentPage: result.currentPage || 1,
         },
-      }
+      };
     } catch (error) {
-      console.error("Error fetching transfer history:", error)
+      console.error("❌ Error fetching transfer history:", error);
       return {
         success: false,
         message: error.message,
@@ -235,38 +227,48 @@ export const userAPI = {
           totalPages: 1,
           currentPage: 1,
         },
-      }
+      };
     }
   },
 
-  // Get transfer by ID - New method
+  // ✅ 2. Get Transfer By ID
   async getTransferById(transferId) {
     try {
       const response = await fetch(`${API_BASE_URL}/transfers/${transferId}`, {
         method: "GET",
         headers: getAuthHeaders(),
-      })
-      if (!response.ok) throw new Error("Failed to fetch transfer")
-      return await response.json()
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to fetch transfer");
+      }
+
+      return await response.json();
     } catch (error) {
-      console.error("Error fetching transfer:", error)
-      throw error
+      console.error("❌ Error fetching transfer by ID:", error);
+      throw error;
     }
   },
 
-  // Update transfer status - New method
+  // ✅ 3. Update Transfer Status
   async updateTransferStatus(transferId, status) {
     try {
       const response = await fetch(`${API_BASE_URL}/transfers/${transferId}/status`, {
         method: "PATCH",
         headers: getAuthHeaders(),
         body: JSON.stringify({ status }),
-      })
-      if (!response.ok) throw new Error("Failed to update transfer status")
-      return await response.json()
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to update transfer status");
+      }
+
+      return await response.json();
     } catch (error) {
-      console.error("Error updating transfer status:", error)
-      throw error
+      console.error("❌ Error updating transfer status:", error);
+      throw error;
     }
   },
 
