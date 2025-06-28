@@ -26,6 +26,7 @@ import {
   AlertTriangle,
   CheckCircle,
   Lock,
+  ChevronLeft,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -52,13 +53,11 @@ const UserSelector = ({ selectedUser, onUserSelect, className }) => {
   const fetchUsers = useCallback(async () => {
     setLoading(true)
     setError("")
-
     try {
       const response = await userAPI.getUsers(filters.page, filters.limit, {
         search: filters.search,
         isActive: filters.status === "active" ? true : filters.status === "inactive" ? false : undefined,
       })
-
       if (response && (response.users || response.data)) {
         const usersData = response.users || response.data || response
         const formattedUsers = userHelpers.formatUserList(usersData)
@@ -69,7 +68,6 @@ const UserSelector = ({ selectedUser, onUserSelect, className }) => {
     } catch (apiError) {
       console.warn("API call failed, using fallback data:", apiError)
       setError("Failed to load users from API")
-
       // Fallback data
       const mockUsers = [
         {
@@ -138,7 +136,6 @@ const UserSelector = ({ selectedUser, onUserSelect, className }) => {
           lastLogin: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
         },
       ]
-
       const formattedMockUsers = userHelpers.formatUserList(mockUsers)
       setUsers(formattedMockUsers)
     } finally {
@@ -163,7 +160,7 @@ const UserSelector = ({ selectedUser, onUserSelect, className }) => {
 
   return (
     <div className={className}>
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {/* Search Input */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -171,13 +168,13 @@ const UserSelector = ({ selectedUser, onUserSelect, className }) => {
             placeholder="Search users by name, email, or invite code..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-10 h-10 sm:h-auto"
           />
         </div>
 
         {/* Status Filter */}
         <Select value={filters.status} onValueChange={(value) => setFilters((prev) => ({ ...prev, status: value }))}>
-          <SelectTrigger>
+          <SelectTrigger className="h-10 sm:h-auto">
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
           <SelectContent>
@@ -195,10 +192,10 @@ const UserSelector = ({ selectedUser, onUserSelect, className }) => {
         ) : error ? (
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
             <div className="flex items-center">
-              <AlertTriangle className="w-4 h-4 text-amber-600 mr-2" />
+              <AlertTriangle className="w-4 h-4 text-amber-600 mr-2 flex-shrink-0" />
               <span className="text-sm text-amber-700">{error}</span>
             </div>
-            <Button onClick={fetchUsers} variant="outline" size="sm" className="mt-2">
+            <Button onClick={fetchUsers} variant="outline" size="sm" className="mt-2 w-full sm:w-auto bg-transparent">
               Retry
             </Button>
           </div>
@@ -211,21 +208,23 @@ const UserSelector = ({ selectedUser, onUserSelect, className }) => {
                 onUserSelect(user)
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger className="h-10 sm:h-auto">
                 <SelectValue placeholder="Select a user to view profile..." />
               </SelectTrigger>
               <SelectContent>
                 {filteredUsers.map((user) => (
                   <SelectItem key={user.id || user._id} value={user.id || user._id}>
                     <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${user.isActive ? "bg-green-500" : "bg-gray-400"}`} />
-                        <span className="font-medium">{user.name}</span>
-                        <span className="text-sm text-gray-500">({user.email})</span>
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div
+                          className={`w-2 h-2 rounded-full flex-shrink-0 ${user.isActive ? "bg-green-500" : "bg-gray-400"}`}
+                        />
+                        <span className="font-medium truncate">{user.name}</span>
+                        <span className="text-sm text-gray-500 truncate hidden sm:inline">({user.email})</span>
                       </div>
-                      <div className="flex items-center gap-2 ml-4">
+                      <div className="flex items-center gap-2 ml-2 flex-shrink-0">
                         <Badge variant="outline" className="text-xs">
-                          {user.coins || user.balance || 0} coins
+                          {user.coins || user.balance || 0}
                         </Badge>
                         {user.hasWallet && <Wallet className="h-3 w-3 text-green-500" />}
                       </div>
@@ -234,7 +233,6 @@ const UserSelector = ({ selectedUser, onUserSelect, className }) => {
                 ))}
               </SelectContent>
             </Select>
-
             <div className="text-xs text-gray-500">
               {searchTerm ? (
                 <>
@@ -268,21 +266,16 @@ const CoinHistoryView = ({ selectedUser, onBack }) => {
 
   const fetchTransferHistory = useCallback(async () => {
     if (!selectedUser) return
-
     setLoading(true)
     setError("")
-
     try {
       const response = await userAPI.getTransferHistory({
         ...filters,
         userId: selectedUser.id || selectedUser._id,
       })
-
       if (response.success && response.data) {
         const formattedTransfers = response.data.transfers.map((transfer) => userHelpers.formatTransferData(transfer))
         setTransferHistory(formattedTransfers)
-
-        // Calculate statistics
         const transferStats = userHelpers.calculateTransferStats(formattedTransfers)
         setStats(transferStats)
       } else {
@@ -291,7 +284,6 @@ const CoinHistoryView = ({ selectedUser, onBack }) => {
     } catch (apiError) {
       console.warn("API call failed, using mock data:", apiError)
       setError("Using mock data - API unavailable")
-
       // Enhanced mock data for demonstration
       const mockTransfers = [
         {
@@ -365,10 +357,8 @@ const CoinHistoryView = ({ selectedUser, onBack }) => {
           balanceAfter: (selectedUser.balance || 0) + 25,
         },
       ]
-
       const formattedMockTransfers = mockTransfers.map((transfer) => userHelpers.formatTransferData(transfer))
       setTransferHistory(formattedMockTransfers)
-
       const mockStats = userHelpers.calculateTransferStats(formattedMockTransfers)
       setStats(mockStats)
     } finally {
@@ -389,18 +379,31 @@ const CoinHistoryView = ({ selectedUser, onBack }) => {
     const config = statusConfig[status] || statusConfig.pending
     const IconComponent = config.icon
     return (
-      <Badge className={`${config.bg} ${config.text} flex items-center gap-1`}>
+      <Badge className={`${config.bg} ${config.text} flex items-center gap-1 text-xs`}>
         <IconComponent className="h-3 w-3" />
-        {config.label}
+        <span className="hidden sm:inline">{config.label}</span>
       </Badge>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      {/* Mobile Header */}
+      <div className="lg:hidden">
+        <Button onClick={onBack} variant="outline" className="mb-4 w-full sm:w-auto bg-transparent">
+          <ChevronLeft className="h-4 w-4 mr-2" />
+          Back to Profile
+        </Button>
+        <div className="mb-4">
+          <h2 className="text-xl sm:text-2xl font-bold">Coin History</h2>
+          <p className="text-sm sm:text-base text-gray-600 truncate">{selectedUser?.name}</p>
+        </div>
+      </div>
+
+      {/* Desktop Header */}
+      <div className="hidden lg:flex items-center justify-between">
         <div>
-          <Button onClick={onBack} variant="outline" className="mb-4">
+          <Button onClick={onBack} variant="outline" className="mb-4 bg-transparent">
             <User className="h-4 w-4 mr-2" />
             Back to Profile
           </Button>
@@ -413,50 +416,58 @@ const CoinHistoryView = ({ selectedUser, onBack }) => {
         </Button>
       </div>
 
+      {/* Mobile Refresh Button */}
+      <div className="lg:hidden">
+        <Button onClick={fetchTransferHistory} disabled={loading} className="w-full sm:w-auto">
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
+      </div>
+
       {/* Statistics Cards */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <Card>
-            <CardContent className="p-4">
+            <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Total Transfers</p>
-                  <p className="text-2xl font-bold">{stats.totalTransfers}</p>
+                  <p className="text-xs sm:text-sm text-gray-600">Total Transfers</p>
+                  <p className="text-lg sm:text-2xl font-bold">{stats.totalTransfers}</p>
                 </div>
-                <Activity className="h-8 w-8 text-blue-500" />
+                <Activity className="h-6 sm:h-8 w-6 sm:w-8 text-blue-500" />
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-4">
+            <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Total Earned</p>
-                  <p className="text-2xl font-bold text-green-600">+{stats.totalAmount}</p>
+                  <p className="text-xs sm:text-sm text-gray-600">Total Earned</p>
+                  <p className="text-lg sm:text-2xl font-bold text-green-600">+{stats.totalAmount}</p>
                 </div>
-                <Coins className="h-8 w-8 text-green-500" />
+                <Coins className="h-6 sm:h-8 w-6 sm:w-8 text-green-500" />
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-4">
+            <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">This Month</p>
-                  <p className="text-2xl font-bold text-purple-600">{stats.monthTransfers}</p>
+                  <p className="text-xs sm:text-sm text-gray-600">This Month</p>
+                  <p className="text-lg sm:text-2xl font-bold text-purple-600">{stats.monthTransfers}</p>
                 </div>
-                <Calendar className="h-8 w-8 text-purple-500" />
+                <Calendar className="h-6 sm:h-8 w-6 sm:w-8 text-purple-500" />
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="p-4">
+            <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Average Amount</p>
-                  <p className="text-2xl font-bold text-orange-600">{Math.round(stats.averageAmount)}</p>
+                  <p className="text-xs sm:text-sm text-gray-600">Average Amount</p>
+                  <p className="text-lg sm:text-2xl font-bold text-orange-600">{Math.round(stats.averageAmount)}</p>
                 </div>
-                <TrendingUp className="h-8 w-8 text-orange-500" />
+                <TrendingUp className="h-6 sm:h-8 w-6 sm:w-8 text-orange-500" />
               </div>
             </CardContent>
           </Card>
@@ -465,21 +476,21 @@ const CoinHistoryView = ({ selectedUser, onBack }) => {
 
       {/* Filters */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
+        <CardHeader className="pb-3 sm:pb-6">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <Filter className="h-4 sm:h-5 w-4 sm:w-5" />
             Filters
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <CardContent className="pt-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             <div>
               <label className="block text-sm font-medium mb-2">Status</label>
               <Select
                 value={filters.status}
                 onValueChange={(value) => setFilters((prev) => ({ ...prev, status: value }))}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-10 sm:h-auto">
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>
@@ -496,7 +507,7 @@ const CoinHistoryView = ({ selectedUser, onBack }) => {
                 value={filters.dateRange}
                 onValueChange={(value) => setFilters((prev) => ({ ...prev, dateRange: value }))}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-10 sm:h-auto">
                   <SelectValue placeholder="All time" />
                 </SelectTrigger>
                 <SelectContent>
@@ -513,7 +524,7 @@ const CoinHistoryView = ({ selectedUser, onBack }) => {
                 value={filters.limit.toString()}
                 onValueChange={(value) => setFilters((prev) => ({ ...prev, limit: Number.parseInt(value) }))}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-10 sm:h-auto">
                   <SelectValue placeholder={filters.limit.toString()} />
                 </SelectTrigger>
                 <SelectContent>
@@ -529,20 +540,20 @@ const CoinHistoryView = ({ selectedUser, onBack }) => {
 
       {/* Transfer History */}
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Transaction History</CardTitle>
-            <Button variant="outline" size="sm">
+        <CardHeader className="pb-3 sm:pb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <CardTitle className="text-base sm:text-lg">Transaction History</CardTitle>
+            <Button variant="outline" size="sm" className="w-full sm:w-auto bg-transparent">
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin mr-2" />
-              <span>Loading transaction history...</span>
+              <span className="text-sm sm:text-base">Loading transaction history...</span>
             </div>
           ) : error ? (
             <Alert className="border-amber-200 bg-amber-50">
@@ -555,35 +566,35 @@ const CoinHistoryView = ({ selectedUser, onBack }) => {
               <p className="text-gray-500">No transaction history found</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {transferHistory.map((transfer) => (
-                <div key={transfer.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                        <Coins className="h-5 w-5 text-green-600" />
+                <div key={transfer.id} className="border rounded-lg p-3 sm:p-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-start justify-between mb-3 gap-3">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="w-8 sm:w-10 h-8 sm:h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                        <Coins className="h-4 sm:h-5 w-4 sm:w-5 text-green-600" />
                       </div>
-                      <div>
-                        <p className="font-medium text-green-600">+{transfer.amount} coins</p>
-                        <p className="text-sm text-gray-600">{transfer.reason}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-green-600 text-sm sm:text-base">+{transfer.amount} coins</p>
+                        <p className="text-xs sm:text-sm text-gray-600 truncate">{transfer.reason}</p>
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right flex-shrink-0">
                       {getStatusBadge(transfer.status)}
                       <p className="text-xs text-gray-500 mt-1">
                         {new Date(transfer.createdAt).toLocaleDateString()}{" "}
-                        {new Date(transfer.createdAt).toLocaleTimeString()}
+                        <span className="hidden sm:inline">{new Date(transfer.createdAt).toLocaleTimeString()}</span>
                       </p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
-                    <div>
-                      <span className="font-medium">Transferred by:</span> {transfer.transferredBy}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600">
+                    <div className="truncate">
+                      <span className="font-medium">By:</span> {transfer.transferredBy}
                     </div>
-                    <div>
-                      <span className="font-medium">Transaction ID:</span> {transfer.transactionId}
+                    <div className="truncate">
+                      <span className="font-medium">ID:</span> {transfer.transactionId}
                     </div>
-                    <div>
+                    <div className="truncate">
                       <span className="font-medium">Balance:</span> {transfer.balanceBefore} → {transfer.balanceAfter}
                     </div>
                   </div>
@@ -605,7 +616,6 @@ export default function UserProfilePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [refreshing, setRefreshing] = useState(false)
-
   const [editMode, setEditMode] = useState(false)
   const [editFormData, setEditFormData] = useState({})
   const [saving, setSaving] = useState(false)
@@ -633,10 +643,8 @@ export default function UserProfilePage() {
   const fetchUsers = useCallback(async () => {
     setLoading(true)
     setError("")
-
     try {
       const response = await userAPI.getUsers(1, 200) // Get more users for better stats
-
       if (response && (response.users || response.data)) {
         const usersData = response.users || response.data || response
         const formattedUsers = userHelpers.formatUserList(usersData)
@@ -647,7 +655,6 @@ export default function UserProfilePage() {
     } catch (apiError) {
       console.warn("API call failed, using fallback data:", apiError)
       setError("Failed to load users from API - using demo data")
-
       // Enhanced fallback data
       const mockUsers = [
         {
@@ -730,7 +737,6 @@ export default function UserProfilePage() {
           lastLogin: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
         },
       ]
-
       const formattedMockUsers = userHelpers.formatUserList(mockUsers)
       setUsers(formattedMockUsers)
     } finally {
@@ -752,10 +758,8 @@ export default function UserProfilePage() {
         newUsersThisMonth: 0,
       }
     }
-
     const baseStats = userHelpers.calculateStats(users)
     const growthMetrics = userHelpers.calculateGrowthMetrics(users)
-
     return {
       ...baseStats,
       averageBalance: baseStats.totalUsers > 0 ? Math.round(baseStats.totalBalance / baseStats.totalUsers) : 0,
@@ -824,10 +828,8 @@ export default function UserProfilePage() {
   const handleSaveEdit = async () => {
     setSaving(true)
     setEditError("")
-
     try {
       const response = await userAPI.updateUser(selectedUser._id || selectedUser.id, editFormData)
-
       if (response.success) {
         // Update the selected user with new data
         setSelectedUser((prev) => ({ ...prev, ...editFormData }))
@@ -863,7 +865,7 @@ export default function UserProfilePage() {
   // Loading state
   if (loading) {
     return (
-      <div className="p-4 sm:p-6 bg-gray-50 min-h-full flex items-center justify-center">
+      <div className="p-3 sm:p-4 lg:p-6 bg-gray-50 min-h-screen flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-teal-600 mx-auto mb-4" />
           <p className="text-gray-600">Loading user data...</p>
@@ -875,40 +877,56 @@ export default function UserProfilePage() {
   // Show coin history view
   if (showCoinHistory && selectedUser) {
     return (
-      <div className="p-4 sm:p-6 bg-gray-50 min-h-full">
+      <div className="p-3 sm:p-4 lg:p-6 bg-gray-50 min-h-screen">
         <CoinHistoryView selectedUser={selectedUser} onBack={() => setShowCoinHistory(false)} />
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-6 bg-gray-50 min-h-full">
+    <div className="p-3 sm:p-4 lg:p-6 bg-gray-50 min-h-screen">
       {/* Enhanced Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 space-y-4 sm:space-y-0">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">User Profile Management</h1>
-          <p className="text-gray-600">View detailed user information and transaction history</p>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={handleRefresh} disabled={refreshing} variant="outline">
-            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-          {selectedUser && (
-            <Button onClick={() => setShowCoinHistory(!showCoinHistory)} className="bg-teal-600 hover:bg-teal-700">
-              {showCoinHistory ? (
-                <>
-                  <User className="h-4 w-4 mr-2" />
-                  View Profile
-                </>
-              ) : (
-                <>
-                  <Coins className="h-4 w-4 mr-2" />
-                  View Coin History
-                </>
-              )}
+      <div className="flex flex-col space-y-4 mb-4 sm:mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800 truncate">
+              User Profile Management
+            </h1>
+            <p className="text-sm sm:text-base text-gray-600 mt-1">
+              View detailed user information and transaction history
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
+            <Button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              variant="outline"
+              className="w-full sm:w-auto order-2 sm:order-1 bg-transparent"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
+              Refresh
             </Button>
-          )}
+            {selectedUser && (
+              <Button
+                onClick={() => setShowCoinHistory(!showCoinHistory)}
+                className="bg-teal-600 hover:bg-teal-700 w-full sm:w-auto order-1 sm:order-2"
+              >
+                {showCoinHistory ? (
+                  <>
+                    <User className="h-4 w-4 mr-2" />
+                    <span className="hidden sm:inline">View Profile</span>
+                    <span className="sm:hidden">Profile</span>
+                  </>
+                ) : (
+                  <>
+                    <Coins className="h-4 w-4 mr-2" />
+                    <span className="hidden sm:inline">View Coin History</span>
+                    <span className="sm:hidden">Coin History</span>
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -918,7 +936,7 @@ export default function UserProfilePage() {
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium mb-6 ${
+          className={`inline-flex items-center px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-medium mb-4 sm:mb-6 ${
             userRole === "superadmin"
               ? "bg-green-100 text-green-800 border border-green-200"
               : userRole === "editor"
@@ -938,113 +956,117 @@ export default function UserProfilePage() {
 
       {/* Error Alert */}
       {error && (
-        <Alert className="mb-6 border-amber-200 bg-amber-50">
+        <Alert className="mb-4 sm:mb-6 border-amber-200 bg-amber-50">
           <AlertTriangle className="h-4 w-4 text-amber-600" />
-          <AlertDescription className="text-amber-800">{error}</AlertDescription>
+          <AlertDescription className="text-amber-800 text-sm">{error}</AlertDescription>
         </Alert>
       )}
 
       {/* Enhanced Statistics Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
         <Card>
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                <Users className="w-5 h-5 text-blue-600" />
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center space-x-3 mb-3 sm:mb-4">
+              <div className="w-8 sm:w-10 h-8 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                <Users className="w-4 sm:w-5 h-4 sm:h-5 text-blue-600" />
               </div>
-              <span className="text-gray-600 font-medium">Total Users</span>
+              <span className="text-gray-600 font-medium text-sm sm:text-base">Total Users</span>
             </div>
-            <div className="text-3xl font-bold text-gray-800">{stats.totalUsers}</div>
-            <p className="text-sm text-gray-500 mt-1">{stats.activeUsers} active</p>
+            <div className="text-2xl sm:text-3xl font-bold text-gray-800">{stats.totalUsers}</div>
+            <p className="text-xs sm:text-sm text-gray-500 mt-1">{stats.activeUsers} active</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                <MessageSquare className="w-5 h-5 text-green-600" />
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center space-x-3 mb-3 sm:mb-4">
+              <div className="w-8 sm:w-10 h-8 sm:h-10 bg-green-100 rounded-full flex items-center justify-center">
+                <MessageSquare className="w-4 sm:w-5 h-4 sm:h-5 text-green-600" />
               </div>
-              <span className="text-gray-600 font-medium">Total Referrals</span>
+              <span className="text-gray-600 font-medium text-sm sm:text-base">Total Referrals</span>
             </div>
-            <div className="text-3xl font-bold text-gray-800">{stats.totalReferrals}</div>
-            <p className="text-sm text-gray-500 mt-1">Referral network</p>
+            <div className="text-2xl sm:text-3xl font-bold text-gray-800">{stats.totalReferrals}</div>
+            <p className="text-xs sm:text-sm text-gray-500 mt-1">Referral network</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                <Wallet className="w-5 h-5 text-purple-600" />
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center space-x-3 mb-3 sm:mb-4">
+              <div className="w-8 sm:w-10 h-8 sm:h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                <Wallet className="w-4 sm:w-5 h-4 sm:h-5 text-purple-600" />
               </div>
-              <span className="text-gray-600 font-medium">Connected Wallets</span>
+              <span className="text-gray-600 font-medium text-sm sm:text-base">Connected Wallets</span>
             </div>
-            <div className="text-3xl font-bold text-gray-800">{stats.usersWithWallets}</div>
-            <p className="text-sm text-gray-500 mt-1">Wallet integration</p>
+            <div className="text-2xl sm:text-3xl font-bold text-gray-800">{stats.usersWithWallets}</div>
+            <p className="text-xs sm:text-sm text-gray-500 mt-1">Wallet integration</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
-                <Calculator className="w-5 h-5 text-orange-600" />
+          <CardContent className="p-3 sm:p-4 lg:p-6">
+            <div className="flex items-center space-x-3 mb-3 sm:mb-4">
+              <div className="w-8 sm:w-10 h-8 sm:h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                <Calculator className="w-4 sm:w-5 h-4 sm:h-5 text-orange-600" />
               </div>
-              <span className="text-gray-600 font-medium">Calculator Users</span>
+              <span className="text-gray-600 font-medium text-sm sm:text-base">Calculator Users</span>
             </div>
-            <div className="text-3xl font-bold text-gray-800">{stats.calculatorUsers}</div>
-            <p className="text-sm text-gray-500 mt-1">Active calculators</p>
+            <div className="text-2xl sm:text-3xl font-bold text-gray-800">{stats.calculatorUsers}</div>
+            <p className="text-xs sm:text-sm text-gray-500 mt-1">Active calculators</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Additional Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total Balance</p>
-                <p className="text-xl font-bold text-green-600">{stats.totalBalance.toLocaleString()} coins</p>
+                <p className="text-xs sm:text-sm text-gray-600">Total Balance</p>
+                <p className="text-lg sm:text-xl font-bold text-green-600">
+                  {stats.totalBalance.toLocaleString()} coins
+                </p>
               </div>
-              <Coins className="h-8 w-8 text-green-500" />
+              <Coins className="h-6 sm:h-8 w-6 sm:w-8 text-green-500" />
             </div>
           </CardContent>
         </Card>
+
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Average Balance</p>
-                <p className="text-xl font-bold text-blue-600">{stats.averageBalance} coins</p>
+                <p className="text-xs sm:text-sm text-gray-600">Average Balance</p>
+                <p className="text-lg sm:text-xl font-bold text-blue-600">{stats.averageBalance} coins</p>
               </div>
-              <TrendingUp className="h-8 w-8 text-blue-500" />
+              <TrendingUp className="h-6 sm:h-8 w-6 sm:w-8 text-blue-500" />
             </div>
           </CardContent>
         </Card>
+
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">New This Month</p>
-                <p className="text-xl font-bold text-purple-600">{stats.newUsersThisMonth}</p>
+                <p className="text-xs sm:text-sm text-gray-600">New This Month</p>
+                <p className="text-lg sm:text-xl font-bold text-purple-600">{stats.newUsersThisMonth}</p>
               </div>
-              <UserCheck className="h-8 w-8 text-purple-500" />
+              <UserCheck className="h-6 sm:h-8 w-6 sm:w-8 text-purple-500" />
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* User Selection */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Search className="h-5 w-5" />
+      <Card className="mb-4 sm:mb-6">
+        <CardHeader className="pb-3 sm:pb-6">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <Search className="h-4 sm:h-5 w-4 sm:w-5" />
             Select User to View Profile
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           <UserSelector selectedUser={selectedUser} onUserSelect={setSelectedUser} className="max-w-full" />
         </CardContent>
       </Card>
@@ -1053,48 +1075,52 @@ export default function UserProfilePage() {
       {selectedUser && formattedUser ? (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
           <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-xl flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  User Profile Details
+            <CardHeader className="pb-3 sm:pb-6">
+              <div className="flex items-start justify-between gap-3">
+                <CardTitle className="text-lg sm:text-xl flex items-center gap-2 min-w-0 flex-1">
+                  <User className="h-4 sm:h-5 w-4 sm:w-5 flex-shrink-0" />
+                  <span className="truncate">User Profile Details</span>
                   {!canEdit && (
-                    <Badge variant="outline" className="ml-2 bg-orange-50 text-orange-700 border-orange-200">
+                    <Badge
+                      variant="outline"
+                      className="ml-2 bg-orange-50 text-orange-700 border-orange-200 text-xs flex-shrink-0"
+                    >
                       <Lock className="h-3 w-3 mr-1" />
-                      Read Only
+                      <span className="hidden sm:inline">Read Only</span>
                     </Badge>
                   )}
                 </CardTitle>
-                <Button variant="ghost" size="sm" onClick={() => setSelectedUser(null)}>
+                <Button variant="ghost" size="sm" onClick={() => setSelectedUser(null)} className="flex-shrink-0">
                   <X className="h-4 w-4" />
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="space-y-6">
+
+            <CardContent className="space-y-4 sm:space-y-6 pt-0">
               {/* User Status and Activity */}
-              <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                  <User className="h-6 w-6 text-blue-600" />
+              <div className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-gray-50 rounded-lg">
+                <div className="w-10 sm:w-12 h-10 sm:h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <User className="h-5 sm:h-6 w-5 sm:w-6 text-blue-600" />
                 </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-lg">{formattedUser.name}</h3>
-                  <p className="text-gray-600">{formattedUser.email}</p>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-base sm:text-lg truncate">{formattedUser.name}</h3>
+                  <p className="text-sm sm:text-base text-gray-600 truncate">{formattedUser.email}</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 flex-shrink-0">
                   <Badge
                     variant={formattedUser.isActive ? "default" : "secondary"}
-                    className={formattedUser.isActive ? "bg-green-100 text-green-800" : ""}
+                    className={`text-xs ${formattedUser.isActive ? "bg-green-100 text-green-800" : ""}`}
                   >
                     {formattedUser.isActive ? "Active" : "Inactive"}
                   </Badge>
-                  <Badge variant="outline" className="capitalize">
+                  <Badge variant="outline" className="capitalize text-xs">
                     {getUserActivityStatus(selectedUser)}
                   </Badge>
                 </div>
               </div>
 
               {/* User Information Grid - Conditionally Editable */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-2 flex items-center gap-2">
                     <User className="h-4 w-4" />
@@ -1105,9 +1131,10 @@ export default function UserProfilePage() {
                       value={editFormData.name || ""}
                       onChange={(e) => handleEditFormChange("name", e.target.value)}
                       placeholder="Enter full name"
+                      className="h-10 sm:h-auto"
                     />
                   ) : (
-                    <Input value={formattedUser.name} readOnly className="bg-gray-50" />
+                    <Input value={formattedUser.name} readOnly className="bg-gray-50 h-10 sm:h-auto" />
                   )}
                 </div>
 
@@ -1122,9 +1149,10 @@ export default function UserProfilePage() {
                       value={editFormData.email || ""}
                       onChange={(e) => handleEditFormChange("email", e.target.value)}
                       placeholder="Enter email address"
+                      className="h-10 sm:h-auto"
                     />
                   ) : (
-                    <Input value={formattedUser.email} readOnly className="bg-gray-50" />
+                    <Input value={formattedUser.email} readOnly className="bg-gray-50 h-10 sm:h-auto" />
                   )}
                 </div>
 
@@ -1139,12 +1167,13 @@ export default function UserProfilePage() {
                       value={editFormData.balance || 0}
                       onChange={(e) => handleEditFormChange("balance", Number.parseInt(e.target.value) || 0)}
                       placeholder="Enter balance"
+                      className="h-10 sm:h-auto"
                     />
                   ) : (
                     <Input
                       value={`${formattedUser.balance} coins`}
                       readOnly
-                      className="bg-gray-50 font-semibold text-green-600"
+                      className="bg-gray-50 font-semibold text-green-600 h-10 sm:h-auto"
                     />
                   )}
                 </div>
@@ -1157,7 +1186,7 @@ export default function UserProfilePage() {
                   <Input
                     value={new Date(selectedUser.createdAt).toLocaleDateString()}
                     readOnly
-                    className="bg-gray-50"
+                    className="bg-gray-50 h-10 sm:h-auto"
                   />
                 </div>
 
@@ -1169,7 +1198,7 @@ export default function UserProfilePage() {
                   <Input
                     value={selectedUser.lastLogin ? new Date(selectedUser.lastLogin).toLocaleString() : "Never"}
                     readOnly
-                    className="bg-gray-50"
+                    className="bg-gray-50 h-10 sm:h-auto"
                   />
                 </div>
 
@@ -1183,9 +1212,14 @@ export default function UserProfilePage() {
                       value={editFormData.inviteCode || ""}
                       onChange={(e) => handleEditFormChange("inviteCode", e.target.value)}
                       placeholder="Enter invite code"
+                      className="h-10 sm:h-auto"
                     />
                   ) : (
-                    <Input value={selectedUser.inviteCode || "N/A"} readOnly className="bg-gray-50 font-mono text-sm" />
+                    <Input
+                      value={selectedUser.inviteCode || "N/A"}
+                      readOnly
+                      className="bg-gray-50 font-mono text-sm h-10 sm:h-auto"
+                    />
                   )}
                 </div>
 
@@ -1199,9 +1233,14 @@ export default function UserProfilePage() {
                       value={editFormData.referredBy || ""}
                       onChange={(e) => handleEditFormChange("referredBy", e.target.value)}
                       placeholder="Enter referrer code"
+                      className="h-10 sm:h-auto"
                     />
                   ) : (
-                    <Input value={selectedUser.referredBy || "Direct signup"} readOnly className="bg-gray-50" />
+                    <Input
+                      value={selectedUser.referredBy || "Direct signup"}
+                      readOnly
+                      className="bg-gray-50 h-10 sm:h-auto"
+                    />
                   )}
                 </div>
 
@@ -1216,9 +1255,14 @@ export default function UserProfilePage() {
                       value={editFormData.calculatorUsage || 0}
                       onChange={(e) => handleEditFormChange("calculatorUsage", Number.parseInt(e.target.value) || 0)}
                       placeholder="Enter usage count"
+                      className="h-10 sm:h-auto"
                     />
                   ) : (
-                    <Input value={`${selectedUser.calculatorUsage || 0} times`} readOnly className="bg-gray-50" />
+                    <Input
+                      value={`${selectedUser.calculatorUsage || 0} times`}
+                      readOnly
+                      className="bg-gray-50 h-10 sm:h-auto"
+                    />
                   )}
                 </div>
 
@@ -1232,7 +1276,7 @@ export default function UserProfilePage() {
                       value={editFormData.role || "user"}
                       onValueChange={(value) => handleEditFormChange("role", value)}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="h-10 sm:h-auto">
                         <SelectValue placeholder="Select role" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1242,7 +1286,11 @@ export default function UserProfilePage() {
                       </SelectContent>
                     </Select>
                   ) : (
-                    <Input value={selectedUser.role || "user"} readOnly className="bg-gray-50 capitalize" />
+                    <Input
+                      value={selectedUser.role || "user"}
+                      readOnly
+                      className="bg-gray-50 capitalize h-10 sm:h-auto"
+                    />
                   )}
                 </div>
               </div>
@@ -1269,8 +1317,8 @@ export default function UserProfilePage() {
                   Wallet Addresses
                 </label>
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="bg-orange-50 text-orange-700">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                    <Badge variant="outline" className="bg-orange-50 text-orange-700 flex-shrink-0">
                       MetaMask
                     </Badge>
                     {editMode && canEdit ? (
@@ -1278,18 +1326,19 @@ export default function UserProfilePage() {
                         value={editFormData.walletAddresses?.metamask || ""}
                         onChange={(e) => handleEditFormChange("walletAddresses.metamask", e.target.value)}
                         placeholder="Enter MetaMask wallet address"
-                        className="font-mono text-xs"
+                        className="font-mono text-xs flex-1 h-10 sm:h-auto"
                       />
                     ) : (
                       <Input
                         value={selectedUser.walletAddresses?.metamask || "Not connected"}
                         readOnly
-                        className="bg-gray-50 font-mono text-xs"
+                        className="bg-gray-50 font-mono text-xs flex-1 h-10 sm:h-auto"
                       />
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="bg-blue-50 text-blue-700">
+
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700 flex-shrink-0">
                       Trust Wallet
                     </Badge>
                     {editMode && canEdit ? (
@@ -1297,13 +1346,13 @@ export default function UserProfilePage() {
                         value={editFormData.walletAddresses?.trustWallet || ""}
                         onChange={(e) => handleEditFormChange("walletAddresses.trustWallet", e.target.value)}
                         placeholder="Enter Trust Wallet address"
-                        className="font-mono text-xs"
+                        className="font-mono text-xs flex-1 h-10 sm:h-auto"
                       />
                     ) : (
                       <Input
                         value={selectedUser.walletAddresses?.trustWallet || "Not connected"}
                         readOnly
-                        className="bg-gray-50 font-mono text-xs"
+                        className="bg-gray-50 font-mono text-xs flex-1 h-10 sm:h-auto"
                       />
                     )}
                   </div>
@@ -1315,7 +1364,7 @@ export default function UserProfilePage() {
                 <Alert className="border-orange-200 bg-orange-50">
                   <Lock className="h-4 w-4 text-orange-600" />
                   <AlertDescription className="text-orange-800">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
                         <strong>Edit Restricted:</strong> Only Super Admin users can edit profile information.
                         <br />
@@ -1323,7 +1372,7 @@ export default function UserProfilePage() {
                           Current role: <strong className="capitalize">{userRole}</strong>
                         </span>
                       </div>
-                      <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-300">
+                      <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-300 w-fit">
                         {userRole === "editor" ? "Editor" : "Viewer"} Access
                       </Badge>
                     </div>
@@ -1335,22 +1384,24 @@ export default function UserProfilePage() {
               {editError && (
                 <Alert className="border-red-200 bg-red-50">
                   <AlertTriangle className="h-4 w-4 text-red-600" />
-                  <AlertDescription className="text-red-800">{editError}</AlertDescription>
+                  <AlertDescription className="text-red-800 text-sm">{editError}</AlertDescription>
                 </Alert>
               )}
 
               {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t">
-                <Button onClick={() => setShowCoinHistory(true)} className="flex-1">
+              <div className="flex flex-col sm:flex-row gap-3 pt-4 sm:pt-6 border-t">
+                <Button onClick={() => setShowCoinHistory(true)} className="flex-1 h-10 sm:h-auto">
                   <Coins className="h-4 w-4 mr-2" />
-                  View Coin History
+                  <span className="hidden sm:inline">View Coin History</span>
+                  <span className="sm:hidden">Coin History</span>
                 </Button>
+
                 {editMode && canEdit ? (
                   <>
                     <Button
                       onClick={handleSaveEdit}
                       disabled={saving}
-                      className="flex-1 bg-green-600 hover:bg-green-700"
+                      className="flex-1 bg-green-600 hover:bg-green-700 h-10 sm:h-auto"
                     >
                       {saving ? (
                         <>
@@ -1360,24 +1411,39 @@ export default function UserProfilePage() {
                       ) : (
                         <>
                           <CheckCircle className="h-4 w-4 mr-2" />
-                          Save Changes
+                          <span className="hidden sm:inline">Save Changes</span>
+                          <span className="sm:hidden">Save</span>
                         </>
                       )}
                     </Button>
-                    <Button onClick={handleCancelEdit} variant="outline" className="flex-1">
+                    <Button
+                      onClick={handleCancelEdit}
+                      variant="outline"
+                      className="flex-1 h-10 sm:h-auto bg-transparent"
+                    >
                       <X className="h-4 w-4 mr-2" />
                       Cancel
                     </Button>
                   </>
                 ) : canEdit ? (
-                  <Button onClick={handleEditProfile} variant="outline" className="flex-1">
+                  <Button
+                    onClick={handleEditProfile}
+                    variant="outline"
+                    className="flex-1 h-10 sm:h-auto bg-transparent"
+                  >
                     <Edit className="h-4 w-4 mr-2" />
-                    Edit Profile
+                    <span className="hidden sm:inline">Edit Profile</span>
+                    <span className="sm:hidden">Edit</span>
                   </Button>
                 ) : (
-                  <Button disabled variant="outline" className="flex-1 opacity-50 cursor-not-allowed">
+                  <Button
+                    disabled
+                    variant="outline"
+                    className="flex-1 opacity-50 cursor-not-allowed h-10 sm:h-auto bg-transparent"
+                  >
                     <Lock className="h-4 w-4 mr-2" />
-                    Edit Restricted
+                    <span className="hidden sm:inline">Edit Restricted</span>
+                    <span className="sm:hidden">Restricted</span>
                   </Button>
                 )}
               </div>
@@ -1386,13 +1452,13 @@ export default function UserProfilePage() {
         </motion.div>
       ) : (
         <Card>
-          <CardContent className="text-center py-12">
-            <Users className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-            <h3 className="text-lg font-medium text-gray-800 mb-2">No User Selected</h3>
-            <p className="text-gray-600 mb-4">
+          <CardContent className="text-center py-8 sm:py-12">
+            <Users className="w-12 sm:w-16 h-12 sm:h-16 mx-auto mb-4 text-gray-300" />
+            <h3 className="text-base sm:text-lg font-medium text-gray-800 mb-2">No User Selected</h3>
+            <p className="text-sm sm:text-base text-gray-600 mb-4">
               Please select a user from the dropdown above to view their detailed profile information.
             </p>
-            <p className="text-sm text-gray-500">
+            <p className="text-xs sm:text-sm text-gray-500">
               Use the search functionality to quickly find specific users by name, email, or invite code.
             </p>
           </CardContent>

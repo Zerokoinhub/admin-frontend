@@ -66,12 +66,25 @@ const ManagementPage = () => {
 
   // Get user role from localStorage with enhanced checking
   useEffect(() => {
-    const userStr = localStorage.getItem("user") || localStorage.getItem("role") || "viewer"
-    const user = JSON.parse(userStr)
-    const role = user.role
-    console.log("the current mode ", role);
-    setUserRole(role)
-    setRoleLoading(false)
+    try {
+      const userStr = localStorage.getItem("user") || localStorage.getItem("role") || '"viewer"'
+      let role = "viewer"
+
+      try {
+        const parsed = JSON.parse(userStr)
+        role = typeof parsed === "string" ? parsed : parsed.role || "viewer"
+      } catch {
+        role = userStr || "viewer"
+      }
+
+      console.log("the current mode ", role)
+      setUserRole(role)
+    } catch (error) {
+      console.error("Error getting user role:", error)
+      setUserRole("viewer")
+    } finally {
+      setRoleLoading(false)
+    }
   }, [])
 
   // Role-based permission helpers
@@ -140,18 +153,18 @@ const ManagementPage = () => {
       const response = await userAPI.getUsers(page, limit)
 
       let allUsers = []
-      if (response.success && response.data && response.data.users) {
-        allUsers = response.data.users
-        setPagination({
-          currentPage: response.data.pagination?.currentPage || 1,
-          totalPages: response.data.pagination?.totalPages || 1,
-          totalItems: response.data.pagination?.totalItems || allUsers.length,
-          itemsPerPage: response.data.pagination?.itemsPerPage || limit,
-        })
-      } else if (response.users) {
-        allUsers = response.users
-      } else if (Array.isArray(response.data)) {
-        allUsers = response.data
+      if (response.success) {
+        allUsers = response.users || response.data || []
+        setPagination(
+          response.pagination || {
+            currentPage: 1,
+            totalPages: 1,
+            totalItems: allUsers.length,
+            itemsPerPage: limit,
+          },
+        )
+      } else {
+        throw new Error("Failed to fetch users")
       }
 
       console.log("Loaded users:", allUsers.length)
@@ -231,7 +244,7 @@ const ManagementPage = () => {
     setTimeout(() => setSuccessMessage(""), 3000)
   }
 
-  // Enhanced user status change with better error handling
+  // Enhanced user status change with better error handling using the updated API
   const handleUserStatusChange = async (userId, currentStatus) => {
     try {
       setRefreshing(true)
@@ -240,13 +253,8 @@ const ManagementPage = () => {
       const isCurrentlyActive = currentStatus === "Active"
       const newStatus = !isCurrentlyActive
 
-      // Call the appropriate API with enhanced error handling
-      let result
-      if (isCurrentlyActive) {
-        result = await userAPI.banUser(userId)
-      } else {
-        result = await userAPI.unbanUser(userId)
-      }
+      // Use the enhanced updateUserStatus function from api.js
+      const result = await userAPI.updateUserStatus(userId, newStatus)
 
       if (result && !result.success) {
         throw new Error(result.message || "Failed to update user status")
@@ -302,8 +310,8 @@ const ManagementPage = () => {
       const searchLower = searchTerm.toLowerCase()
       filtered = filtered.filter(
         (user) =>
-          user.name.toLowerCase().includes(searchLower) ||
-          user.email.toLowerCase().includes(searchLower) ||
+          user.name?.toLowerCase().includes(searchLower) ||
+          user.email?.toLowerCase().includes(searchLower) ||
           (user.inviteCode && user.inviteCode.toLowerCase().includes(searchLower)),
       )
     }
@@ -417,11 +425,16 @@ const ManagementPage = () => {
           <p className="text-gray-600 mt-1">Manage and monitor your platform users • {stats.totalUsers} total users</p>
         </div>
         <div className="flex gap-3">
-          <Button onClick={handleRefresh} disabled={refreshing} variant="outline" className="flex items-center gap-2">
+          <Button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            variant="outline"
+            className="flex items-center gap-2 bg-transparent"
+          >
             <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
             {refreshing ? "Refreshing..." : "Refresh"}
           </Button>
-          <Button variant="outline" className="flex items-center gap-2">
+          <Button variant="outline" className="flex items-center gap-2 bg-transparent">
             <Download className="h-4 w-4" />
             Export
           </Button>
@@ -468,7 +481,6 @@ const ManagementPage = () => {
             </Alert>
           </motion.div>
         )}
-
         {error && (
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
             <Alert className="border-red-200 bg-red-50">
@@ -888,10 +900,8 @@ const ManagementPage = () => {
           canEdit
             ? (updatedUser) => {
                 console.log("Status changed for user:", updatedUser)
-
                 // Update the selected user immediately
                 setSelectedUser(updatedUser)
-
                 // Update both users lists with the new status
                 const updateUsersList = (prevUsers) => {
                   return prevUsers.map((u) =>
@@ -904,27 +914,22 @@ const ManagementPage = () => {
                       : u,
                   )
                 }
-
                 setUsers(updateUsersList)
                 setFilteredUsers(updateUsersList)
-
                 // Recalculate stats with the updated user list
                 const updatedUserList = users.map((user) =>
                   (user.id || user._id) === (updatedUser.id || updatedUser._id)
                     ? { ...user, isActive: updatedUser.isActive }
                     : user,
                 )
-
                 const calculatedStats = userHelpers.calculateStats(updatedUserList)
                 const engagementMetrics = calculateEngagementMetrics(updatedUserList)
-
                 setStats((prevStats) => ({
                   ...prevStats,
                   activeUsers: calculatedStats.activeUsers,
                   inactiveUsers: calculatedStats.inactiveUsers,
                   engagementMetrics,
                 }))
-
                 // Show success message
                 setSuccessMessage(`User ${updatedUser.isActive ? "unbanned" : "banned"} successfully!`)
                 setTimeout(() => setSuccessMessage(""), 3000)

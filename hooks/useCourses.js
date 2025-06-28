@@ -29,7 +29,11 @@ export const useCourses = () => {
       }
 
       const currentUser = getCurrentUser();
-      console.log("Fetching courses for:", currentUser?.email, currentUser?.role);
+      console.log(
+        "Fetching courses for:",
+        currentUser?.email,
+        currentUser?.role
+      );
 
       const response = await makeAuthenticatedRequest(API_BASE, {
         method: "GET",
@@ -67,19 +71,28 @@ export const useCourses = () => {
         throw new Error("User ID not found.");
       }
 
+      const currUsr = localStorage.getItem("user");
+      const currUsrStr = JSON.parse(currUsr);
+      const uploadedBy = currUsrStr.username
+        .toLowerCase()
+        .replace(/[^a-zA-Z0-9 ]/g, "") // remove special chars
+        .split(" ")
+        .map((word, index) =>
+          index === 0 ? word : word.charAt(0).toUpperCase() + word.slice(1)
+        )
+        .join("");
       const coursePayload = {
         courseName: courseData.courseName,
         pages: courseData.pages,
-        uploadedBy: currentUser.id,
+        uploadedBy: uploadedBy,
       };
-
       console.log("Creating course:", coursePayload);
 
       const response = await fetch(API_BASE, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem("token") || ""}`,
+          Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
         },
         body: JSON.stringify(coursePayload),
       });
@@ -95,7 +108,8 @@ export const useCourses = () => {
       }
     } catch (err) {
       console.error("Error creating course:", err);
-      const errorMessage = err instanceof Error ? err.message : "Failed to create course";
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to create course";
       setError(errorMessage);
       return { success: false, error: errorMessage };
     }
@@ -108,10 +122,13 @@ export const useCourses = () => {
         throw new Error("User not authenticated. Please log in again.");
       }
 
-      const response = await makeAuthenticatedRequest(`${API_BASE}/${courseId}`, {
-        method: "PUT",
-        body: JSON.stringify(courseData),
-      });
+      const response = await makeAuthenticatedRequest(
+        `${API_BASE}/${courseId}`,
+        {
+          method: "PUT",
+          body: JSON.stringify(courseData),
+        }
+      );
 
       const data = await response.json();
       console.log("Update response:", data);
@@ -126,7 +143,8 @@ export const useCourses = () => {
       }
     } catch (err) {
       console.error("Error updating course:", err);
-      const errorMessage = err instanceof Error ? err.message : "Failed to update course";
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to update course";
       setError(errorMessage);
       return { success: false, error: errorMessage };
     }
@@ -139,9 +157,12 @@ export const useCourses = () => {
         throw new Error("User not authenticated. Please log in again.");
       }
 
-      const response = await makeAuthenticatedRequest(`${API_BASE}/${courseId}`, {
-        method: "DELETE",
-      });
+      const response = await makeAuthenticatedRequest(
+        `${API_BASE}/${courseId}`,
+        {
+          method: "DELETE",
+        }
+      );
 
       const data = await response.json();
       console.log("Delete response:", data);
@@ -154,7 +175,8 @@ export const useCourses = () => {
       }
     } catch (err) {
       console.error("Error deleting course:", err);
-      const errorMessage = err instanceof Error ? err.message : "Failed to delete course";
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to delete course";
       setError(errorMessage);
       return { success: false, error: errorMessage };
     }

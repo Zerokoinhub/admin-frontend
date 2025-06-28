@@ -312,7 +312,6 @@ export default function DashboardPage() {
     setUserEmail(userData.email)
     setUserRole(userData.role)
     setRoleDisplayName(getRoleDisplayName(userData.role))
-
     loadDashboardData()
   }, [loadDashboardData])
 
@@ -323,7 +322,7 @@ export default function DashboardPage() {
     {
       label: "Total Users",
       value: dashboardStats.totalUsers,
-      icon: <Users className="h-5 w-5" />,
+      icon: <Users className="h-4 w-4 sm:h-5 sm:w-5" />,
       allowedRoles: ["superadmin", "admin", "editor", "viewer"],
       color: "from-blue-500 to-blue-600",
       bgColor: "bg-blue-50",
@@ -335,7 +334,7 @@ export default function DashboardPage() {
     {
       label: "Active Users",
       value: dashboardStats.activeUsers,
-      icon: <UserCheck className="h-5 w-5" />,
+      icon: <UserCheck className="h-4 w-4 sm:h-5 sm:w-5" />,
       allowedRoles: ["superadmin", "admin", "editor", "viewer"],
       color: "from-green-500 to-green-600",
       bgColor: "bg-green-50",
@@ -347,7 +346,7 @@ export default function DashboardPage() {
     {
       label: "Users with Wallets",
       value: dashboardStats.usersWithWallets,
-      icon: <Wallet className="h-5 w-5" />,
+      icon: <Wallet className="h-4 w-4 sm:h-5 sm:w-5" />,
       allowedRoles: ["superadmin", "admin", "editor", "viewer"],
       color: "from-emerald-500 to-emerald-600",
       bgColor: "bg-emerald-50",
@@ -359,7 +358,7 @@ export default function DashboardPage() {
     {
       label: "Total Referrals",
       value: dashboardStats.totalReferrals,
-      icon: <BadgePercent className="h-5 w-5" />,
+      icon: <BadgePercent className="h-4 w-4 sm:h-5 sm:w-5" />,
       allowedRoles: ["superadmin", "admin", "editor", "viewer"],
       color: "from-purple-500 to-purple-600",
       bgColor: "bg-purple-50",
@@ -371,7 +370,7 @@ export default function DashboardPage() {
     {
       label: "Calculator Users",
       value: dashboardStats.calculatorUsers,
-      icon: <Calculator className="h-5 w-5" />,
+      icon: <Calculator className="h-4 w-4 sm:h-5 sm:w-5" />,
       allowedRoles: ["superadmin", "admin", "editor", "viewer"],
       color: "from-orange-500 to-orange-600",
       bgColor: "bg-orange-50",
@@ -383,7 +382,7 @@ export default function DashboardPage() {
     {
       label: "Firebase Users",
       value: dashboardStats.usersWithFirebase,
-      icon: <Smartphone className="h-5 w-5" />,
+      icon: <Smartphone className="h-4 w-4 sm:h-5 sm:w-5" />,
       allowedRoles: ["superadmin", "admin", "editor"],
       color: "from-cyan-500 to-cyan-600",
       bgColor: "bg-cyan-50",
@@ -395,7 +394,7 @@ export default function DashboardPage() {
     {
       label: "Admin Users",
       value: dashboardStats.adminUsers,
-      icon: <Crown className="h-5 w-5" />,
+      icon: <Crown className="h-4 w-4 sm:h-5 sm:w-5" />,
       allowedRoles: ["superadmin", "admin"],
       color: "from-indigo-500 to-indigo-600",
       bgColor: "bg-indigo-50",
@@ -407,7 +406,7 @@ export default function DashboardPage() {
     {
       label: "Inactive Users",
       value: dashboardStats.inactiveUsers,
-      icon: <UserX className="h-5 w-5" />,
+      icon: <UserX className="h-4 w-4 sm:h-5 sm:w-5" />,
       allowedRoles: ["superadmin", "admin", "editor"],
       color: "from-red-500 to-red-600",
       bgColor: "bg-red-50",
@@ -419,7 +418,7 @@ export default function DashboardPage() {
     {
       label: "Total Revenue",
       value: dashboardStats.totalRevenue,
-      icon: <DollarSign className="h-5 w-5" />,
+      icon: <DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />,
       allowedRoles: ["superadmin", "admin"],
       color: "from-yellow-500 to-yellow-600",
       bgColor: "bg-yellow-50",
@@ -432,7 +431,7 @@ export default function DashboardPage() {
     {
       label: "Coin Distribution",
       value: dashboardStats.totalCoinDistribution,
-      icon: <HandCoins className="h-5 w-5" />,
+      icon: <HandCoins className="h-4 w-4 sm:h-5 sm:w-5" />,
       allowedRoles: ["superadmin", "admin", "editor", "viewer"],
       color: "from-teal-500 to-teal-600",
       bgColor: "bg-teal-50",
@@ -444,7 +443,7 @@ export default function DashboardPage() {
     {
       label: "Avg Engagement",
       value: dashboardStats.engagementMetrics.averageEngagementScore,
-      icon: <Zap className="h-5 w-5" />,
+      icon: <Zap className="h-4 w-4 sm:h-5 sm:w-5" />,
       allowedRoles: ["superadmin", "admin", "editor"],
       color: "from-pink-500 to-pink-600",
       bgColor: "bg-pink-50",
@@ -457,7 +456,7 @@ export default function DashboardPage() {
     {
       label: "Recent Updates",
       value: dashboardStats.recentlyUpdated,
-      icon: <Clock className="h-5 w-5" />,
+      icon: <Clock className="h-4 w-4 sm:h-5 sm:w-5" />,
       allowedRoles: ["superadmin", "admin", "editor"],
       color: "from-violet-500 to-violet-600",
       bgColor: "bg-violet-50",
@@ -475,10 +474,10 @@ export default function DashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="flex flex-col items-center gap-4">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="flex flex-col items-center gap-4 text-center">
           <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-          <p className="text-gray-600">Loading dashboard...</p>
+          <p className="text-gray-600 text-sm sm:text-base">Loading dashboard...</p>
         </div>
       </div>
     )
@@ -486,14 +485,14 @@ export default function DashboardPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center space-y-4">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="text-center space-y-4 max-w-md">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
             <AlertTriangle className="h-8 w-8 text-red-600" />
           </div>
-          <h2 className="text-xl font-semibold text-gray-900">Error Loading Dashboard</h2>
-          <p className="text-gray-600 max-w-md">{error}</p>
-          <Button onClick={() => loadDashboardData()} className="bg-blue-600 hover:bg-blue-700">
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Error Loading Dashboard</h2>
+          <p className="text-gray-600 text-sm sm:text-base">{error}</p>
+          <Button onClick={() => loadDashboardData()} className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
             Retry
           </Button>
         </div>
@@ -504,16 +503,18 @@ export default function DashboardPage() {
   // Show error state if no user data
   if (!userName || !userRole) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center space-y-4">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="text-center space-y-4 max-w-md">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
             <Shield className="h-8 w-8 text-red-600" />
           </div>
-          <h2 className="text-xl font-semibold text-gray-900">Authentication Required</h2>
-          <p className="text-gray-600 max-w-md">
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Authentication Required</h2>
+          <p className="text-gray-600 text-sm sm:text-base">
             Unable to load user data from localStorage. Please log in again to access the dashboard.
           </p>
-          <Button onClick={() => window.location.reload()}>Reload Page</Button>
+          <Button onClick={() => window.location.reload()} className="w-full sm:w-auto">
+            Reload Page
+          </Button>
         </div>
       </div>
     )
@@ -523,92 +524,116 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
       {/* Enhanced Header Section */}
       <div className={`${colorScheme.bg} border-b border-gray-200/50`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center">
-                  <Activity className={`h-6 w-6 ${colorScheme.accent}`} />
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6">
+          <div className="flex flex-col space-y-4">
+            {/* Main Header */}
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+              <div className="space-y-2 flex-1 min-w-0">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-xl shadow-sm flex items-center justify-center flex-shrink-0">
+                    <Activity className={`h-5 w-5 sm:h-6 sm:w-6 ${colorScheme.accent}`} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 truncate">
+                      Welcome back, <span className={colorScheme.accent}>{userName}</span> 👋
+                    </h1>
+                    <p className="text-gray-600 text-xs sm:text-sm lg:text-base">
+                      Here's what's happening with your platform today
+                    </p>
+                    {userEmail && <p className="text-xs text-gray-500 mt-1 truncate">{userEmail}</p>}
+                  </div>
                 </div>
-                <div>
-                  <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">
-                    Welcome back, <span className={colorScheme.accent}>{userName}</span> 👋
-                  </h1>
-                  <p className="text-gray-600 text-sm lg:text-base">Here's what's happening with your platform today</p>
-                  {userEmail && <p className="text-xs text-gray-500 mt-1">{userEmail}</p>}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 sm:flex-shrink-0">
+                <Button
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  variant="outline"
+                  size="sm"
+                  className="w-full sm:w-auto text-xs sm:text-sm bg-transparent"
+                >
+                  <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
+                  {isRefreshing ? "Refreshing..." : "Refresh"}
+                </Button>
+
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                  <Badge
+                    variant="outline"
+                    className={`${colorScheme.badge} px-2 sm:px-3 py-1 sm:py-1.5 font-medium text-xs sm:text-sm justify-center sm:justify-start`}
+                  >
+                    <Shield className="h-3 w-3 mr-1 sm:mr-2" />
+                    {roleDisplayName}
+                  </Badge>
+
+                  <div className="text-xs sm:text-sm text-gray-600 bg-white/60 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-center sm:text-left">
+                    {getPermissionsDescription(userRole)}
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              <Button
-                onClick={handleRefresh}
-                disabled={isRefreshing}
-                variant="outline"
-                size="sm"
-                className="w-full sm:w-auto"
+            {/* Enhanced Growth Metrics Summary */}
+            <div className="overflow-x-auto -mx-3 sm:mx-0">
+              <div
+                className="flex sm:grid sm:grid-cols-3 md:grid-cols-6 gap-3 sm:gap-4 px-3 sm:px-0 pb-2 sm:pb-0"
+                style={{ minWidth: "max-content" }}
               >
-                <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
-                {isRefreshing ? "Refreshing..." : "Refresh"}
-              </Button>
-              <Badge variant="outline" className={`${colorScheme.badge} px-3 py-1.5 font-medium`}>
-                <Shield className="h-3 w-3 mr-2" />
-                {roleDisplayName}
-              </Badge>
-              <div className="text-sm text-gray-600 bg-white/60 px-3 py-1.5 rounded-lg">
-                {getPermissionsDescription(userRole)}
+                <div className="bg-white/60 rounded-lg p-2 sm:p-3 flex-shrink-0 w-24 sm:w-auto">
+                  <p className="text-xs text-gray-600">Today</p>
+                  <p className="text-sm sm:text-lg font-semibold text-gray-900">
+                    {dashboardStats.growthMetrics.newUsersToday}
+                  </p>
+                  <p className="text-xs text-gray-500">new users</p>
+                </div>
+                <div className="bg-white/60 rounded-lg p-2 sm:p-3 flex-shrink-0 w-24 sm:w-auto">
+                  <p className="text-xs text-gray-600">This Week</p>
+                  <p className="text-sm sm:text-lg font-semibold text-gray-900">
+                    {dashboardStats.growthMetrics.newUsersLast7Days}
+                  </p>
+                  <p className="text-xs text-gray-500">new users</p>
+                </div>
+                <div className="bg-white/60 rounded-lg p-2 sm:p-3 flex-shrink-0 w-24 sm:w-auto">
+                  <p className="text-xs text-gray-600">This Month</p>
+                  <p className="text-sm sm:text-lg font-semibold text-gray-900">
+                    {dashboardStats.growthMetrics.newUsersLast30Days}
+                  </p>
+                  <p className="text-xs text-gray-500">new users</p>
+                </div>
+                <div className="bg-white/60 rounded-lg p-2 sm:p-3 flex-shrink-0 w-24 sm:w-auto">
+                  <p className="text-xs text-gray-600">Weekly Activity</p>
+                  <p className="text-sm sm:text-lg font-semibold text-gray-900">
+                    {formatPercentage(dashboardStats.growthMetrics.weeklyActivityRate)}
+                  </p>
+                  <p className="text-xs text-gray-500">active rate</p>
+                </div>
+                <div className="bg-white/60 rounded-lg p-2 sm:p-3 flex-shrink-0 w-24 sm:w-auto">
+                  <p className="text-xs text-gray-600">Growth (7d)</p>
+                  <p className="text-sm sm:text-lg font-semibold text-gray-900">
+                    {formatPercentage(dashboardStats.growthMetrics.growthRate7Days)}
+                  </p>
+                  <p className="text-xs text-gray-500">growth rate</p>
+                </div>
+                <div className="bg-white/60 rounded-lg p-2 sm:p-3 flex-shrink-0 w-24 sm:w-auto">
+                  <p className="text-xs text-gray-600">Growth (30d)</p>
+                  <p className="text-sm sm:text-lg font-semibold text-gray-900">
+                    {formatPercentage(dashboardStats.growthMetrics.growthRate30Days)}
+                  </p>
+                  <p className="text-xs text-gray-500">growth rate</p>
+                </div>
               </div>
-            </div>
-          </div>
-
-          {/* Enhanced Growth Metrics Summary */}
-          <div className="mt-6 grid grid-cols-2 lg:grid-cols-6 gap-4">
-            <div className="bg-white/60 rounded-lg p-3">
-              <p className="text-xs text-gray-600">Today</p>
-              <p className="text-lg font-semibold text-gray-900">{dashboardStats.growthMetrics.newUsersToday}</p>
-              <p className="text-xs text-gray-500">new users</p>
-            </div>
-            <div className="bg-white/60 rounded-lg p-3">
-              <p className="text-xs text-gray-600">This Week</p>
-              <p className="text-lg font-semibold text-gray-900">{dashboardStats.growthMetrics.newUsersLast7Days}</p>
-              <p className="text-xs text-gray-500">new users</p>
-            </div>
-            <div className="bg-white/60 rounded-lg p-3">
-              <p className="text-xs text-gray-600">This Month</p>
-              <p className="text-lg font-semibold text-gray-900">{dashboardStats.growthMetrics.newUsersLast30Days}</p>
-              <p className="text-xs text-gray-500">new users</p>
-            </div>
-            <div className="bg-white/60 rounded-lg p-3">
-              <p className="text-xs text-gray-600">Weekly Activity</p>
-              <p className="text-lg font-semibold text-gray-900">
-                {formatPercentage(dashboardStats.growthMetrics.weeklyActivityRate)}
-              </p>
-              <p className="text-xs text-gray-500">active rate</p>
-            </div>
-            <div className="bg-white/60 rounded-lg p-3">
-              <p className="text-xs text-gray-600">Growth (7d)</p>
-              <p className="text-lg font-semibold text-gray-900">
-                {formatPercentage(dashboardStats.growthMetrics.growthRate7Days)}
-              </p>
-              <p className="text-xs text-gray-500">growth rate</p>
-            </div>
-            <div className="bg-white/60 rounded-lg p-3">
-              <p className="text-xs text-gray-600">Growth (30d)</p>
-              <p className="text-lg font-semibold text-gray-900">
-                {formatPercentage(dashboardStats.growthMetrics.growthRate30Days)}
-              </p>
-              <p className="text-xs text-gray-500">growth rate</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
         {/* Revenue Access Notice */}
         {!canViewRevenue(userRole) && (
-          <Alert className="mb-8 border-amber-200 bg-amber-50">
+          <Alert className="mb-6 sm:mb-8 border-amber-200 bg-amber-50">
             <EyeOff className="h-4 w-4 text-amber-600" />
-            <AlertDescription className="text-amber-800">
+            <AlertDescription className="text-amber-800 text-sm">
               <strong>Limited Access Notice:</strong> Revenue data and financial analytics are restricted to Admin users
               only. Contact your administrator if you need access to this information.
             </AlertDescription>
@@ -616,7 +641,7 @@ export default function DashboardPage() {
         )}
 
         {/* Enhanced Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
           {filteredStats.map((item, index) => (
             <Card
               key={index}
@@ -625,18 +650,20 @@ export default function DashboardPage() {
               <div
                 className={`absolute inset-0 bg-gradient-to-br ${item.color} opacity-0 group-hover:opacity-5 transition-opacity duration-200`}
               />
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className={`w-12 h-12 ${item.bgColor} rounded-xl flex items-center justify-center`}>
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <div
+                    className={`w-10 h-10 sm:w-12 sm:h-12 ${item.bgColor} rounded-xl flex items-center justify-center`}
+                  >
                     <div className={item.textColor}>{item.icon}</div>
                   </div>
                   {item.isRevenue && <Badge className="bg-red-100 text-red-800 text-xs px-2 py-1">Admin Only</Badge>}
                 </div>
 
                 <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-600">{item.label}</p>
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">{item.label}</p>
                   <div className="flex items-end justify-between">
-                    <p className="text-2xl font-bold text-gray-900">
+                    <p className="text-lg sm:text-2xl font-bold text-gray-900 truncate">
                       {item.isRevenue ? formatCurrency(item.value) : formatNumber(item.value) + (item.suffix || "")}
                     </p>
                     <div
@@ -650,7 +677,7 @@ export default function DashboardPage() {
                     >
                       {item.changeType === "positive" && <TrendingUp className="h-3 w-3" />}
                       {item.changeType === "negative" && <TrendingDown className="h-3 w-3" />}
-                      {item.change}
+                      <span className="truncate">{item.change}</span>
                     </div>
                   </div>
                   {item.description && <p className="text-xs text-gray-500 mt-1">{item.description}</p>}
@@ -662,18 +689,18 @@ export default function DashboardPage() {
 
         {/* Enhanced Engagement Metrics */}
         {canViewSensitiveData(userRole) && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
             <Card className="border-0 shadow-sm">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center">
-                    <Zap className="h-5 w-5 text-green-600" />
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-50 rounded-xl flex items-center justify-center">
+                    <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
                   </div>
                   <Badge className="bg-green-100 text-green-800 text-xs">High Engagement</Badge>
                 </div>
                 <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-600">High Engagement Users</p>
-                  <p className="text-2xl font-bold text-gray-900">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">High Engagement Users</p>
+                  <p className="text-lg sm:text-2xl font-bold text-gray-900">
                     {formatNumber(dashboardStats.engagementMetrics.highEngagementUsers)}
                   </p>
                   <p className="text-xs text-gray-500">Users with 70+ engagement score</p>
@@ -682,16 +709,16 @@ export default function DashboardPage() {
             </Card>
 
             <Card className="border-0 shadow-sm">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
-                    <Activity className="h-5 w-5 text-blue-600" />
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-50 rounded-xl flex items-center justify-center">
+                    <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
                   </div>
                   <Badge className="bg-blue-100 text-blue-800 text-xs">Average</Badge>
                 </div>
                 <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-600">Average Engagement</p>
-                  <p className="text-2xl font-bold text-gray-900">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">Average Engagement</p>
+                  <p className="text-lg sm:text-2xl font-bold text-gray-900">
                     {dashboardStats.engagementMetrics.averageEngagementScore}/100
                   </p>
                   <p className="text-xs text-gray-500">Platform-wide engagement score</p>
@@ -700,16 +727,16 @@ export default function DashboardPage() {
             </Card>
 
             <Card className="border-0 shadow-sm">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center">
-                    <UserX className="h-5 w-5 text-red-600" />
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-red-50 rounded-xl flex items-center justify-center">
+                    <UserX className="h-4 w-4 sm:h-5 sm:w-5 text-red-600" />
                   </div>
                   <Badge className="bg-red-100 text-red-800 text-xs">Low Engagement</Badge>
                 </div>
                 <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-600">Low Engagement Users</p>
-                  <p className="text-2xl font-bold text-gray-900">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">Low Engagement Users</p>
+                  <p className="text-lg sm:text-2xl font-bold text-gray-900">
                     {formatNumber(dashboardStats.engagementMetrics.lowEngagementUsers)}
                   </p>
                   <p className="text-xs text-gray-500">Users with &lt;30 engagement score</p>
@@ -720,22 +747,22 @@ export default function DashboardPage() {
         )}
 
         {/* Enhanced Charts Section */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 sm:gap-8">
           {/* User Growth Chart */}
           <Card className="border-0 shadow-sm">
-            <CardHeader className="pb-4">
+            <CardHeader className="pb-3 sm:pb-4">
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
-                  <CardTitle className="text-lg font-semibold text-gray-900">User Growth</CardTitle>
-                  <p className="text-sm text-gray-600">Track user registration over time</p>
+                  <CardTitle className="text-base sm:text-lg font-semibold text-gray-900">User Growth</CardTitle>
+                  <p className="text-xs sm:text-sm text-gray-600">Track user registration over time</p>
                 </div>
-                <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-                  <Users className="h-5 w-5 text-blue-600" />
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-50 rounded-lg flex items-center justify-center">
+                  <Users className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
                 </div>
               </div>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="h-[300px] w-full">
+              <div className="h-[250px] sm:h-[300px] w-full">
                 <UserGrowthChart users={users} />
               </div>
             </CardContent>
@@ -744,39 +771,44 @@ export default function DashboardPage() {
           {/* Revenue Chart or Placeholder */}
           {canViewRevenue(userRole) ? (
             <Card className="border-0 shadow-sm">
-              <CardHeader className="pb-4">
+              <CardHeader className="pb-3 sm:pb-4">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
-                    <CardTitle className="text-lg font-semibold text-gray-900">Revenue Analytics</CardTitle>
-                    <p className="text-sm text-gray-600">Financial performance overview</p>
+                    <CardTitle className="text-base sm:text-lg font-semibold text-gray-900">
+                      Revenue Analytics
+                    </CardTitle>
+                    <p className="text-xs sm:text-sm text-gray-600">Financial performance overview</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-10 h-10 bg-red-50 rounded-lg flex items-center justify-center">
-                      <DollarSign className="h-5 w-5 text-red-600" />
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-red-50 rounded-lg flex items-center justify-center">
+                      <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-red-600" />
                     </div>
                     <Badge className="bg-red-100 text-red-800 text-xs">Admin Only</Badge>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
-                <div className="h-[300px] w-full">
+                <div className="h-[250px] sm:h-[300px] w-full">
                   <RewardRevenueChart users={users} />
                 </div>
               </CardContent>
             </Card>
           ) : (
             <Card className="border-2 border-dashed border-gray-200 bg-gray-50/50">
-              <CardContent className="p-8 h-[400px] flex flex-col items-center justify-center text-center">
-                <div className="w-20 h-20 bg-gray-100 rounded-2xl flex items-center justify-center mb-6">
-                  <EyeOff className="h-10 w-10 text-gray-400" />
+              <CardContent className="p-6 sm:p-8 h-[320px] sm:h-[400px] flex flex-col items-center justify-center text-center">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-100 rounded-2xl flex items-center justify-center mb-4 sm:mb-6">
+                  <EyeOff className="h-8 w-8 sm:h-10 sm:w-10 text-gray-400" />
                 </div>
-                <h3 className="text-xl font-semibold text-gray-700 mb-3">Revenue Analytics</h3>
-                <p className="text-gray-500 mb-6 max-w-sm leading-relaxed">
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-700 mb-2 sm:mb-3">Revenue Analytics</h3>
+                <p className="text-gray-500 mb-4 sm:mb-6 max-w-sm leading-relaxed text-sm sm:text-base">
                   This section contains sensitive financial data and is only accessible to Admin users.
                 </p>
                 <div className="space-y-3">
-                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 px-4 py-2">
-                    <Shield className="h-4 w-4 mr-2" />
+                  <Badge
+                    variant="outline"
+                    className="bg-red-50 text-red-700 border-red-200 px-3 sm:px-4 py-1.5 sm:py-2"
+                  >
+                    <Shield className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                     Admin Access Required
                   </Badge>
                   <p className="text-xs text-gray-400">Contact your system administrator for access</p>
@@ -787,23 +819,30 @@ export default function DashboardPage() {
         </div>
 
         {/* Enhanced Footer */}
-        <div className="mt-12 pt-8 border-t border-gray-200">
+        <div className="mt-8 sm:mt-12 pt-6 sm:pt-8 border-t border-gray-200">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <p className="text-sm text-gray-500">
+            <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 text-center sm:text-left">
+              <p className="text-xs sm:text-sm text-gray-500">
                 Last updated: {lastUpdated ? lastUpdated.toLocaleString() : "Never"}
               </p>
-              <Button onClick={handleRefresh} variant="ghost" size="sm" disabled={isRefreshing}>
+              <Button
+                onClick={handleRefresh}
+                variant="ghost"
+                size="sm"
+                disabled={isRefreshing}
+                className="text-xs sm:text-sm"
+              >
                 <RefreshCw className={`h-3 w-3 mr-1 ${isRefreshing ? "animate-spin" : ""}`} />
                 Refresh
               </Button>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-sm text-gray-500">
+
+            <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 text-center sm:text-right">
+              <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-500">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                 System Status: Online
               </div>
-              <div className="text-sm text-gray-500">
+              <div className="text-xs sm:text-sm text-gray-500">
                 {formatNumber(dashboardStats.totalUsers)} users • {formatNumber(dashboardStats.activeUsers)} active
               </div>
             </div>

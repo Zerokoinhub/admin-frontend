@@ -1,4 +1,5 @@
 // API service for handling user data and helpers
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL
 
 // Helper: Get auth headers with token
@@ -14,41 +15,62 @@ const getAuthHeaders = () => {
 // API SERVICE
 // ========================
 export const userAPI = {
-  // Fetch paginated user list - Updated to handle actual response structure
+  // Fetch paginated user list - Enhanced to handle multiple response structures
   async getUsers(page = 1, limit = 10, filters = {}) {
     const params = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
       ...filters,
     })
+
     try {
       const response = await fetch(`${API_BASE_URL}/users?${params}`, {
         method: "GET",
         headers: getAuthHeaders(),
       })
+
       if (!response.ok) throw new Error("Failed to fetch users")
 
       const result = await response.json()
       console.log("API Response:", result)
 
-      // Handle the actual response structure: { success: true, data: { users: [...], pagination: {...} } }
-      if (result.success && result.data) {
-        return {
-          success: true,
-          users: result.data.users || [],
-          pagination: result.data.pagination || {
-            currentPage: 1,
-            totalPages: 1,
-            totalItems: 0,
-            itemsPerPage: limit,
-            hasNextPage: false,
-            hasPrevPage: false,
-          },
-          data: result.data.users || [], // For backward compatibility
-        }
+      // Handle multiple possible response structures
+      let users = []
+      let pagination = {
+        currentPage: page,
+        totalPages: 1,
+        totalItems: 0,
+        itemsPerPage: limit,
+        hasNextPage: false,
+        hasPrevPage: false,
       }
 
-      return result
+      if (result.success && result.data) {
+        if (result.data.users) {
+          // Structure: { success: true, data: { users: [...], pagination: {...} } }
+          users = result.data.users
+          pagination = result.data.pagination || pagination
+        } else if (Array.isArray(result.data)) {
+          // Structure: { success: true, data: [...] }
+          users = result.data
+          pagination.totalItems = users.length
+        }
+      } else if (result.users) {
+        // Structure: { users: [...], pagination: {...} }
+        users = result.users
+        pagination = result.pagination || pagination
+      } else if (Array.isArray(result)) {
+        // Structure: [...]
+        users = result
+        pagination.totalItems = users.length
+      }
+
+      return {
+        success: true,
+        users: users,
+        data: users, // For backward compatibility
+        pagination: pagination,
+      }
     } catch (error) {
       console.error("Error fetching users:", error)
       throw error
@@ -62,7 +84,9 @@ export const userAPI = {
         method: "GET",
         headers: getAuthHeaders(),
       })
+
       if (!response.ok) throw new Error("Failed to fetch user")
+
       return await response.json()
     } catch (error) {
       console.error("Error fetching user:", error)
@@ -77,7 +101,9 @@ export const userAPI = {
         method: "POST",
         headers: getAuthHeaders(),
       })
+
       if (!response.ok) throw new Error("Failed to ban user")
+
       return await response.json()
     } catch (error) {
       console.error("Error banning user:", error)
@@ -92,11 +118,48 @@ export const userAPI = {
         method: "POST",
         headers: getAuthHeaders(),
       })
+
       if (!response.ok) throw new Error("Failed to unban user")
+
       return await response.json()
     } catch (error) {
       console.error("Error unbanning user:", error)
       throw error
+    }
+  },
+
+  // Update user status (enhanced version that works with both ban/unban and direct status update)
+  async updateUserStatus(userId, isActive) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/${userId}/status`, {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ isActive }),
+      })
+
+      if (!response.ok) {
+        // If direct status update fails, try ban/unban approach
+        if (isActive) {
+          return await this.unbanUser(userId)
+        } else {
+          return await this.banUser(userId)
+        }
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error("Error updating user status:", error)
+      // Fallback to ban/unban if status update fails
+      try {
+        if (isActive) {
+          return await this.unbanUser(userId)
+        } else {
+          return await this.banUser(userId)
+        }
+      } catch (fallbackError) {
+        console.error("Fallback status update also failed:", fallbackError)
+        throw fallbackError
+      }
     }
   },
 
@@ -140,94 +203,93 @@ export const userAPI = {
   },
 
   // NEW: Edit user balance directly using the edit-balance endpoint
-  editUserBalance: async (firebaseUid, newBalance) => {
-  try {
-    if (!firebaseUid || typeof newBalance !== "number") {
-      throw new Error("Invalid input: firebaseUid and numeric newBalance are required.");
-    }
-
-    const response = await fetch(`${API_BASE_URL}/users/edit-balance`, {
-      method: "PUT",
-      headers: {
-        ...getAuthHeaders(),
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ firebaseUid, newBalance }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Failed to update user balance");
-    }
-
-    const result = await response.json();
-
-    return {
-      success: true,
-      data: {
-        user: result.user,
-        newBalance: result.transaction.newBalance,
-        previousBalance: result.transaction.previousBalance,
-        message: result.message,
-        transactionLogged: true, // ✅ Implied by backend success
-        timestamp: result.transaction.timestamp,
-      },
-    };
-  } catch (error) {
-    console.error("Error updating user balance:", error);
-    return {
-      success: false,
-      message: error.message,
-    };
-  }
-},
-
-  // ✅ 1. Get Transfer History
-  async getTransferHistory(filters = {}) {
+  editUserBalance: async (email, newBalance , admin) => {
     try {
-      const params = new URLSearchParams();
-
-      if (filters.page) params.append("page", filters.page);
-      if (filters.limit) params.append("limit", filters.limit);
-      if (filters.search) params.append("search", filters.search);
-      if (filters.status) params.append("status", filters.status);
-      if (filters.dateRange) params.append("dateRange", filters.dateRange);
-      if (filters.userId) params.append("userId", filters.userId);
-
-      const url = `${API_BASE_URL}/transfers/history?${params.toString()}`;
-      const response = await fetch(url, {
-        method: "GET",
-        headers: getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to fetch transfer history");
+      if (!email || typeof newBalance !== "number") {
+        throw new Error("Invalid input: email and numeric newBalance are required.")
       }
 
-      const result = await response.json();
+      const response = await fetch(`${API_BASE_URL}/users/edit-balance`, {
+        method: "PUT",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, newBalance ,admin}), // ✅ use email now
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.message || "Failed to update user balance")
+      }
 
       return {
         success: true,
         data: {
-          transfers: result.transfers || [],
-          total: result.total || 0,
-          totalPages: result.totalPages || 1,
-          currentPage: result.currentPage || 1,
+          user: result.user,
+          newBalance: result.transaction.newBalance,
+          previousBalance: result.transaction.balanceBefore, // ✅ match backend response
+          amountChanged: result.transaction.amountChanged,
+          message: result.message,
+          transactionLogged: true,
+          timestamp: result.transaction.timestamp,
         },
-      };
+      }
     } catch (error) {
-      console.error("❌ Error fetching transfer history:", error);
+      console.error("Error updating user balance:", error)
+      return {
+        success: false,
+        message: error.message || "Unexpected error occurred",
+      }
+    }
+  },
+
+  // ✅ 1. Get Transfer History
+  async getTransferHistory(filters = {}) {
+    try {
+      const params = new URLSearchParams()
+      if (filters.page) params.append("page", filters.page)
+      if (filters.limit) params.append("limit", filters.limit)
+      if (filters.search) params.append("search", filters.search)
+      if (filters.status) params.append("status", filters.status)
+      if (filters.dateRange) params.append("dateRange", filters.dateRange)
+      if (filters.userId) params.append("userId", filters.userId)
+
+      const url = `${API_BASE_URL}/transfer/transferHistory?${params.toString()}`
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: getAuthHeaders(),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || "Failed to fetch transfer history")
+      }
+
+      const result = await response.json()
+
+      // Handle the exact API response structure where data is directly an array
+      if (result.success && result.data) {
+        return {
+          success: true,
+          data: Array.isArray(result.data) ? result.data : result.data.transfers || [],
+        }
+      }
+
+      return {
+        success: false,
+        message: "Invalid response format",
+        data: [],
+      }
+    } catch (error) {
+      console.error("❌ Error fetching transfer history:", error)
       return {
         success: false,
         message: error.message,
-        data: {
-          transfers: [],
-          total: 0,
-          totalPages: 1,
-          currentPage: 1,
-        },
-      };
+        data: [],
+      }
     }
   },
 
@@ -237,17 +299,17 @@ export const userAPI = {
       const response = await fetch(`${API_BASE_URL}/transfers/${transferId}`, {
         method: "GET",
         headers: getAuthHeaders(),
-      });
+      })
 
       if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.message || "Failed to fetch transfer");
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.message || "Failed to fetch transfer")
       }
 
-      return await response.json();
+      return await response.json()
     } catch (error) {
-      console.error("❌ Error fetching transfer by ID:", error);
-      throw error;
+      console.error("❌ Error fetching transfer by ID:", error)
+      throw error
     }
   },
 
@@ -258,17 +320,17 @@ export const userAPI = {
         method: "PATCH",
         headers: getAuthHeaders(),
         body: JSON.stringify({ status }),
-      });
+      })
 
       if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.message || "Failed to update transfer status");
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.message || "Failed to update transfer status")
       }
 
-      return await response.json();
+      return await response.json()
     } catch (error) {
-      console.error("❌ Error updating transfer status:", error);
-      throw error;
+      console.error("❌ Error updating transfer status:", error)
+      throw error
     }
   },
 
@@ -278,13 +340,35 @@ export const userAPI = {
       const response = await fetch(`${API_BASE_URL}/users/change-password`, {
         method: "POST",
         headers: getAuthHeaders(),
-        body: JSON.stringify({ oldPassword, newPassword, confirmPassword }),
+        body: JSON.stringify({
+          oldPassword,
+          newPassword,
+          confirmPassword,
+        }),
       })
-      if (!response.ok) throw new Error("Failed to change password")
-      return await response.json()
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Failed to change password")
+      }
+
+      const result = await response.json()
+
+      // Handle your backend response structure
+      if (result.success) {
+        return {
+          success: true,
+          message: result.message || "Password changed successfully",
+        }
+      }
+
+      return result
     } catch (error) {
       console.error("Error changing password:", error)
-      throw error
+      return {
+        success: false,
+        message: error.message || "Failed to change password",
+      }
     }
   },
 
@@ -295,15 +379,34 @@ export const userAPI = {
         method: "GET",
         headers: getAuthHeaders(),
       })
-      if (!response.ok) throw new Error("Failed to get profile")
-      return await response.json()
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Failed to get profile")
+      }
+
+      const result = await response.json()
+
+      // Handle your backend response structure
+      if (result.success) {
+        return {
+          success: true,
+          user: result.user,
+          data: result.user, // For backward compatibility
+        }
+      }
+
+      return result
     } catch (error) {
       console.error("Error getting profile:", error)
-      throw error
+      return {
+        success: false,
+        message: error.message || "Failed to get profile",
+      }
     }
   },
 
-  // Update logged-in user's profile
+  // Update logged-in user's profile (matches your backend controller)
   async updateProfile(data) {
     try {
       const response = await fetch(`${API_BASE_URL}/users/profile`, {
@@ -311,11 +414,30 @@ export const userAPI = {
         headers: getAuthHeaders(),
         body: JSON.stringify(data),
       })
-      if (!response.ok) throw new Error("Failed to update profile")
-      return await response.json()
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Failed to update profile")
+      }
+
+      const result = await response.json()
+
+      // Handle your backend response structure: { success: true, user: {...} }
+      if (result.success) {
+        return {
+          success: true,
+          user: result.user,
+          message: "Profile updated successfully",
+        }
+      }
+
+      return result
     } catch (error) {
       console.error("Error updating profile:", error)
-      throw error
+      return {
+        success: false,
+        message: error.message || "Failed to update profile",
+      }
     }
   },
 
@@ -325,7 +447,9 @@ export const userAPI = {
       const response = await fetch(`${API_BASE_URL}/users/total-referrals`, {
         headers: getAuthHeaders(),
       })
+
       if (!response.ok) throw new Error("Failed to fetch total referrals")
+
       return await response.json()
     } catch (error) {
       console.error("Error fetching total referrals:", error)
@@ -339,7 +463,9 @@ export const userAPI = {
       const response = await fetch(`${API_BASE_URL}/users/total-wallets`, {
         headers: getAuthHeaders(),
       })
+
       if (!response.ok) throw new Error("Failed to fetch wallet count")
+
       return await response.json()
     } catch (error) {
       console.error("Error fetching wallet count:", error)
@@ -351,26 +477,12 @@ export const userAPI = {
   async getCalculatorUsers() {
     try {
       const response = await this.getUsers()
+
       if (!response.ok) throw new Error("Failed to fetch calculator users")
+
       return await response.json()
     } catch (error) {
       console.error("Error fetching calculator users:", error)
-      throw error
-    }
-  },
-
-  // Update user active status
-  async updateUserStatus(userId, isActive) {
-    try {
-      const response = await fetch(`${API_BASE_URL}/users/${userId}/status`, {
-        method: "PATCH",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ isActive }),
-      })
-      if (!response.ok) throw new Error("Failed to update user status")
-      return await response.json()
-    } catch (error) {
-      console.error("Error updating user status:", error)
       throw error
     }
   },
@@ -382,11 +494,61 @@ export const userAPI = {
         method: "GET",
         headers: getAuthHeaders(),
       })
+
       if (!response.ok) throw new Error("Failed to fetch user sessions")
+
       return await response.json()
     } catch (error) {
       console.error("Error fetching user sessions:", error)
       throw error
+    }
+  },
+
+  // Update user - Since you don't have PUT /users/:id route, we'll use profile update for current user
+  // or throw an error for other users since the route doesn't exist
+  async updateUser(userId, userData) {
+    try {
+      // Check if this is trying to update the current user's profile
+      const currentUser = await this.getProfile()
+
+      if (currentUser.success && currentUser.user && currentUser.user._id === userId) {
+        // If updating current user, use the profile update endpoint
+        return await this.updateProfile(userData)
+      } else {
+        // For other users, we don't have an endpoint, so return an error
+        throw new Error("Cannot update other users - endpoint not available. Only profile updates are supported.")
+      }
+    } catch (error) {
+      console.error("Error updating user:", error)
+      return {
+        success: false,
+        message: error.message || "Failed to update user",
+      }
+    }
+  },
+
+  // Alternative function for admin to update any user (if you add the backend route later)
+  async adminUpdateUser(userId, userData) {
+    try {
+      // This would be for when you add the PUT /users/:id route to your backend
+      const response = await fetch(`${API_BASE_URL}/admin/users/${userId}`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(userData),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Failed to update user")
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error("Error updating user:", error)
+      return {
+        success: false,
+        message: error.message || "Admin update not available - route not implemented",
+      }
     }
   },
 }
@@ -480,6 +642,7 @@ export const userHelpers = {
 
     // Use lastSignInAt or updatedAt for activity calculation
     const lastActivity = user.lastSignInAt || user.updatedAt
+
     if (lastActivity) {
       const lastActivityDate = new Date(lastActivity)
       const daysSinceActivity = (Date.now() - lastActivityDate.getTime()) / (1000 * 60 * 60 * 24)
@@ -564,27 +727,38 @@ export const userHelpers = {
     return !!(user.walletAddresses && (user.walletAddresses.metamask || user.walletAddresses.trustWallet))
   },
 
-  // Format transfer data for display - New helper
+  // Format transfer data for display - Updated for MongoDB structure
   formatTransferData(transfer) {
+    const dateTime = new Date(transfer.dateTime)
     return {
-      id: transfer.id || transfer._id,
-      userId: transfer.userId,
+      id: transfer._id,
+      userId: transfer.userId || transfer._id,
       userName: transfer.userName || "Unknown User",
-      userEmail: transfer.userEmail || "No email",
+      userEmail: transfer.email || "No email",
       amount: Number(transfer.amount) || 0,
-      reason: transfer.reason || "No reason provided",
-      status: transfer.status || "pending",
-      createdAt: transfer.createdAt,
-      date: transfer.date || new Date(transfer.createdAt).toLocaleDateString(),
-      time: transfer.time || new Date(transfer.createdAt).toLocaleTimeString(),
-      transferredBy: transfer.transferredBy || transfer.adminName || "System",
-      transactionId: transfer.transactionId || `TXN${Date.now()}`,
+      reason: transfer.reason || "Coin transfer",
+      status: transfer.status || "completed",
+      createdAt: transfer.dateTime,
+      date: dateTime.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      }),
+      time: dateTime.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
+      }),
+      transferredBy: transfer.adminName || "System",
+      transactionId: `TXN${transfer._id}`,
       balanceBefore: transfer.balanceBefore || 0,
       balanceAfter: transfer.balanceAfter || 0,
+      dateTime: transfer.dateTime,
     }
   },
 
-  // Calculate transfer statistics - New helper
+  // Calculate transfer statistics - Updated helper
   calculateTransferStats(transfers) {
     if (!Array.isArray(transfers)) {
       return {
@@ -612,9 +786,9 @@ export const userHelpers = {
       pendingTransfers: transfers.filter((t) => t.status === "pending").length,
       failedTransfers: transfers.filter((t) => t.status === "failed").length,
       averageAmount: 0,
-      todayTransfers: transfers.filter((t) => new Date(t.createdAt) >= today).length,
-      weekTransfers: transfers.filter((t) => new Date(t.createdAt) >= weekAgo).length,
-      monthTransfers: transfers.filter((t) => new Date(t.createdAt) >= monthAgo).length,
+      todayTransfers: transfers.filter((t) => new Date(t.createdAt || t.dateTime) >= today).length,
+      weekTransfers: transfers.filter((t) => new Date(t.createdAt || t.dateTime) >= weekAgo).length,
+      monthTransfers: transfers.filter((t) => new Date(t.createdAt || t.dateTime) >= monthAgo).length,
     }
 
     stats.averageAmount = stats.totalTransfers > 0 ? stats.totalAmount / stats.totalTransfers : 0

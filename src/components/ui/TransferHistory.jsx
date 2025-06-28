@@ -22,79 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-
-// Mock transferAPI for demonstration
-const transferAPI = {
-  async getHistory(filters) {
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    // Simulate server down scenario (you can toggle this)
-    const serverDown = Math.random() > 0.7 // 30% chance server is down
-
-    if (serverDown) {
-      throw new Error("Server is down yet")
-    }
-
-    // Mock successful response
-    const mockTransfers = [
-      {
-        id: "1",
-        userId: "user1",
-        userName: "John Doe",
-        userEmail: "john@example.com",
-        amount: 100,
-        reason: "Bonus reward",
-        status: "completed",
-        createdAt: new Date().toISOString(),
-        transferredBy: "Admin",
-        transactionId: "TXN001",
-        balanceBefore: 500,
-        balanceAfter: 600,
-      },
-      {
-        id: "2",
-        userId: "user2",
-        userName: "Jane Smith",
-        userEmail: "jane@example.com",
-        amount: 250,
-        reason: "Contest prize",
-        status: "pending",
-        createdAt: new Date(Date.now() - 86400000).toISOString(),
-        transferredBy: "System",
-        transactionId: "TXN002",
-        balanceBefore: 300,
-        balanceAfter: 550,
-      },
-    ]
-
-    return {
-      success: true,
-      data: {
-        transfers: mockTransfers,
-        total: mockTransfers.length,
-        totalPages: 1,
-      },
-    }
-  },
-
-  async updateTransferStatus(transferId, newStatus) {
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    return { success: true }
-  },
-}
-
-// Mock userHelpers
-const userHelpers = {
-  calculateTransferStats(transfers) {
-    return {
-      totalTransfers: transfers.length,
-      totalAmount: transfers.reduce((sum, t) => sum + t.amount, 0),
-      completedTransfers: transfers.filter((t) => t.status === "completed").length,
-      averageAmount: transfers.length > 0 ? transfers.reduce((sum, t) => sum + t.amount, 0) / transfers.length : 0,
-    }
-  },
-}
+import { userAPI, userHelpers } from "../../src/lib/api"
 
 export default function TransferHistory({ onBack, transferHistory = [], onRefresh }) {
   const [transfers, setTransfers] = useState(transferHistory)
@@ -112,6 +40,7 @@ export default function TransferHistory({ onBack, transferHistory = [], onRefres
   const [selectedUserId, setSelectedUserId] = useState("")
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
+
   const itemsPerPage = 10
 
   // Update local transfers when prop changes
@@ -126,14 +55,14 @@ export default function TransferHistory({ onBack, transferHistory = [], onRefres
     }
   }, [transferHistory])
 
-  // Enhanced fetch transfer history using transferAPI
+  // Update the fetchTransferHistory function to handle the exact API response structure
   const fetchTransferHistory = async (page = 1, search = "", status = "all", dateFilter = "all", userId = "") => {
     try {
       setLoading(true)
       setError("")
       setServerDown(false)
 
-      // Prepare filters for the transferAPI
+      // Prepare filters for the userAPI
       const filters = {
         page,
         limit: itemsPerPage,
@@ -148,7 +77,6 @@ export default function TransferHistory({ onBack, transferHistory = [], onRefres
       if (dateFilter !== "all" && !startDate && !endDate) {
         const now = new Date()
         const filterStartDate = new Date()
-
         switch (dateFilter) {
           case "today":
             filterStartDate.setHours(0, 0, 0, 0)
@@ -169,40 +97,125 @@ export default function TransferHistory({ onBack, transferHistory = [], onRefres
       }
 
       try {
-        // Use the transferAPI to fetch data
-        const response = await transferAPI.getHistory(filters)
-
+        // Use the userAPI to fetch data
+        const response = await userAPI.getTransferHistory(filters)
         if (response.success && response.data) {
-          const formattedTransfers = response.data.transfers.map((transfer) => ({
-            id: transfer.id || transfer._id,
-            userId: transfer.userId,
-            userName: transfer.userName || transfer.user?.name || "Unknown User",
-            userEmail: transfer.userEmail || transfer.user?.email || "No email",
-            amount: Number(transfer.amount) || 0,
-            reason: transfer.reason || "No reason provided",
-            status: transfer.status || "completed",
-            createdAt: transfer.createdAt || transfer.timestamp,
-            date: transfer.date || new Date(transfer.createdAt || transfer.timestamp).toLocaleDateString(),
-            time: transfer.time || new Date(transfer.createdAt || transfer.timestamp).toLocaleTimeString(),
-            transferredBy: transfer.transferredBy || transfer.adminName || "System",
-            transactionId: transfer.transactionId || `TXN${Date.now()}`,
-            balanceBefore: transfer.balanceBefore || 0,
-            balanceAfter: transfer.balanceAfter || 0,
-          }))
+          // Handle the exact API response structure where data is directly an array
+          const transfersArray = Array.isArray(response.data) ? response.data : response.data.transfers || []
 
-          setTransfers(formattedTransfers)
-          setTotalPages(response.data.totalPages || 1)
-          setTotalTransfers(response.data.total || 0)
+          // Format the API response data to match expected structure
+          const formattedTransfers = transfersArray.map((transfer) => {
+            const dateTime = new Date(transfer.dateTime)
+            return {
+              id: transfer._id,
+              userId: transfer.userId || transfer._id,
+              userName: transfer.userName,
+              userEmail: transfer.email,
+              amount: Number(transfer.amount),
+              reason: transfer.reason || "Coin transfer", // Default since not in API
+              status: transfer.status || "completed", // Default since not in API
+              createdAt: transfer.dateTime,
+              date: dateTime.toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              }),
+              time: dateTime.toLocaleTimeString("en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                hour12: true,
+              }),
+              transferredBy: transfer.adminName,
+              transactionId: `TXN${transfer._id}`,
+              balanceBefore: transfer.balanceBefore || 0,
+              balanceAfter: transfer.balanceAfter || 0,
+              dateTime: transfer.dateTime,
+            }
+          })
 
-          // Calculate comprehensive stats
-          const transferStats = userHelpers.calculateTransferStats(formattedTransfers)
+          // Apply client-side filtering since API might not support all filters
+          let filteredTransfers = formattedTransfers
+
+          // Apply search filter
+          if (search) {
+            const searchLower = search.toLowerCase()
+            filteredTransfers = filteredTransfers.filter(
+              (transfer) =>
+                transfer.userName.toLowerCase().includes(searchLower) ||
+                transfer.userEmail.toLowerCase().includes(searchLower) ||
+                transfer.reason.toLowerCase().includes(searchLower) ||
+                transfer.transactionId.toLowerCase().includes(searchLower),
+            )
+          }
+
+          // Apply status filter
+          if (status !== "all") {
+            filteredTransfers = filteredTransfers.filter((transfer) => transfer.status === status)
+          }
+
+          // Apply date filter
+          if (dateFilter !== "all" || startDate || endDate) {
+            filteredTransfers = filteredTransfers.filter((transfer) => {
+              const transferDate = new Date(transfer.dateTime)
+              const now = new Date()
+
+              if (startDate && endDate) {
+                const start = new Date(startDate)
+                const end = new Date(endDate)
+                end.setHours(23, 59, 59, 999) // Include the entire end date
+                return transferDate >= start && transferDate <= end
+              }
+
+              switch (dateFilter) {
+                case "today":
+                  const today = new Date()
+                  today.setHours(0, 0, 0, 0)
+                  const tomorrow = new Date(today)
+                  tomorrow.setDate(tomorrow.getDate() + 1)
+                  return transferDate >= today && transferDate < tomorrow
+                case "week":
+                  const weekAgo = new Date()
+                  weekAgo.setDate(now.getDate() - 7)
+                  return transferDate >= weekAgo
+                case "month":
+                  const monthAgo = new Date()
+                  monthAgo.setMonth(now.getMonth() - 1)
+                  return transferDate >= monthAgo
+                default:
+                  return true
+              }
+            })
+          }
+
+          // Apply pagination
+          const startIndex = (page - 1) * itemsPerPage
+          const endIndex = startIndex + itemsPerPage
+          const paginatedTransfers = filteredTransfers.slice(startIndex, endIndex)
+
+          setTransfers(paginatedTransfers)
+          setTotalPages(Math.ceil(filteredTransfers.length / itemsPerPage))
+          setTotalTransfers(filteredTransfers.length)
+
+          // Calculate comprehensive stats from all filtered transfers
+          const transferStats = userHelpers.calculateTransferStats
+            ? userHelpers.calculateTransferStats(filteredTransfers)
+            : {
+                totalTransfers: filteredTransfers.length,
+                totalAmount: filteredTransfers.reduce((sum, t) => sum + t.amount, 0),
+                completedTransfers: filteredTransfers.filter((t) => t.status === "completed").length,
+                averageAmount:
+                  filteredTransfers.length > 0
+                    ? filteredTransfers.reduce((sum, t) => sum + t.amount, 0) / filteredTransfers.length
+                    : 0,
+              }
+
           setStats(transferStats)
           setServerDown(false)
           return
         }
       } catch (apiError) {
-        console.error("TransferAPI call failed:", apiError)
-
+        console.error("UserAPI call failed:", apiError)
         // Check if it's a server down error
         if (apiError.message === "Server is down yet" || apiError.message.includes("Server is down")) {
           setServerDown(true)
@@ -210,7 +223,6 @@ export default function TransferHistory({ onBack, transferHistory = [], onRefres
         } else {
           setError("Unable to connect to transfer service. Please try again later.")
         }
-
         // Clear existing data when server is down
         setTransfers([])
         setTotalTransfers(0)
@@ -268,7 +280,7 @@ export default function TransferHistory({ onBack, transferHistory = [], onRefres
     }
   }
 
-  // Enhanced refresh with transferAPI
+  // Enhanced refresh with userAPI
   const handleRefresh = async () => {
     setIsRefreshing(true)
     try {
@@ -285,11 +297,10 @@ export default function TransferHistory({ onBack, transferHistory = [], onRefres
     }
   }
 
-  // Update transfer status using transferAPI
+  // Update transfer status using userAPI
   const updateTransferStatus = async (transferId, newStatus) => {
     try {
-      const result = await transferAPI.updateTransferStatus(transferId, newStatus)
-
+      const result = await userAPI.updateTransferStatus(transferId, newStatus)
       if (result.success) {
         setTransfers((prev) =>
           prev.map((transfer) => (transfer.id === transferId ? { ...transfer, status: newStatus } : transfer)),
@@ -330,7 +341,7 @@ export default function TransferHistory({ onBack, transferHistory = [], onRefres
     )
   }
 
-  // Enhanced export functionality
+  // Update the export functionality to handle the new structure
   const handleExport = async () => {
     if (serverDown) {
       setError("Cannot export data - Server is down yet")
@@ -339,7 +350,6 @@ export default function TransferHistory({ onBack, transferHistory = [], onRefres
 
     try {
       setLoading(true)
-
       const exportFilters = {
         page: 1,
         limit: 1000,
@@ -353,45 +363,48 @@ export default function TransferHistory({ onBack, transferHistory = [], onRefres
       let allTransfersForExport = []
 
       try {
-        const response = await transferAPI.getHistory(exportFilters)
+        const response = await userAPI.getTransferHistory(exportFilters)
         if (response.success && response.data) {
-          allTransfersForExport = response.data.transfers
+          const transfersArray = Array.isArray(response.data) ? response.data : response.data.transfers || []
+          allTransfersForExport = transfersArray.map((transfer) => {
+            const dateTime = new Date(transfer.dateTime)
+            return {
+              ...transfer,
+              date: dateTime.toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              }),
+              time: dateTime.toLocaleTimeString("en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                hour12: true,
+              }),
+              userName: transfer.userName,
+              userEmail: transfer.email,
+              adminName: transfer.adminName,
+            }
+          })
         }
       } catch (apiError) {
         allTransfersForExport = transfers
       }
 
-      const headers = [
-        "Date",
-        "Time",
-        "User Name",
-        "Email",
-        "Amount",
-        "Reason",
-        "Status",
-        "Transaction ID",
-        "Admin",
-        "Balance Before",
-        "Balance After",
-        "User ID",
-      ]
+      const headers = ["Date", "Time", "User Name", "Email", "Amount", "Admin", "Transaction ID", "User ID"]
 
       const csvContent = [
         headers.join(","),
         ...allTransfersForExport.map((transfer) =>
           [
-            `"${transfer.date || new Date(transfer.createdAt).toLocaleDateString()}"`,
-            `"${transfer.time || new Date(transfer.createdAt).toLocaleTimeString()}"`,
-            `"${transfer.userName || transfer.user?.name || "Unknown"}"`,
-            `"${transfer.userEmail || transfer.user?.email || "No email"}"`,
+            `"${transfer.date || new Date(transfer.dateTime).toLocaleDateString()}"`,
+            `"${transfer.time || new Date(transfer.dateTime).toLocaleTimeString()}"`,
+            `"${transfer.userName || "Unknown"}"`,
+            `"${transfer.userEmail || transfer.email || "No email"}"`,
             transfer.amount || 0,
-            `"${transfer.reason || "No reason"}"`,
-            transfer.status || "completed",
-            `"${transfer.transactionId || ""}"`,
-            `"${transfer.transferredBy || transfer.adminName || "System"}"`,
-            transfer.balanceBefore || 0,
-            transfer.balanceAfter || 0,
-            `"${transfer.userId || ""}"`,
+            `"${transfer.adminName || "System"}"`,
+            `"${transfer.transactionId || `TXN${transfer._id}`}"`,
+            `"${transfer._id || ""}"`,
           ].join(","),
         ),
       ].join("\n")
@@ -647,7 +660,10 @@ export default function TransferHistory({ onBack, transferHistory = [], onRefres
                       Reason
                     </th>
                     <th className="hidden lg:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date & Time
+                      Date
+                    </th>
+                    <th className="hidden lg:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Time
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
@@ -695,7 +711,9 @@ export default function TransferHistory({ onBack, transferHistory = [], onRefres
                           <Calendar className="h-4 w-4 mr-1 text-gray-400" />
                           {transfer.date}
                         </div>
-                        <div className="flex items-center text-xs text-gray-500">
+                      </td>
+                      <td className="hidden lg:table-cell px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center text-sm text-gray-500">
                           <Clock className="h-3 w-3 mr-1" />
                           {transfer.time}
                         </div>
@@ -734,7 +752,6 @@ export default function TransferHistory({ onBack, transferHistory = [], onRefres
                 >
                   Previous
                 </Button>
-
                 <div className="flex items-center space-x-1">
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                     const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i
@@ -754,7 +771,6 @@ export default function TransferHistory({ onBack, transferHistory = [], onRefres
                     return null
                   })}
                 </div>
-
                 <Button
                   variant="outline"
                   size="sm"

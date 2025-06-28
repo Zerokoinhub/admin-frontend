@@ -7,7 +7,7 @@ export default function FullScreenLoader() {
     <div className="fixed inset-0 z-[9999] bg-black/30 backdrop-blur-sm flex items-center justify-center">
       <div className="relative w-30 h-30">
         <Image
-          src="/logo.png"
+          src="/logo.svg"
           alt="Loading"
           fill
           className="object-contain z-10 relative"
