@@ -397,7 +397,7 @@ export default function CourseManagementPage() {
         </div>
         <div>
           By:{" "}
-          {course.uploadedBy?.username || course.uploadedBy?.email || "Unknown"}
+          {course.uploadedBy?.username || course.uploadedBy || "Unknown"}
         </div>
       </div>
 
