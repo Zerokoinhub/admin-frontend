@@ -179,7 +179,7 @@ export default function SettingPage() {
       let endpoint = ""
       let requestBody = null
       const headers = {}
-      const BASE_API_URL = "http://localhost:5000/api/notifications"
+      const BASE_API_URL = process.env.NEXT_PUBLIC_API_BASE_URL+"/notifications"
 
       // Map selectedSendTo to priority and determine endpoint
       let priority = "old-user" // default
