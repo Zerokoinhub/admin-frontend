@@ -5,16 +5,54 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
-import { GraduationCap, Edit, Target, X, ChevronDown, Trash2, Edit3, Bell, Upload, ArrowLeft } from "lucide-react"
+import {
+  User,
+  Shield,
+  Eye,
+  Edit,
+  GraduationCap,
+  Target,
+  Bell,
+  ChevronDown,
+  X,
+  Upload,
+  ArrowLeft,
+  Edit3,
+  Trash2,
+} from "lucide-react"
 import Image from "next/image"
+import { userAPI, userHelpers } from "../../src/lib/api"
 import { useUsers } from "../../hooks/useUsers"
-import { userHelpers } from "@/lib/api"
 import { useAdmins } from "../../hooks/useAdmins"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export default function SettingPage() {
+  // User role state
+  const [userRole, setUserRole] = useState("")
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
+  // State management
+  const [users, setUsers] = useState([])
+  const [selectedUser, setSelectedUser] = useState(null)
+  const [transferAmount, setTransferAmount] = useState("")
+  const [transferReason, setTransferReason] = useState("")
+  const [searchTerm, setSearchTerm] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [transferHistory, setTransferHistory] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [message, setMessage] = useState({ type: "", text: "" })
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [activeTab, setActiveTab] = useState("history") // Default to history for all users
+  const [historyFilters, setHistoryFilters] = useState({
+    search: "",
+    status: "all",
+    dateRange: "all",
+  })
+
+  // Settings specific state
   const [currentView, setCurrentView] = useState("main")
   const [showExpiryDropdown, setShowExpiryDropdown] = useState(false)
   const [selectedExpiry, setSelectedExpiry] = useState("02:00")
@@ -29,13 +67,15 @@ export default function SettingPage() {
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [notificationView, setNotificationView] = useState("empty")
-  const [userRole, setUserRole] = useState("viewer")
+
   const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL
+
   const [notificationData, setNotificationData] = useState({
     title: "Upcoming Zero Koin",
     description:
       "Zero Koin mining is the process of validating transactions and securing the Zero Koin blockchain by solving complex mathematical problems, typically using computing power, to earn rewards in Zero Koin.",
   })
+
   const [isUploading, setIsUploading] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const [formData, setFormData] = useState({
@@ -44,23 +84,43 @@ export default function SettingPage() {
     role: "Super Admin",
     time: "1 Month",
   })
+
   const [sentNotifications, setSentNotifications] = useState([])
+  const [editingNotification, setEditingNotification] = useState(null)
 
   // Get user role from localStorage
   useEffect(() => {
-    const storedUser = localStorage.getItem("user")
-    if (storedUser) {
-      try {
-        const parsedUser = JSON.parse(storedUser)
-        console.log("the role:", parsedUser.role)
-        if (parsedUser.role) {
-          setUserRole(parsedUser.role)
+    try {
+      const user = localStorage.getItem("user")
+      if (user) {
+        const userData = JSON.parse(user)
+        setUserRole(userData.role || "")
+        console.log("her i am", userData.role)
+        // Set default tab based on role
+        if (userData.role === "superadmin") {
+          setActiveTab("transfer") // Super admin starts with transfer tab
+        } else {
+          setActiveTab("history") // Others start with history tab
         }
-      } catch (error) {
-        console.error("Failed to parse stored user:", error)
       }
+    } catch (error) {
+      console.error("Error parsing user data:", error)
     }
   }, [])
+
+  // Check permissions
+  const hasTransferAccess = userRole === "superadmin"
+  const hasHistoryAccess = true // All users can access history
+
+  // Fetch users on component mount (only for super admin)
+  useEffect(() => {
+    if (hasTransferAccess) {
+      fetchUsers()
+    }
+    if (activeTab === "history") {
+      fetchTransferHistory()
+    }
+  }, [currentPage, activeTab, hasTransferAccess])
 
   // Fetch sent notifications from backend
   useEffect(() => {
@@ -95,7 +155,6 @@ export default function SettingPage() {
         console.error("Failed to fetch notifications:", error)
       }
     }
-
     fetchSentNotifications()
   }, [])
 
@@ -114,25 +173,226 @@ export default function SettingPage() {
   const [currentAdminPassword, setCurrentAdminPassword] = useState("")
 
   // Fetch users data for statistics
-  const { users, loading, error } = useUsers(1, 100)
+  const { users: allUsers, loading: usersLoading, error: usersError } = useUsers(1, 100)
 
   // Calculate real statistics from users
   const stats = useMemo(() => {
-    if (!users || users.length === 0) {
+    if (!allUsers || allUsers.length === 0) {
       return {
         learningRewards: 0,
         referralsRewards: 0,
         adBaseRewards: 0,
       }
     }
-
-    const userStats = userHelpers.calculateStats(users)
+    const userStats = userHelpers.calculateStats(allUsers)
     return {
-      learningRewards: users.length,
+      learningRewards: allUsers.length,
       referralsRewards: userStats.totalReferrals,
-      adBaseRewards: Math.floor(users.length * 0.3),
+      adBaseRewards: Math.floor(allUsers.length * 0.3),
     }
-  }, [users])
+  }, [allUsers])
+
+  // Fetch users from API
+  const fetchUsers = async () => {
+    if (!hasTransferAccess) return
+
+    try {
+      setLoading(true)
+      const response = await userAPI.getUsers(currentPage, 10)
+      if (response.success) {
+        setUsers(response.users || response.data || [])
+        setTotalPages(response.pagination?.totalPages || 1)
+      } else {
+        setMessage({ type: "error", text: "Failed to fetch users" })
+      }
+    } catch (error) {
+      console.error("Error fetching users:", error)
+      setMessage({ type: "error", text: "Error fetching users" })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Fetch transfer history
+  const fetchTransferHistory = async () => {
+    try {
+      setHistoryLoading(true)
+      const response = await userAPI.getTransferHistory(historyFilters)
+      if (response.success) {
+        const transfers = response.data || []
+        const formattedTransfers = transfers.map((transfer) => userHelpers.formatTransferData(transfer))
+        setTransferHistory(formattedTransfers)
+      } else {
+        setMessage({ type: "error", text: response.message || "Failed to fetch transfer history" })
+      }
+    } catch (error) {
+      console.error("Error fetching transfer history:", error)
+      setMessage({ type: "error", text: "Error fetching transfer history" })
+      setTransferHistory([])
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  // Handle user selection
+  const handleUserSelect = (user) => {
+    setSelectedUser(user)
+    setMessage({ type: "", text: "" })
+    setIsMobileMenuOpen(false)
+  }
+
+  // Handle transfer execution
+  const handleTransfer = async () => {
+    if (!hasTransferAccess) {
+      setMessage({ type: "error", text: "You don't have permission to transfer coins" })
+      return
+    }
+
+    if (!selectedUser || !transferAmount || !selectedUser.email) {
+      setMessage({
+        type: "error",
+        text: "Please select a user with email and enter transfer amount",
+      })
+      return
+    }
+
+    const amount = Number.parseInt(transferAmount)
+    if (isNaN(amount) || amount <= 0) {
+      setMessage({ type: "error", text: "Please enter a valid amount" })
+      return
+    }
+
+    try {
+      setLoading(true)
+      const currentBalance = selectedUser.balance || 0
+      const newBalance = amount
+      const adminUser = localStorage.getItem("user")
+      const adminUserStr = JSON.parse(adminUser)
+      const admin = adminUserStr.username
+
+      const response = await userAPI.editUserBalance(selectedUser.email, newBalance, admin)
+
+      if (response.success) {
+        setMessage({
+          type: "success",
+          text: `Successfully transferred ${amount} coins to ${selectedUser.name}. New balance: ${response.data.newBalance}`,
+        })
+        setSelectedUser((prev) => ({
+          ...prev,
+          balance: response.data.newBalance,
+        }))
+        setUsers((prev) =>
+          prev.map((user) =>
+            user.email === selectedUser.email ? { ...user, balance: response.data.newBalance } : user,
+          ),
+        )
+        setTransferAmount("")
+        setTransferReason("")
+        // Refresh transfer history
+        fetchTransferHistory()
+      } else {
+        setMessage({
+          type: "error",
+          text: response.message || "Transfer failed",
+        })
+      }
+    } catch (error) {
+      console.error("Transfer error:", error)
+      setMessage({
+        type: "error",
+        text: error.message || "Transfer failed",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Filter users based on search term
+  const filteredUsers = users.filter(
+    (user) =>
+      user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email?.toLowerCase().includes(searchTerm.toLowerCase()),
+  )
+
+  // Filter transfer history
+  const filteredHistory = transferHistory.filter((transfer) => {
+    const matchesSearch =
+      !historyFilters.search ||
+      transfer.userName?.toLowerCase().includes(historyFilters.search.toLowerCase()) ||
+      transfer.userEmail?.toLowerCase().includes(historyFilters.search.toLowerCase()) ||
+      transfer.transactionId?.toLowerCase().includes(historyFilters.search.toLowerCase())
+
+    const matchesStatus = historyFilters.status === "all" || transfer.status === historyFilters.status
+
+    let matchesDate = true
+    if (historyFilters.dateRange !== "all") {
+      const transferDate = new Date(transfer.dateTime || transfer.createdAt)
+      const now = new Date()
+      switch (historyFilters.dateRange) {
+        case "today":
+          matchesDate = transferDate.toDateString() === now.toDateString()
+          break
+        case "week":
+          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+          matchesDate = transferDate >= weekAgo
+          break
+        case "month":
+          const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+          matchesDate = transferDate >= monthAgo
+          break
+      }
+    }
+
+    return matchesSearch && matchesStatus && matchesDate
+  })
+
+  // Export transfer history to CSV
+  const exportToCSV = () => {
+    const headers = ["Transaction ID", "User Name", "Email", "Amount", "Date", "Time", "Admin", "Status"]
+    const csvContent = [
+      headers.join(","),
+      ...filteredHistory.map((transfer) =>
+        [
+          transfer.transactionId,
+          `"${transfer.userName}"`,
+          transfer.userEmail,
+          transfer.amount,
+          transfer.date,
+          transfer.time,
+          `"${transfer.transferredBy}"`,
+          transfer.status,
+        ].join(","),
+      ),
+    ].join("\n")
+
+    const blob = new Blob([csvContent], { type: "text/csv" })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `transfer-history-${new Date().toISOString().split("T")[0]}.csv`
+    a.click()
+    window.URL.revokeObjectURL(url)
+  }
+
+  // Calculate transfer statistics
+  const transferStats = userHelpers.calculateTransferStats(filteredHistory)
+
+  // Get role icon and color
+  const getRoleDisplay = (role) => {
+    switch (role) {
+      case "superadmin":
+        return { icon: Shield, color: "text-red-600", bg: "bg-red-50", label: "Super Admin" }
+      case "editor":
+        return { icon: Edit, color: "text-blue-600", bg: "bg-blue-50", label: "Editor" }
+      case "viewer":
+        return { icon: Eye, color: "text-green-600", bg: "bg-green-50", label: "Viewer" }
+      default:
+        return { icon: User, color: "text-gray-600", bg: "bg-gray-50", label: "User" }
+    }
+  }
+
+  const roleDisplay = getRoleDisplay(userRole)
+  const RoleIcon = roleDisplay.icon
 
   // Handle image upload
   const handleImageUpload = async (event) => {
@@ -414,7 +674,116 @@ export default function SettingPage() {
     }
   }
 
-  if (loading) {
+  // Enhanced notification handlers
+  const handleEditNotification = (notification) => {
+    if (userRole === "viewer") {
+      alert("You don't have permission to edit notifications.")
+      return
+    }
+
+    setEditingNotification(notification)
+    setNotificationData({
+      title: notification.title,
+      description: notification.description,
+    })
+    setUploadedImage(notification.image)
+    setSelectedSendTo(
+      notification.priority === "new-user"
+        ? "New User"
+        : notification.priority === "top-rated-user"
+          ? "Top rated user"
+          : notification.priority === "old-user"
+            ? "Old User"
+            : "General Users",
+    )
+    setNotificationView("edit")
+  }
+
+  const handleDeleteNotification = async (notificationId) => {
+    if (userRole === "viewer") {
+      alert("You don't have permission to delete notifications.")
+      return
+    }
+
+    if (confirm("Are you sure you want to delete this notification?")) {
+      try {
+        const response = await fetch(`${BASE_URL}/notifications/${notificationId}`, {
+          method: "DELETE",
+        })
+
+        if (response.ok) {
+          setSentNotifications((prev) => prev.filter((n) => n.id !== notificationId))
+          alert("Notification deleted successfully!")
+          if (sentNotifications.length <= 1) {
+            setNotificationView("empty")
+          }
+        } else {
+          throw new Error("Failed to delete notification")
+        }
+      } catch (error) {
+        console.error("Delete failed:", error)
+        alert("Failed to delete notification. Please try again.")
+      }
+    }
+  }
+
+  const handleUpdateNotification = async () => {
+    if (userRole === "viewer") {
+      alert("You don't have permission to update notifications.")
+      return
+    }
+
+    const priorityMap = {
+      "New User": "new-user",
+      "Old User": "old-user",
+      "Top rated user": "top-rated-user",
+      "General Users": "general",
+    }
+
+    const priority = priorityMap[selectedSendTo] || "general"
+
+    const updatedNotification = {
+      ...editingNotification,
+      title: notificationData.title,
+      description: notificationData.description,
+      image: uploadedImage,
+      priority: priority,
+      sentTo: selectedSendTo,
+      timestamp: new Date().toISOString(),
+    }
+
+    try {
+      const response = await fetch(`${BASE_URL}/notifications/${editingNotification.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updatedNotification),
+      })
+
+      if (response.ok) {
+        setSentNotifications((prev) => prev.map((n) => (n.id === editingNotification.id ? updatedNotification : n)))
+        alert("Notification updated successfully!")
+        setEditingNotification(null)
+        setNotificationData({
+          title: "Upcoming Zero Koin",
+          description:
+            "Zero Koin mining is the process of validating transactions and securing the Zero Koin blockchain by solving complex mathematical problems, typically using computing power, to earn rewards in Zero Koin.",
+        })
+        setUploadedImage(null)
+        setUploadedImageFile(null)
+        setSelectedSendTo("Send to")
+        setNotificationView("list")
+      } else {
+        throw new Error("Failed to update notification")
+      }
+    } catch (error) {
+      console.error("Update failed:", error)
+      alert("Failed to update notification. Please try again.")
+    }
+  }
+
+  if (loading || usersLoading) {
     return (
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
         <div className="flex justify-center items-center h-64">
@@ -468,6 +837,153 @@ export default function SettingPage() {
       )
     }
 
+    // Enhanced Notification List View
+    if (notificationView === "list") {
+      return (
+        <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen relative">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Notifications</h1>
+            <div className="flex gap-2">
+              {(userRole === "superadmin" || userRole === "editor") && (
+                <Button
+                  onClick={handleCreateNotification}
+                  className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+                >
+                  Create New
+                </Button>
+              )}
+              <Button onClick={() => setCurrentView("main")} variant="outline" className="w-full sm:w-auto">
+                Back to Settings
+              </Button>
+            </div>
+          </div>
+
+          {sentNotifications.length === 0 ? (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6">
+              <div className="w-24 sm:w-32 h-24 sm:h-32 bg-teal-100 rounded-full flex items-center justify-center">
+                <Bell className="h-12 sm:h-16 w-12 sm:w-16 text-teal-600" />
+              </div>
+              <div className="text-center space-y-2">
+                <h2 className="text-lg sm:text-xl font-medium text-gray-900">No Notifications Yet!</h2>
+                <p className="text-gray-600">Create your first notification to get started.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+              {sentNotifications.map((notification) => (
+                <Card
+                  key={notification.id}
+                  className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden"
+                >
+                  <CardContent className="p-0">
+                    {/* Image Section with Error Handling */}
+                    {notification.image ? (
+                      <div className="relative w-full h-48 bg-gray-100">
+                        <Image
+                          src={notification.image || "/placeholder.svg"}
+                          alt={notification.title}
+                          fill
+                          className="object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none"
+                            e.currentTarget.nextElementSibling.style.display = "flex"
+                          }}
+                        />
+                        <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 items-center justify-center hidden">
+                          <div className="text-center">
+                            <Bell className="h-12 w-12 mx-auto mb-2 text-gray-400" />
+                            <p className="text-sm text-gray-500 font-medium">Image Unavailable</p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-full h-48 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                        <div className="text-center">
+                          <Bell className="h-12 w-12 mx-auto mb-2 text-gray-400" />
+                          <p className="text-sm text-gray-500 font-medium">No Image</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Content Section */}
+                    <div className="p-4 space-y-3">
+                      {/* Title */}
+                      <h3 className="text-lg font-semibold text-gray-900 line-clamp-2 leading-tight">
+                        {notification.title}
+                      </h3>
+
+                      {/* Description */}
+                      <p className="text-sm text-gray-600 line-clamp-3 leading-relaxed">{notification.description}</p>
+
+                      {/* Type Badge */}
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            notification.priority === "new-user"
+                              ? "bg-green-100 text-green-800"
+                              : notification.priority === "top-rated-user"
+                                ? "bg-purple-100 text-purple-800"
+                                : notification.priority === "old-user"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : "bg-gray-100 text-gray-800"
+                          }`}
+                        >
+                          {notification.priority === "new-user"
+                            ? "New User"
+                            : notification.priority === "top-rated-user"
+                              ? "Top Rated User"
+                              : notification.priority === "old-user"
+                                ? "Old User"
+                                : "General User"}
+                        </span>
+                      </div>
+
+                      {/* Created Date */}
+                      <p className="text-xs text-gray-500 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 bg-gray-400 rounded-full"></span>
+                        Created:{" "}
+                        {new Date(notification.timestamp).toLocaleDateString("en-US", {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+
+                      {/* Action Buttons */}
+                      {(userRole === "superadmin" || userRole === "editor") && (
+                        <div className="flex gap-2 pt-2 border-t border-gray-100">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleEditNotification(notification)}
+                            className="flex-1 text-xs py-1.5 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-colors"
+                          >
+                            <Edit3 className="h-3 w-3 mr-1" />
+                            Edit
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDeleteNotification(notification.id)}
+                            className="flex-1 text-xs py-1.5 hover:bg-red-50 hover:border-red-200 hover:text-red-700 transition-colors"
+                          >
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Delete
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )
+    }
+
     // Create Notification View
     if (notificationView === "create") {
       return (
@@ -483,7 +999,7 @@ export default function SettingPage() {
             </Button>
           </div>
           <div className="max-w-2xl mx-auto space-y-6">
-            {/* Upload Image Area */}
+            {/* Enhanced Upload Image Area */}
             <div
               onClick={handleUploadClick}
               className={`border-2 border-dashed border-gray-300 rounded-lg p-8 sm:p-12 text-center transition-colors ${
@@ -501,13 +1017,39 @@ export default function SettingPage() {
               <div className="space-y-4">
                 {uploadedImage ? (
                   <div className="space-y-4">
-                    <Image
-                      src={uploadedImage || "/placeholder.svg"}
-                      alt="Uploaded notification image"
-                      width={200}
-                      height={120}
-                      className="mx-auto rounded-lg object-cover"
-                    />
+                    <div className="relative inline-block">
+                      <Image
+                        src={uploadedImage || "/placeholder.svg?height=180&width=300"}
+                        alt="Uploaded notification image"
+                        width={300}
+                        height={180}
+                        className="mx-auto rounded-lg object-cover shadow-md"
+                        onError={(e) => {
+                          e.currentTarget.src = "/placeholder.svg?height=180&width=300"
+                        }}
+                      />
+                      {userRole !== "viewer" && (
+                        <div className="absolute top-2 right-2 flex gap-1">
+                          <Button
+                            size="sm"
+                            onClick={() => document.getElementById("image-upload").click()}
+                            className="w-8 h-8 p-0 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg"
+                          >
+                            <Edit3 className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setUploadedImage(null)
+                              setUploadedImageFile(null)
+                            }}
+                            className="w-8 h-8 p-0 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-lg"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                     <p className="text-teal-600 font-medium">Image uploaded successfully!</p>
                     <p className="text-sm text-gray-500">Click to change image</p>
                   </div>
@@ -527,12 +1069,11 @@ export default function SettingPage() {
                 )}
               </div>
             </div>
-
             {/* Editable Content */}
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="notification-title" className="text-sm font-medium text-gray-700">
-                  Notification Title
+                  Notification Title *
                 </Label>
                 <Input
                   id="notification-title"
@@ -544,7 +1085,7 @@ export default function SettingPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="notification-description" className="text-sm font-medium text-gray-700">
-                  Description
+                  Description *
                 </Label>
                 <textarea
                   id="notification-description"
@@ -555,16 +1096,243 @@ export default function SettingPage() {
                   disabled={userRole === "viewer"}
                 />
               </div>
+              {/* Send To Selection */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700">Send To * (Required)</Label>
+                <div className="relative">
+                  <Button
+                    onClick={() => setShowSendToDropdown(!showSendToDropdown)}
+                    className={`w-full justify-between ${
+                      selectedSendTo === "Send to"
+                        ? "bg-white text-gray-500 border-gray-300 hover:bg-gray-50"
+                        : "bg-teal-600 text-white border-teal-600 hover:bg-teal-700"
+                    } border`}
+                    disabled={userRole === "viewer"}
+                  >
+                    {selectedSendTo}
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                  {showSendToDropdown && userRole !== "viewer" && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10">
+                      <div className="py-1">
+                        {["New User", "Old User", "Top rated user", "General Users"].map((option) => (
+                          <button
+                            key={option}
+                            onClick={() => {
+                              setSelectedSendTo(option)
+                              setShowSendToDropdown(false)
+                            }}
+                            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          >
+                            <div className="w-2 h-2 bg-gray-400 rounded-full mr-3"></div>
+                            {option}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {selectedSendTo === "Send to" && (
+                  <p className="text-red-500 text-xs">Please select at least one option</p>
+                )}
+              </div>
             </div>
-
             <div className="flex justify-end">
               {(userRole === "superadmin" || userRole === "editor") && (
                 <Button
                   onClick={handleNext}
                   className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-md text-sm font-medium"
-                  disabled={!notificationData.title.trim() || !notificationData.description.trim()}
+                  disabled={
+                    !notificationData.title.trim() ||
+                    !notificationData.description.trim() ||
+                    selectedSendTo === "Send to"
+                  }
                 >
                   Next
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    // Edit Notification View
+    if (notificationView === "edit") {
+      return (
+        <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Edit Notification</h1>
+            <Button
+              onClick={() => {
+                setEditingNotification(null)
+                setNotificationData({
+                  title: "Upcoming Zero Koin",
+                  description:
+                    "Zero Koin mining is the process of validating transactions and securing the Zero Koin blockchain by solving complex mathematical problems, typically using computing power, to earn rewards in Zero Koin.",
+                })
+                setUploadedImage(null)
+                setUploadedImageFile(null)
+                setSelectedSendTo("Send to")
+                setNotificationView("list")
+              }}
+              variant="outline"
+              className="w-full sm:w-auto"
+            >
+              Back
+            </Button>
+          </div>
+          <div className="max-w-2xl mx-auto space-y-6">
+            {/* Enhanced Upload Image Area */}
+            <div
+              onClick={handleUploadClick}
+              className={`border-2 border-dashed border-gray-300 rounded-lg p-8 sm:p-12 text-center transition-colors ${
+                userRole === "viewer" ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:border-gray-400"
+              } ${uploadedImage ? "border-teal-500 bg-teal-50" : ""}`}
+            >
+              <input
+                id="image-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+                disabled={userRole === "viewer"}
+              />
+              <div className="space-y-4">
+                {uploadedImage ? (
+                  <div className="space-y-4">
+                    <div className="relative inline-block">
+                      <Image
+                        src={uploadedImage || "/placeholder.svg?height=180&width=300"}
+                        alt="Uploaded notification image"
+                        width={300}
+                        height={180}
+                        className="mx-auto rounded-lg object-cover shadow-md"
+                        onError={(e) => {
+                          e.currentTarget.src = "/placeholder.svg?height=180&width=300"
+                        }}
+                      />
+                      {userRole !== "viewer" && (
+                        <div className="absolute top-2 right-2 flex gap-1">
+                          <Button
+                            size="sm"
+                            onClick={() => document.getElementById("image-upload").click()}
+                            className="w-8 h-8 p-0 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg"
+                          >
+                            <Edit3 className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setUploadedImage(null)
+                              setUploadedImageFile(null)
+                            }}
+                            className="w-8 h-8 p-0 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-lg"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-teal-600 font-medium">Image uploaded successfully!</p>
+                    <p className="text-sm text-gray-500">Click to change image</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="w-12 h-12 mx-auto bg-gray-100 rounded-lg flex items-center justify-center">
+                      {isUploading ? (
+                        <div className="w-6 h-6 border-2 border-gray-300 border-t-teal-600 rounded-full animate-spin"></div>
+                      ) : (
+                        <Upload className="h-6 w-6 text-gray-600" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-gray-600 font-medium">{isUploading ? "Uploading..." : "Upload Image"}</p>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+            {/* Editable Content */}
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="notification-title" className="text-sm font-medium text-gray-700">
+                  Notification Title *
+                </Label>
+                <Input
+                  id="notification-title"
+                  value={notificationData.title}
+                  onChange={(e) => setNotificationData({ ...notificationData, title: e.target.value })}
+                  className="border-gray-200"
+                  disabled={userRole === "viewer"}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="notification-description" className="text-sm font-medium text-gray-700">
+                  Description *
+                </Label>
+                <textarea
+                  id="notification-description"
+                  value={notificationData.description}
+                  onChange={(e) => setNotificationData({ ...notificationData, description: e.target.value })}
+                  className="w-full p-3 border border-gray-200 rounded-md text-sm leading-relaxed resize-none"
+                  rows={4}
+                  disabled={userRole === "viewer"}
+                />
+              </div>
+              {/* Send To Selection */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700">Send To * (Required)</Label>
+                <div className="relative">
+                  <Button
+                    onClick={() => setShowSendToDropdown(!showSendToDropdown)}
+                    className={`w-full justify-between ${
+                      selectedSendTo === "Send to"
+                        ? "bg-white text-gray-500 border-gray-300 hover:bg-gray-50"
+                        : "bg-teal-600 text-white border-teal-600 hover:bg-teal-700"
+                    } border`}
+                    disabled={userRole === "viewer"}
+                  >
+                    {selectedSendTo}
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                  {showSendToDropdown && userRole !== "viewer" && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10">
+                      <div className="py-1">
+                        {["New User", "Old User", "Top rated user", "General Users"].map((option) => (
+                          <button
+                            key={option}
+                            onClick={() => {
+                              setSelectedSendTo(option)
+                              setShowSendToDropdown(false)
+                            }}
+                            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          >
+                            <div className="w-2 h-2 bg-gray-400 rounded-full mr-3"></div>
+                            {option}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {selectedSendTo === "Send to" && (
+                  <p className="text-red-500 text-xs">Please select at least one option</p>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end">
+              {(userRole === "superadmin" || userRole === "editor") && (
+                <Button
+                  onClick={handleUpdateNotification}
+                  className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-md text-sm font-medium"
+                  disabled={
+                    !notificationData.title.trim() ||
+                    !notificationData.description.trim() ||
+                    selectedSendTo === "Send to"
+                  }
+                >
+                  Update Notification
                 </Button>
               )}
             </div>
@@ -610,7 +1378,6 @@ export default function SettingPage() {
               )}
             </div>
           </div>
-
           <div className="max-w-2xl mx-auto space-y-6">
             {/* Notification Preview */}
             <div className="relative rounded-lg overflow-hidden">
@@ -621,8 +1388,21 @@ export default function SettingPage() {
                   width={600}
                   height={200}
                   className="w-full h-48 sm:h-56 object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none"
+                    e.currentTarget.nextElementSibling.style.display = "flex"
+                  }}
                 />
-              ) : (
+              ) : null}
+              {uploadedImage && (
+                <div className="w-full h-48 sm:h-56 bg-gradient-to-r from-teal-400 to-blue-500 items-center justify-center hidden">
+                  <div className="text-white text-center">
+                    <Bell className="h-12 w-12 mx-auto mb-2" />
+                    <p className="text-lg font-medium">Image Unavailable</p>
+                  </div>
+                </div>
+              )}
+              {!uploadedImage && (
                 <div className="w-full h-48 sm:h-56 bg-gradient-to-r from-teal-400 to-blue-500 flex items-center justify-center">
                   <div className="text-white text-center">
                     <Bell className="h-12 w-12 mx-auto mb-2" />
@@ -631,13 +1411,11 @@ export default function SettingPage() {
                 </div>
               )}
             </div>
-
             {/* Content Preview */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-gray-900">{notificationData.title}</h3>
               <p className="text-gray-700 text-sm leading-relaxed">{notificationData.description}</p>
             </div>
-
             <div className="flex justify-end">
               {(userRole === "superadmin" || userRole === "editor") && (
                 <Button
@@ -650,7 +1428,6 @@ export default function SettingPage() {
               )}
             </div>
           </div>
-
           {/* Success Modal */}
           <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
             <DialogContent className="sm:max-w-md bg-white text-center border-0 shadow-2xl mx-4">
@@ -681,97 +1458,6 @@ export default function SettingPage() {
         </div>
       )
     }
-
-    // Notification List View
-    if (notificationView === "list") {
-      return (
-        <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen relative">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Notifications</h1>
-            <Button onClick={() => setCurrentView("main")} variant="outline" className="w-full sm:w-auto">
-              Back to Settings
-            </Button>
-          </div>
-
-          <div className="max-w-md mx-auto bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            {/* Notification List */}
-            <div className="max-h-96 overflow-y-auto">
-              {sentNotifications.length === 0 ? (
-                <div className="p-6 text-center text-gray-500">
-                  <Bell className="h-12 w-12 mx-auto mb-2 text-gray-300" />
-                  <p>No notifications sent yet</p>
-                </div>
-              ) : (
-                sentNotifications.map((notification) => (
-                  <div key={notification.id} className="p-4 border-b border-gray-100 last:border-b-0">
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 bg-teal-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-1">
-                        <div className="w-4 h-4 bg-teal-600 rounded-sm flex items-center justify-center">
-                          <span className="text-white text-xs font-bold">Z</span>
-                        </div>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <h3 className="text-sm font-semibold text-gray-900 truncate">Zerokoin Network</h3>
-                          <button className="text-gray-400 hover:text-gray-600 flex-shrink-0">
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                        <p className="text-sm font-medium text-gray-800 mb-1">{notification.title}</p>
-                        <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed">{notification.description}</p>
-                        <p className="text-xs text-gray-400 mt-2">
-                          Sent to: {notification.sentTo} • {new Date(notification.timestamp).toLocaleTimeString()}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Action Buttons */}
-            {sentNotifications.length > 0 && (
-              <div className="p-4 bg-gray-50 border-t border-gray-200">
-                <div className="flex gap-3">
-                  <Button
-                    variant="outline"
-                    className="flex-1 bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                    onClick={() => {
-                      console.log("Manage notifications")
-                    }}
-                  >
-                    Manage
-                  </Button>
-                  <Button
-                    className="flex-1 bg-teal-600 hover:bg-teal-700 text-white"
-                    onClick={() => {
-                      if (confirm("Are you sure you want to clear all notifications?")) {
-                        setSentNotifications([])
-                        setNotificationView("empty")
-                      }
-                    }}
-                  >
-                    Clear All
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Create New Notification Button */}
-          <div className="flex justify-center pt-4">
-            {(userRole === "superadmin" || userRole === "editor") && (
-              <Button
-                onClick={handleCreateNotification}
-                className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-md text-sm font-medium"
-              >
-                Create New Notification
-              </Button>
-            )}
-          </div>
-        </div>
-      )
-    }
   }
 
   // Main Settings View
@@ -781,7 +1467,6 @@ export default function SettingPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Setting</h1>
         </div>
-
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           <Card className="bg-white border border-gray-200">
@@ -799,7 +1484,6 @@ export default function SettingPage() {
               </div>
             </CardContent>
           </Card>
-
           <Card className="bg-white border border-gray-200">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center space-x-3 sm:space-x-4">
@@ -813,7 +1497,6 @@ export default function SettingPage() {
               </div>
             </CardContent>
           </Card>
-
           <Card className="bg-white border border-gray-200 sm:col-span-2 lg:col-span-1">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center space-x-3 sm:space-x-4">
@@ -830,7 +1513,6 @@ export default function SettingPage() {
             </CardContent>
           </Card>
         </div>
-
         {/* Expiry Dropdown */}
         {(userRole === "superadmin" || userRole === "editor") && (
           <div className="flex justify-center sm:justify-end">
@@ -863,7 +1545,6 @@ export default function SettingPage() {
             </div>
           </div>
         )}
-
         {/* Navigation Buttons */}
         <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 pt-4 sm:pt-8">
           <Button
@@ -912,7 +1593,6 @@ export default function SettingPage() {
             </Button>
           )}
         </div>
-
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           <Card className="bg-white border border-gray-200">
@@ -930,7 +1610,6 @@ export default function SettingPage() {
               </div>
             </CardContent>
           </Card>
-
           <Card className="bg-white border border-gray-200">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center space-x-3 sm:space-x-4">
@@ -944,7 +1623,6 @@ export default function SettingPage() {
               </div>
             </CardContent>
           </Card>
-
           <Card className="bg-white border border-gray-200 sm:col-span-2 lg:col-span-1">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center space-x-3 sm:space-x-4">
@@ -961,7 +1639,6 @@ export default function SettingPage() {
             </CardContent>
           </Card>
         </div>
-
         {/* Admin Access Table */}
         <Card className="bg-white border border-gray-200">
           <CardContent className="p-3 sm:p-6">
@@ -1053,7 +1730,6 @@ export default function SettingPage() {
             </div>
           </CardContent>
         </Card>
-
         {/* Add Admin Modal */}
         <Dialog open={showAddAdminModal} onOpenChange={setShowAddAdminModal}>
           <DialogContent className="sm:max-w-md bg-white">
@@ -1133,7 +1809,6 @@ export default function SettingPage() {
             </div>
           </DialogContent>
         </Dialog>
-
         {/* Edit Admin Modal */}
         <Dialog open={showEditAdminModal} onOpenChange={setShowEditAdminModal}>
           <DialogContent className="sm:max-w-md bg-white">
@@ -1265,4 +1940,3 @@ export default function SettingPage() {
     )
   }
 }
-

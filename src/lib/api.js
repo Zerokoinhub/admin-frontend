@@ -1,5 +1,4 @@
 // API service for handling user data and helpers
-
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL
 
 // Helper: Get auth headers with token
@@ -22,15 +21,12 @@ export const userAPI = {
       limit: limit.toString(),
       ...filters,
     })
-
     try {
       const response = await fetch(`${API_BASE_URL}/users?${params}`, {
         method: "GET",
         headers: getAuthHeaders(),
       })
-
       if (!response.ok) throw new Error("Failed to fetch users")
-
       const result = await response.json()
       console.log("API Response:", result)
 
@@ -84,9 +80,7 @@ export const userAPI = {
         method: "GET",
         headers: getAuthHeaders(),
       })
-
       if (!response.ok) throw new Error("Failed to fetch user")
-
       return await response.json()
     } catch (error) {
       console.error("Error fetching user:", error)
@@ -94,16 +88,48 @@ export const userAPI = {
     }
   },
 
+  // FIXED: Update user - Now properly calls the backend PUT /users/:id endpoint
+  async updateUser(userId, userData) {
+    try {
+      console.log("Updating user:", userId, "with data:", userData)
+
+      const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(userData),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `Failed to update user: ${response.status}`)
+      }
+
+      const result = await response.json()
+      console.log("Update result:", result)
+
+      return {
+        success: true,
+        user: result.user,
+        message: result.message || "User updated successfully",
+        changes: result.changes,
+      }
+    } catch (error) {
+      console.error("Error updating user:", error)
+      return {
+        success: false,
+        message: error.message || "Failed to update user",
+      }
+    }
+  },
+
   // Ban a user
   async banUser(userId) {
     try {
       const response = await fetch(`${API_BASE_URL}/users/${userId}/ban`, {
-        method: "POST",
+        method: "PUT", // Changed from POST to PUT to match backend
         headers: getAuthHeaders(),
       })
-
       if (!response.ok) throw new Error("Failed to ban user")
-
       return await response.json()
     } catch (error) {
       console.error("Error banning user:", error)
@@ -115,12 +141,10 @@ export const userAPI = {
   async unbanUser(userId) {
     try {
       const response = await fetch(`${API_BASE_URL}/users/${userId}/unban`, {
-        method: "POST",
+        method: "PUT", // Changed from POST to PUT to match backend
         headers: getAuthHeaders(),
       })
-
       if (!response.ok) throw new Error("Failed to unban user")
-
       return await response.json()
     } catch (error) {
       console.error("Error unbanning user:", error)
@@ -131,22 +155,8 @@ export const userAPI = {
   // Update user status (enhanced version that works with both ban/unban and direct status update)
   async updateUserStatus(userId, isActive) {
     try {
-      const response = await fetch(`${API_BASE_URL}/users/${userId}/status`, {
-        method: "PATCH",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ isActive }),
-      })
-
-      if (!response.ok) {
-        // If direct status update fails, try ban/unban approach
-        if (isActive) {
-          return await this.unbanUser(userId)
-        } else {
-          return await this.banUser(userId)
-        }
-      }
-
-      return await response.json()
+      // Use the updateUser function to update the isActive status
+      return await this.updateUser(userId, { isActive })
     } catch (error) {
       console.error("Error updating user status:", error)
       // Fallback to ban/unban if status update fails
@@ -166,7 +176,7 @@ export const userAPI = {
   // Manual coin transfer - Enhanced with reason parameter
   async transferCoins(userId, amount, reason = "Manual transfer") {
     try {
-      const response = await fetch(`${API_BASE_URL}/users/${userId}/coin-transfer`, {
+      const response = await fetch(`${API_BASE_URL}/users/${userId}/transfer`, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -188,7 +198,7 @@ export const userAPI = {
           transferId: result.transferId || `transfer_${Date.now()}`,
           transactionId:
             result.transactionId || `TXN${Date.now()}${Math.random().toString(36).substr(2, 9)}`.toUpperCase(),
-          newBalance: result.newBalance,
+          newBalance: result.transaction?.newBalance || result.user?.balance,
           amount: amount,
           reason: reason,
         },
@@ -202,24 +212,20 @@ export const userAPI = {
     }
   },
 
-  // NEW: Edit user balance directly using the edit-balance endpoint
-  editUserBalance: async (email, newBalance , admin) => {
+  // Edit user balance directly using the edit-balance endpoint
+  async editUserBalance(email, newBalance, admin) {
     try {
       if (!email || typeof newBalance !== "number") {
         throw new Error("Invalid input: email and numeric newBalance are required.")
       }
 
       const response = await fetch(`${API_BASE_URL}/users/edit-balance`, {
-        method: "PUT",
-        headers: {
-          ...getAuthHeaders(),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, newBalance ,admin}), // ✅ use email now
+        method: "POST", // Changed from PUT to POST to match backend
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ email, newBalance, admin }),
       })
 
       const result = await response.json()
-
       if (!response.ok) {
         throw new Error(result.message || "Failed to update user balance")
       }
@@ -229,7 +235,7 @@ export const userAPI = {
         data: {
           user: result.user,
           newBalance: result.transaction.newBalance,
-          previousBalance: result.transaction.balanceBefore, // ✅ match backend response
+          previousBalance: result.transaction.balanceBefore,
           amountChanged: result.transaction.amountChanged,
           message: result.message,
           transactionLogged: true,
@@ -245,7 +251,7 @@ export const userAPI = {
     }
   },
 
-  // ✅ 1. Get Transfer History
+  // Get Transfer History
   async getTransferHistory(filters = {}) {
     try {
       const params = new URLSearchParams()
@@ -257,7 +263,6 @@ export const userAPI = {
       if (filters.userId) params.append("userId", filters.userId)
 
       const url = `${API_BASE_URL}/transfer/transferHistory?${params.toString()}`
-
       const response = await fetch(url, {
         method: "GET",
         headers: getAuthHeaders(),
@@ -293,19 +298,17 @@ export const userAPI = {
     }
   },
 
-  // ✅ 2. Get Transfer By ID
+  // Get Transfer By ID
   async getTransferById(transferId) {
     try {
       const response = await fetch(`${API_BASE_URL}/transfers/${transferId}`, {
         method: "GET",
         headers: getAuthHeaders(),
       })
-
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}))
         throw new Error(errData.message || "Failed to fetch transfer")
       }
-
       return await response.json()
     } catch (error) {
       console.error("❌ Error fetching transfer by ID:", error)
@@ -313,7 +316,7 @@ export const userAPI = {
     }
   },
 
-  // ✅ 3. Update Transfer Status
+  // Update Transfer Status
   async updateTransferStatus(transferId, status) {
     try {
       const response = await fetch(`${API_BASE_URL}/transfers/${transferId}/status`, {
@@ -321,12 +324,10 @@ export const userAPI = {
         headers: getAuthHeaders(),
         body: JSON.stringify({ status }),
       })
-
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}))
         throw new Error(errData.message || "Failed to update transfer status")
       }
-
       return await response.json()
     } catch (error) {
       console.error("❌ Error updating transfer status:", error)
@@ -338,7 +339,7 @@ export const userAPI = {
   async changePassword(oldPassword, newPassword, confirmPassword) {
     try {
       const response = await fetch(`${API_BASE_URL}/users/change-password`, {
-        method: "POST",
+        method: "PUT", // Changed from POST to PUT to match backend
         headers: getAuthHeaders(),
         body: JSON.stringify({
           oldPassword,
@@ -346,22 +347,18 @@ export const userAPI = {
           confirmPassword,
         }),
       })
-
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.message || "Failed to change password")
       }
-
       const result = await response.json()
 
-      // Handle your backend response structure
       if (result.success) {
         return {
           success: true,
           message: result.message || "Password changed successfully",
         }
       }
-
       return result
     } catch (error) {
       console.error("Error changing password:", error)
@@ -379,15 +376,12 @@ export const userAPI = {
         method: "GET",
         headers: getAuthHeaders(),
       })
-
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.message || "Failed to get profile")
       }
-
       const result = await response.json()
 
-      // Handle your backend response structure
       if (result.success) {
         return {
           success: true,
@@ -395,7 +389,6 @@ export const userAPI = {
           data: result.user, // For backward compatibility
         }
       }
-
       return result
     } catch (error) {
       console.error("Error getting profile:", error)
@@ -406,7 +399,7 @@ export const userAPI = {
     }
   },
 
-  // Update logged-in user's profile (matches your backend controller)
+  // Update logged-in user's profile
   async updateProfile(data) {
     try {
       const response = await fetch(`${API_BASE_URL}/users/profile`, {
@@ -414,15 +407,12 @@ export const userAPI = {
         headers: getAuthHeaders(),
         body: JSON.stringify(data),
       })
-
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.message || "Failed to update profile")
       }
-
       const result = await response.json()
 
-      // Handle your backend response structure: { success: true, user: {...} }
       if (result.success) {
         return {
           success: true,
@@ -430,7 +420,6 @@ export const userAPI = {
           message: "Profile updated successfully",
         }
       }
-
       return result
     } catch (error) {
       console.error("Error updating profile:", error)
@@ -444,12 +433,10 @@ export const userAPI = {
   // Get total referrals
   async getTotalReferrals() {
     try {
-      const response = await fetch(`${API_BASE_URL}/users/total-referrals`, {
+      const response = await fetch(`${API_BASE_URL}/users/stats/referrals`, {
         headers: getAuthHeaders(),
       })
-
       if (!response.ok) throw new Error("Failed to fetch total referrals")
-
       return await response.json()
     } catch (error) {
       console.error("Error fetching total referrals:", error)
@@ -460,12 +447,10 @@ export const userAPI = {
   // Get total connected wallets
   async getTotalWallets() {
     try {
-      const response = await fetch(`${API_BASE_URL}/users/total-wallets`, {
+      const response = await fetch(`${API_BASE_URL}/users/stats/wallets`, {
         headers: getAuthHeaders(),
       })
-
       if (!response.ok) throw new Error("Failed to fetch wallet count")
-
       return await response.json()
     } catch (error) {
       console.error("Error fetching wallet count:", error)
@@ -476,13 +461,27 @@ export const userAPI = {
   // Get users with calculator usage
   async getCalculatorUsers() {
     try {
-      const response = await this.getUsers()
-
+      const response = await fetch(`${API_BASE_URL}/users/calculator-users`, {
+        headers: getAuthHeaders(),
+      })
       if (!response.ok) throw new Error("Failed to fetch calculator users")
-
       return await response.json()
     } catch (error) {
       console.error("Error fetching calculator users:", error)
+      throw error
+    }
+  },
+
+  // Get total calculator usage
+  async getTotalCalculatorUsage() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/stats/calculator-usage`, {
+        headers: getAuthHeaders(),
+      })
+      if (!response.ok) throw new Error("Failed to fetch calculator usage")
+      return await response.json()
+    } catch (error) {
+      console.error("Error fetching calculator usage:", error)
       throw error
     }
   },
@@ -494,9 +493,7 @@ export const userAPI = {
         method: "GET",
         headers: getAuthHeaders(),
       })
-
       if (!response.ok) throw new Error("Failed to fetch user sessions")
-
       return await response.json()
     } catch (error) {
       console.error("Error fetching user sessions:", error)
@@ -504,52 +501,10 @@ export const userAPI = {
     }
   },
 
-  // Update user - Since you don't have PUT /users/:id route, we'll use profile update for current user
-  // or throw an error for other users since the route doesn't exist
-  async updateUser(userId, userData) {
-    try {
-      // Check if this is trying to update the current user's profile
-      const currentUser = await this.getProfile()
-
-      if (currentUser.success && currentUser.user && currentUser.user._id === userId) {
-        // If updating current user, use the profile update endpoint
-        return await this.updateProfile(userData)
-      } else {
-        // For other users, we don't have an endpoint, so return an error
-        throw new Error("Cannot update other users - endpoint not available. Only profile updates are supported.")
-      }
-    } catch (error) {
-      console.error("Error updating user:", error)
-      return {
-        success: false,
-        message: error.message || "Failed to update user",
-      }
-    }
-  },
-
-  // Alternative function for admin to update any user (if you add the backend route later)
+  // Alternative function for admin to update any user (deprecated - use updateUser instead)
   async adminUpdateUser(userId, userData) {
-    try {
-      // This would be for when you add the PUT /users/:id route to your backend
-      const response = await fetch(`${API_BASE_URL}/admin/users/${userId}`, {
-        method: "PUT",
-        headers: getAuthHeaders(),
-        body: JSON.stringify(userData),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || "Failed to update user")
-      }
-
-      return await response.json()
-    } catch (error) {
-      console.error("Error updating user:", error)
-      return {
-        success: false,
-        message: error.message || "Admin update not available - route not implemented",
-      }
-    }
+    console.warn("adminUpdateUser is deprecated, use updateUser instead")
+    return await this.updateUser(userId, userData)
   },
 }
 
@@ -642,7 +597,6 @@ export const userHelpers = {
 
     // Use lastSignInAt or updatedAt for activity calculation
     const lastActivity = user.lastSignInAt || user.updatedAt
-
     if (lastActivity) {
       const lastActivityDate = new Date(lastActivity)
       const daysSinceActivity = (Date.now() - lastActivityDate.getTime()) / (1000 * 60 * 60 * 24)
@@ -792,7 +746,6 @@ export const userHelpers = {
     }
 
     stats.averageAmount = stats.totalTransfers > 0 ? stats.totalAmount / stats.totalTransfers : 0
-
     return stats
   },
 

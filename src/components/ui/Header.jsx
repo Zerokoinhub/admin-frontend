@@ -153,127 +153,136 @@ export default function Header({ onMenuClick, onNotificationClick, notificationC
 
       {/* Notification Panel */}
       {showNotificationPanel && (
-        <div className="fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-50 border-l border-gray-200 flex flex-col">
-          <div className="p-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
-            <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-gray-900">Notifications</h3>
-              <span className="bg-teal-600 text-white text-xs px-2 py-1 rounded-full">{actualNotificationCount}</span>
-            </div>
-            <Button variant="ghost" size="sm" onClick={() => setShowNotificationPanel(false)} className="h-6 w-6 p-0">
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
+  <div className="fixed top-0 right-0 h-full w-full sm:w-96 max-w-full bg-white shadow-2xl z-50 border-l border-gray-200 flex flex-col transition-all duration-300 ease-in-out">
+    {/* Header */}
+    <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        <h3 className="font-semibold text-gray-900 text-lg">Notifications</h3>
+        <span className="bg-teal-600 text-white text-xs px-2 py-0.5 rounded-full">
+          {actualNotificationCount}
+        </span>
+      </div>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setShowNotificationPanel(false)}
+        className="h-6 w-6 p-0 text-gray-500 hover:text-red-500"
+      >
+        <X className="h-4 w-4" />
+      </Button>
+    </div>
 
-          <div className="flex-1 overflow-y-auto">
-            {loading ? (
-              <div className="p-4 flex justify-center">
-                <div className="w-6 h-6 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+    {/* Notification List */}
+    <div className="flex-1 overflow-y-auto scroll-smooth">
+      {loading ? (
+        <div className="p-6 flex justify-center items-center">
+          <div className="w-6 h-6 border-2 border-teal-200 border-t-teal-600 rounded-full animate-spin" />
+        </div>
+      ) : notifications.length > 0 ? (
+        notifications.map((notification, index) => (
+          <div
+            key={notification._id || index}
+            className="p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors duration-200"
+          >
+            <div className="flex items-start gap-3">
+              {/* Image or Placeholder */}
+              {notification.imageUrl ? (
+                <img
+                  src={notification.imageUrl}
+                  alt="Notification"
+                  className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                  onError={(e) => {
+                    e.target.style.display = "none"
+                    e.target.nextSibling.style.display = "flex"
+                  }}
+                />
+              ) : null}
+
+              {/* Fallback Icon */}
+              <div
+                className="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{ display: notification.imageUrl ? "none" : "flex" }}
+              >
+                <span className="text-white text-xs font-bold bg-teal-600 px-2 py-1 rounded">Z</span>
               </div>
-            ) : notifications.length > 0 ? (
-              notifications.map((notification, index) => (
-                <div key={notification._id || index} className="p-4 border-b border-gray-100 hover:bg-gray-50">
-                  <div className="flex items-start gap-3">
-                    {notification.imageUrl ? (
-                      <img
-                        src={notification.imageUrl || "/placeholder.svg"}
-                        alt="Notification"
-                        className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
-                        onError={(e) => {
-                          e.target.style.display = "none"
-                          e.target.nextSibling.style.display = "flex"
-                        }}
-                      />
-                    ) : null}
-                    <div
-                      className="w-8 h-8 bg-teal-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-1"
-                      style={{ display: notification.imageUrl ? "none" : "flex" }}
-                    >
-                      <div className="w-4 h-4 bg-teal-600 rounded-sm flex items-center justify-center">
-                        <span className="text-white text-xs font-bold">Z</span>
-                      </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-medium text-gray-900 text-sm">Zerokoin Network</p>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-4 w-4 p-0 hover:bg-red-100"
-                          onClick={() => removeNotification(notification._id)}
-                        >
-                          <X className="h-3 w-3 text-gray-400 hover:text-red-500" />
-                        </Button>
-                      </div>
-                      <p className="font-medium text-gray-800 text-sm mb-1">{notification.title}</p>
-                      <p className="text-xs text-gray-600 mb-2 line-clamp-2">{notification.message}</p>
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs text-gray-400">
-                          {notification.sentTo} • {new Date(notification.createdAt).toLocaleDateString()}
-                        </p>
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            notification.priority === "new-user"
-                              ? "bg-green-100 text-green-800"
-                              : notification.priority === "top-rated-user"
-                                ? "bg-purple-100 text-purple-800"
-                                : "bg-blue-100 text-blue-800"
-                          }`}
-                        >
-                          {notification.priority === "new-user"
-                            ? "New"
-                            : notification.priority === "top-rated-user"
-                              ? "Top"
-                              : "Regular"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+
+              {/* Notification Content */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-sm font-medium text-gray-900">Zerokoin Network</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-4 w-4 p-0 hover:bg-red-100"
+                    onClick={() => removeNotification(notification._id)}
+                  >
+                    <X className="h-3 w-3 text-gray-400 hover:text-red-500" />
+                  </Button>
                 </div>
-              ))
-            ) : (
-              <div className="p-4">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-teal-100 rounded-full flex items-center justify-center">
-                    <Bell className="h-5 w-5 text-teal-600" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900">Hi Admin!</p>
-                    <p className="text-sm text-gray-500">No new notifications</p>
-                    <p className="text-xs text-gray-400">Check back later</p>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-sm text-gray-600">
-                    View on Admin: <span className="font-medium">System</span>
+                <p className="text-sm font-semibold text-gray-800 mb-1">{notification.title}</p>
+                <p className="text-xs text-gray-600 line-clamp-2">{notification.message}</p>
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-xs text-gray-400">
+                    {notification.sentTo} • {new Date(notification.createdAt).toLocaleDateString()}
                   </p>
-                  <p className="text-xs text-gray-500">No notifications available</p>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                      notification.priority === "new-user"
+                        ? "bg-green-100 text-green-800"
+                        : notification.priority === "top-rated-user"
+                        ? "bg-purple-100 text-purple-800"
+                        : "bg-blue-100 text-blue-800"
+                    }`}
+                  >
+                    {notification.priority === "new-user"
+                      ? "New"
+                      : notification.priority === "top-rated-user"
+                      ? "Top"
+                      : "Regular"}
+                  </span>
                 </div>
               </div>
-            )}
+            </div>
           </div>
-
-          <div className="p-4 border-t border-gray-200 flex gap-2 flex-shrink-0">
-            <Button
-              className="flex-1 bg-teal-600 hover:bg-teal-700 text-white text-sm"
-              onClick={handleRefresh}
-              disabled={loading}
-            >
-              {loading ? "Loading..." : "Refresh"}
-            </Button>
-            <Button
-              variant="outline"
-              className="flex-1 text-sm bg-transparent"
-              onClick={() => {
-                if (confirm("Are you sure you want to clear all notifications?")) {
-                  setNotifications([])
-                }
-              }}
-            >
-              Clear All
-            </Button>
+        ))
+      ) : (
+        <div className="p-6 text-center text-gray-600 space-y-2">
+          <div className="flex justify-center">
+            <div className="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center">
+              <Bell className="h-6 w-6 text-teal-600" />
+            </div>
           </div>
+          <h4 className="font-semibold text-gray-900">No Notifications</h4>
+          <p className="text-sm text-gray-500">You’re all caught up!</p>
+          <p className="text-xs text-gray-400">Check back later for updates.</p>
         </div>
       )}
+    </div>
+
+    {/* Footer Actions */}
+    <div className="p-4 border-t border-gray-200 flex gap-2">
+      <Button
+        className="flex-1 bg-teal-600 hover:bg-teal-700 text-white text-sm"
+        onClick={handleRefresh}
+        disabled={loading}
+      >
+        {loading ? "Refreshing..." : "Refresh"}
+      </Button>
+      <Button
+        variant="outline"
+        className="flex-1 text-sm"
+        onClick={() => {
+          if (confirm("Are you sure you want to clear all notifications?")) {
+            setNotifications([]);
+          }
+        }}
+      >
+        Clear All
+      </Button>
+    </div>
+  </div>
+)}
+
     </>
   )
 }
