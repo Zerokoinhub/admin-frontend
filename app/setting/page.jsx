@@ -186,15 +186,15 @@ export default function SettingPage() {
       switch (selectedSendTo) {
         case "New User":
           priority = "new-user"
-          endpoint = `${BASE_API_URL}/notifications/general-with-image`
+          endpoint = `${BASE_URL}/notifications/general-with-image`
           break
         case "Old User":
           priority = "old-user"
-          endpoint = `${BASE_API_URL}/notifications/general-with-image`
+          endpoint = `${BASE_URL}/notifications/general-with-image`
           break
         case "Top rated user":
           priority = "top-rated-user"
-          endpoint = `${BASE_API_URL}/notifications/top-users`
+          endpoint = `${BASE_URL}/notifications/top-users`
           break
         default:
           throw new Error("Invalid recipient selection")
