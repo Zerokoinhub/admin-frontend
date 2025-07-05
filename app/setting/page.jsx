@@ -30,6 +30,7 @@ export default function SettingPage() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [notificationView, setNotificationView] = useState("empty")
   const [userRole, setUserRole] = useState("viewer")
+  const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL
   const [notificationData, setNotificationData] = useState({
     title: "Upcoming Zero Koin",
     description:
@@ -65,7 +66,7 @@ export default function SettingPage() {
   useEffect(() => {
     const fetchSentNotifications = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/notifications")
+        const response = await fetch(`${BASE_URL}/notifications`)
         if (response.ok) {
           const result = await response.json()
           if (result.success && result.data) {
@@ -179,22 +180,21 @@ export default function SettingPage() {
       let endpoint = ""
       let requestBody = null
       const headers = {}
-      const BASE_API_URL = process.env.NEXT_PUBLIC_API_BASE_URL+"/notifications"
 
       // Map selectedSendTo to priority and determine endpoint
       let priority = "old-user" // default
       switch (selectedSendTo) {
         case "New User":
           priority = "new-user"
-          endpoint = `${BASE_API_URL}/general-with-image`
+          endpoint = `${BASE_API_URL}/notifications/general-with-image`
           break
         case "Old User":
           priority = "old-user"
-          endpoint = `${BASE_API_URL}/general-with-image`
+          endpoint = `${BASE_API_URL}/notifications/general-with-image`
           break
         case "Top rated user":
           priority = "top-rated-user"
-          endpoint = `${BASE_API_URL}/top-users`
+          endpoint = `${BASE_API_URL}/notifications/top-users`
           break
         default:
           throw new Error("Invalid recipient selection")

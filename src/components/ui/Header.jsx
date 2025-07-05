@@ -10,6 +10,7 @@ export default function Header({ onMenuClick, onNotificationClick, notificationC
   const [showNotificationPanel, setShowNotificationPanel] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(false)
+  const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL
 
   const getHeaderTitle = () => {
     switch (pathname) {
@@ -38,7 +39,7 @@ export default function Header({ onMenuClick, onNotificationClick, notificationC
   const fetchNotifications = async () => {
     setLoading(true)
     try {
-      const response = await fetch("http://localhost:5000/api/notifications?page=1&limit=100")
+      const response = await fetch(`${BASE_URL}/notifications?page=1&limit=100`)
       if (response.ok) {
         const result = await response.json()
         if (result.success && result.data) {
