@@ -13,14 +13,9 @@ import { Badge } from "@/components/ui/badge";
 import { userAPI } from "@/lib/api";
 import {
   User,
-  Mail,
-  MapPin,
-  Wallet,
-  Coins,
-  Calendar,
-  Activity,
   Shield,
   AlertCircle,
+  X,
 } from "lucide-react";
 
 const UserModal = ({ user, open, onClose, onStatusChange }) => {
@@ -38,60 +33,39 @@ const UserModal = ({ user, open, onClose, onStatusChange }) => {
   }, [open, user]);
 
   const toggleBanStatus = async () => {
-    if (!user?.id) {
-      setError("User ID not found");
-      return;
-    }
+    if (!user?.id) return setError("User ID not found");
 
     setLoading(true);
     setError("");
     setSuccess("");
 
     try {
-      let response;
-      const newActiveStatus = isBanned;
+      const newStatus = isBanned;
+      const response = isBanned
+        ? await userAPI.unbanUser(user.id)
+        : await userAPI.banUser(user.id);
 
-      if (isBanned) {
-        response = await userAPI.unbanUser(user.id);
-        setSuccess("User unbanned successfully!");
-      } else {
-        response = await userAPI.banUser(user.id);
-        setSuccess("User banned successfully!");
-      }
-
-      setIsBanned(!newActiveStatus);
+      setIsBanned(!newStatus);
+      setSuccess(isBanned ? "User unbanned successfully!" : "User banned successfully!");
 
       const updatedUser = {
         ...user,
-        isActive: newActiveStatus,
-        status: newActiveStatus ? "Active" : "Banned",
+        isActive: newStatus,
+        status: newStatus ? "Active" : "Banned",
       };
 
-      if (onStatusChange) onStatusChange(updatedUser);
+      onStatusChange?.(updatedUser);
 
       setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
-      console.error("Ban/Unban error:", err);
-      setError(err.message || "Failed to update user status. Please try again.");
+      setError(err.message || "Failed to update user status.");
     } finally {
       setLoading(false);
     }
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return "N/A";
-    try {
-      return new Date(dateString).toLocaleString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return "Invalid Date";
-    }
-  };
+  const formatDate = (date) =>
+    date ? new Date(date).toLocaleString() : "N/A";
 
   const getStatusBadge = () =>
     isBanned ? (
@@ -100,7 +74,7 @@ const UserModal = ({ user, open, onClose, onStatusChange }) => {
         Banned
       </Badge>
     ) : (
-      <Badge className="flex items-center gap-1 bg-green-100 text-green-800">
+      <Badge className="bg-green-100 text-green-800 flex items-center gap-1">
         <Shield className="h-3 w-3" />
         Active
       </Badge>
@@ -110,103 +84,103 @@ const UserModal = ({ user, open, onClose, onStatusChange }) => {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-auto p-0">
-        <DialogHeader className="p-6 pb-4 border-b">
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-xl font-semibold flex items-center gap-2">
-              <User className="h-5 w-5" />
-              User Details
+      <DialogContent className="max-w-[95vw] sm:max-w-2xl lg:max-w-4xl max-h-[90vh] flex flex-col p-0 rounded-xl">
+        {/* Header */}
+        <DialogHeader className="p-4 sm:p-6 border-b relative">
+          <div className="flex flex-col items-center gap-2">
+            <DialogTitle className="text-lg sm:text-xl flex items-center gap-2">
+              <User className="w-5 h-5" /> {user.name}
             </DialogTitle>
             {getStatusBadge()}
           </div>
+          {/* Close button on top-right */}
+          {/* <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className="absolute top-4 right-4 text-gray-500 hover:text-black p-1 h-8 w-8"
+          >
+            <X className="h-5 w-5" />
+          </Button> */}
         </DialogHeader>
 
-        <div className="p-6 space-y-6">
+        {/* Scrollable Content */}
+        <div className="overflow-y-auto px-4 sm:px-6 pt-4 pb-6 flex-1">
           {success && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2">
-              <Shield className="h-4 w-4 text-green-600" />
-              <span className="text-green-800 text-sm font-medium">{success}</span>
+            <div className="bg-green-50 text-green-800 border border-green-200 rounded px-4 py-2 mb-4 flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              <span className="text-sm font-medium">{success}</span>
             </div>
           )}
-
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-red-600" />
-              <span className="text-red-800 text-sm font-medium">{error}</span>
+            <div className="bg-red-50 text-red-800 border border-red-200 rounded px-4 py-2 mb-4 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              <span className="text-sm font-medium">{error}</span>
             </div>
           )}
 
-          <div className="flex flex-col md:flex-row gap-6">
-            {/* Basic Info */}
-            <div className="w-full space-y-4">
-              <h3 className="text-lg font-medium flex items-center gap-2">
-                <User className="h-4 w-4" /> Basic Info
-              </h3>
-
-              <Input readOnly value={user.name || "Unnamed"} placeholder="Name" />
-              <Input readOnly value={user.email || "No email"} placeholder="Email" />
-              <Input readOnly value={user.country || "Unknown"} placeholder="Country" />
-              <Input readOnly value={user.role || "user"} placeholder="Role" />
-            </div>
-
-            {/* Wallet & Activity */}
-            <div className="w-full space-y-4">
-              <h3 className="text-lg font-medium flex items-center gap-2">
-                <Wallet className="h-4 w-4" /> Wallet & Activity
-              </h3>
-
-              <Input readOnly value={user.wallet || "Not Connected"} placeholder="Wallet" />
-              <Input readOnly value={(user.coins || 0).toLocaleString()} placeholder="Coins" />
-              <Input readOnly value={user.calculatorUsage || 0} placeholder="Calculator Usage" />
-              <Input readOnly value={user.inviteCode || "N/A"} placeholder="Referral Code" />
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[
+              ["Full Name", user.name],
+              ["Email", user.email],
+              ["Country", user.country || "Unknown"],
+              ["Role", user.role],
+              ["Wallet", user.wallet || "Not Connected"],
+              ["Coins", (user.coins || 0).toLocaleString()],
+              ["Calculator Usage", user.calculatorUsage || 0],
+              ["Invite Code", user.inviteCode || "N/A"],
+              ["Joined Date", formatDate(user.joinedDate)],
+              ["Last Login", formatDate(user.lastLogin)],
+              ["Referred By", user.referredBy || "Direct signup"],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {label}
+                </label>
+                <Input readOnly value={value} />
+              </div>
+            ))}
           </div>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
-            <Input readOnly value={formatDate(user.joinedDate)} placeholder="Joined Date" />
-            <Input readOnly value={formatDate(user.lastLogin)} placeholder="Last Login" />
+        {/* Sticky Footer */}
+        <div className="border-t px-4 sm:px-6 py-4 flex flex-col-reverse sm:flex-row justify-between items-stretch sm:items-center gap-3 bg-white">
+          <div className="text-sm text-gray-500 font-mono truncate">
+            User ID: {user.id}
           </div>
-
-          {user.referredBy && (
-            <div className="pt-4 border-t">
-              <Input readOnly value={user.referredBy} placeholder="Referred By" />
-            </div>
-          )}
-
-          {/* Action Row */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between pt-6 border-t gap-3">
-            <div className="text-sm text-gray-500">
-              User ID: <span className="font-mono">{user.id}</span>
-            </div>
-            <div className="flex gap-3 flex-wrap">
-              <Button variant="outline" onClick={onClose} disabled={loading}>
-                Close
-              </Button>
-              <Button
-                onClick={toggleBanStatus}
-                disabled={loading}
-                className={`px-6 py-2 text-sm font-medium rounded-md ${
-                  isBanned
-                    ? "bg-green-600 hover:bg-green-700 text-white"
-                    : "bg-red-600 hover:bg-red-700 text-white"
-                }`}
-              >
-                {loading ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Processing...
-                  </div>
-                ) : isBanned ? (
-                  <div className="flex items-center gap-2">
-                    <Shield className="h-4 w-4" /> Unban User
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4" /> Ban User
-                  </div>
-                )}
-              </Button>
-            </div>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Button
+              variant="outline"
+              onClick={onClose}
+              disabled={loading}
+              className="w-full sm:w-auto"
+            >
+              Close
+            </Button>
+            <Button
+              onClick={toggleBanStatus}
+              disabled={loading}
+              className={`w-full sm:w-auto ${
+                isBanned
+                  ? "bg-green-600 hover:bg-green-700"
+                  : "bg-red-600 hover:bg-red-700"
+              } text-white`}
+            >
+              {loading ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Processing...
+                </div>
+              ) : isBanned ? (
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4" /> Unban User
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" /> Ban User
+                </div>
+              )}
+            </Button>
           </div>
         </div>
       </DialogContent>

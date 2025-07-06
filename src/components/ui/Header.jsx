@@ -144,7 +144,7 @@ export default function Header({ onMenuClick, onNotificationClick, notificationC
         <Button variant="ghost" size="sm" className="h-8 w-8 p-0 relative" onClick={handleNotificationClick}>
           <Bell className="h-5 w-5 text-gray-600" />
           {actualNotificationCount > 0 && (
-            <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full text-xs text-white flex items-center justify-center">
+            <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 rounded-full text-xs text-white flex items-center justify-center">
               {actualNotificationCount > 99 ? "99+" : actualNotificationCount}
             </span>
           )}

@@ -1,8 +1,8 @@
-'use client'
-import { LogOut } from 'lucide-react'
+"use client";
+import { LogOut } from "lucide-react";
 
-import { motion, AnimatePresence } from 'framer-motion'
-import Image from 'next/image'
+import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
 import {
   LayoutDashboard,
   Users,
@@ -12,8 +12,8 @@ import {
   Trophy,
   Calculator,
   Settings,
-} from 'lucide-react'
-import MenuButton from './MenuButton'
+} from "lucide-react";
+import MenuButton from "./MenuButton";
 
 export default function Sidebar({ isOpen, onClose }) {
   return (
@@ -33,10 +33,10 @@ export default function Sidebar({ isOpen, onClose }) {
           {/* Sliding Sidebar */}
           <motion.div
             className="fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-gray-200 py-6 flex flex-col shadow-md md:hidden"
-            initial={{ x: '-100%' }}
+            initial={{ x: "-100%" }}
             animate={{ x: 0 }}
-            exit={{ x: '-100%' }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            exit={{ x: "-100%" }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
           >
             <SidebarContent />
           </motion.div>
@@ -48,16 +48,30 @@ export default function Sidebar({ isOpen, onClose }) {
         <SidebarContent />
       </div>
     </AnimatePresence>
-  )
+  );
 }
 
 function SidebarContent({ onClose }) {
   return (
     <>
       {/* Logo and nav */}
-      <div className="flex items-center gap-2 text-xl px-9 font-semibold text-cyan-700 mb-6">
-        <Image src="/logo.svg" alt="Zerokoin Logo" width={33} height={33} />
-        <span className="text-3xl">Zerokoin</span>
+      <div className="flex items-center gap-3 px-9 mb-3">
+        <Image
+          src="/logo.svg"
+          alt="Zerokoin Logo"
+          width={35}
+          height={35}
+          className="block"
+        />
+        <span
+          className="text-[1.5rem] sm:text-[1.5rem] font-semibold pt-2 text-cyan-700"
+          style={{
+            fontFamily: "Roboto, sans-serif",
+            lineHeight: "35px", // perfectly matches logo height
+          }}
+        >
+          ZERO KOIN
+        </span>
       </div>
 
       <hr className="border-gray-300 mb-6" />
@@ -65,45 +79,84 @@ function SidebarContent({ onClose }) {
       <nav>
         <ul className="space-y-2 px-4">
           <li>
-            <MenuButton label="Dashboard" Icon={LayoutDashboard} path="/dashboard" onClick={onClose} />
+            <MenuButton
+              label="Dashboard"
+              Icon={LayoutDashboard}
+              path="/dashboard"
+              onClick={onClose}
+            />
           </li>
           <li>
-            <MenuButton label="User Management" Icon={Users} path="/user-management" onClick={onClose} />
+            <MenuButton
+              label="User Management"
+              Icon={Users}
+              path="/user-management"
+              onClick={onClose}
+            />
           </li>
           <li>
-            <MenuButton label="Coin Transfer" Icon={Wallet} path="/coin-transfer" onClick={onClose} />
+            <MenuButton
+              label="Coin Transfer"
+              Icon={Wallet}
+              path="/coin-transfer"
+              onClick={onClose}
+            />
           </li>
           <li>
-            <MenuButton label="User Profile" Icon={User} path="/user-profile" onClick={onClose} />
+            <MenuButton
+              label="User Profile"
+              Icon={User}
+              path="/user-profile"
+              onClick={onClose}
+            />
           </li>
           <li>
-            <MenuButton label="Course Management" Icon={Book} path="/course-management" onClick={onClose} />
+            <MenuButton
+              label="Course Management"
+              Icon={Book}
+              path="/course-management"
+              onClick={onClose}
+            />
           </li>
           <li>
-            <MenuButton label="Rewards System" Icon={Trophy} path="/rewards-system" onClick={onClose} />
+            <MenuButton
+              label="Rewards System"
+              Icon={Trophy}
+              path="/rewards-system"
+              onClick={onClose}
+            />
           </li>
           <li>
-            <MenuButton label="Calculator" Icon={Calculator} path="/calculator" onClick={onClose} />
+            <MenuButton
+              label="Calculator"
+              Icon={Calculator}
+              path="/calculator"
+              onClick={onClose}
+            />
           </li>
           <li>
-            <MenuButton label="Setting" Icon={Settings} path="/setting" onClick={onClose} />
+            <MenuButton
+              label="Setting"
+              Icon={Settings}
+              path="/setting"
+              onClick={onClose}
+            />
           </li>
         </ul>
       </nav>
-        <div className="mt-auto px-4">
-    <button
-      onClick={() => {
-        localStorage.removeItem('token')
-        localStorage.removeItem('user')
-        window.location.href = '/' // or use router.push('/')
-      }}
-      className="flex items-center w-full gap-3 px-4 py-2 text-red-600 hover:bg-red-50 rounded-md mt-6 transition"
-    >
-      <LogOut className="w-5 h-5" />
-      <span className="text-sm font-medium">Sign out</span>
-    </button>
-  </div>
+      <div className="mt-auto px-4">
+        <button
+          onClick={() => {
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+            window.location.href = "/"; // or use router.push('/')
+          }}
+          className="flex items-center w-full gap-3 px-4 py-2 text-red-600 hover:bg-red-50 rounded-md mt-6 transition"
+        >
+          <LogOut className="w-5 h-5" />
+          <span className="text-sm font-medium">Sign out</span>
+        </button>
+      </div>
     </>
   );
 }
-
