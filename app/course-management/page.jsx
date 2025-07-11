@@ -133,10 +133,10 @@ export default function CourseManagementPage() {
       return;
     }
 
-    if (formData.pages.some((page) => page.time < 0)) {
-      alert("Duration must be a positive number");
-      return;
-    }
+    // if (formData.pages.some((page) => page.time < 0)) {
+    //   alert("Duration must be a positive number");
+    //   return;
+    // }
 
     setIsSubmitting(true);
     console.log("Submitting course with user context:", userData?.email);
@@ -152,7 +152,7 @@ export default function CourseManagementPage() {
           pages: formData.pages.map((page) => ({
             title: page.title.trim(),
             content: page.content.trim(),
-            time: Number(page.time) || 0,
+            time: String(page.time) || 0,
           })),
         };
         result = await updateCourse(selectedCourse._id, editPayload);
@@ -172,7 +172,7 @@ export default function CourseManagementPage() {
           // Reset form
           setFormData({
             courseName: "",
-            pages: [{ title: "", content: "", time: 0 }],
+            pages: [{ title: "", content: "", time: "" }],
           });
         }, 2000);
       } else {
@@ -248,9 +248,9 @@ export default function CourseManagementPage() {
           ? course.pages.map((page) => ({
               title: page.title || "",
               content: page.content || "",
-              time: Number(page.time) || 0,
+              time: String(page.time) || 0,
             }))
-          : [{ title: "", content: "", time: 0 }],
+          : [{ title: "", content: "", time: "" }],
     });
     setIsEditing(true);
     setCurrentView("upload");
@@ -264,7 +264,7 @@ export default function CourseManagementPage() {
   const addPage = () => {
     setFormData({
       ...formData,
-      pages: [...formData.pages, { title: "", content: "", time: 0 }],
+      pages: [...formData.pages, { title: "", content: "", time: "" }],
     });
   };
 
@@ -280,7 +280,7 @@ export default function CourseManagementPage() {
   const updatePage = (index, field, value) => {
     const updatedPages = formData.pages.map((page, i) =>
       i === index
-        ? { ...page, [field]: field === "time" ? Number(value) || 0 : value }
+        ? { ...page, [field]: field === "time" ? String(value) || "0" : value }
         : page
     );
     setFormData({ ...formData, pages: updatedPages });
@@ -288,16 +288,35 @@ export default function CourseManagementPage() {
 
   // Calculate total duration for a course
   const getTotalDuration = (pages) => {
-    return pages.reduce((total, page) => total + (page.time || 0), 0);
+    return pages.reduce((total, page) => total + (page.time || "0"), 0);
   };
 
   // Format duration in minutes to readable format
-  const formatDuration = (minutes) => {
-    if (minutes < 60) return `${minutes}m`;
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
-  };
+  const formatDuration = (input) => {
+  let totalSeconds = 0;
+
+  // If input is in "mm:ss" format
+  if (typeof input === "string" && input.includes(":")) {
+    const [minStr, secStr] = input.split(":");
+    const minutes = parseInt(minStr, 10);
+    const seconds = parseInt(secStr, 10);
+    totalSeconds = minutes * 60 + seconds;
+  } else {
+    // If input is a number (in minutes)
+    totalSeconds = Number(input) * 60;
+  }
+
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = Math.floor(totalSeconds % 60);
+
+  let result = "";
+  if (hours > 0) result += `${hours}h `;
+  if (minutes > 0) result += `${minutes}m `;
+  if (seconds > 0) result += `${seconds}s`;
+
+  return result.trim();
+};
 
   // Generate analytics data from real courses and users
   const generateAnalyticsData = () => {
