@@ -7,8 +7,8 @@ import {
   LayoutDashboard,
   Users,
   Wallet,
-  User,
   Book,
+  LineChart,
   Trophy,
   Calculator,
   Settings,
@@ -104,9 +104,9 @@ function SidebarContent({ onClose }) {
           </li>
           <li>
             <MenuButton
-              label="User Profile"
-              Icon={User}
-              path="/user-profile"
+              label="Zero Analytics"
+              Icon={LineChart}
+              path="/zero-analytics"
               onClick={onClose}
             />
           </li>

@@ -12,8 +12,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "User Profile",
-  description: "ZeroKoin admin panel",
+  title: "Zero Analytics",
+  description: "ZeroKoin admob analytics are showing there.",
 };
 
 export default function UserProfileLayout({ children }) {
