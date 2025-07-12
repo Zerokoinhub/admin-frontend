@@ -81,7 +81,7 @@ const RewardRevenueChart = ({ users = [] }) => {
   }
 
   return (
-    <Card className="rounded-xl sm:rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-300 h-[300px] sm:h-[350px] md:h-[400px] lg:h-[42vh] min-h-[280px]">
+    <Card className="rounded-xl sm:rounded-2xl  duration-300 h-[300px] sm:h-[350px] md:h-[800px] lg:h-[51vh] min-h-[280px]">
       <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 pb-3 sm:pb-4 px-4 sm:px-6">
         <CardTitle
           className={`text-lg sm:text-xl lg:text-2xl font-bold transition-all duration-700 ease-out ${

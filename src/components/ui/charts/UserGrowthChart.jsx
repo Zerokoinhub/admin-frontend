@@ -56,7 +56,7 @@ export default function UserGrowthChart({ users = [] }) {
   // Responsive configuration
   const config = useMemo(() => ({
     chart: {
-      height: isMobile ? "280px" : isTablet ? "320px" : "400px",
+      height: isMobile ? "280px" : isTablet ? "320px" : "380px",
       margins: isMobile 
         ? { top: 10, right: 10, left: 5, bottom: 5 }
         : isTablet 
@@ -146,7 +146,7 @@ export default function UserGrowthChart({ users = [] }) {
 
   return (
     <Card 
-      className="rounded-xl sm:rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-300 min-h-[280px]"
+      className=""
       style={{ height: config.chart.height }}
     >
       <CardHeader className={config.spacing.headerPadding}>
@@ -206,10 +206,10 @@ export default function UserGrowthChart({ users = [] }) {
                   return `Period: ${label}`;
                 }}
                 contentStyle={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                  //backgroundColor: 'rgba(255, 255, 255, 0.95)',
                   border: 'none',
                   borderRadius: isMobile ? '8px' : '12px',
-                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.12)',
+                  //boxShadow: '0 4px 20px rgba(0, 0, 0, 0.12)',
                   backdropFilter: 'blur(8px)',
                   fontSize: config.text.tooltip,
                   fontWeight: '500',

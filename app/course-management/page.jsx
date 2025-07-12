@@ -113,7 +113,6 @@ export default function CourseManagementPage() {
     setIsMobileMenuOpen(false);
   };
 
-  
   const handleSubmitCourse = async () => {
     if (!isAuthenticated) {
       alert("Please log in to create courses");
@@ -293,30 +292,30 @@ export default function CourseManagementPage() {
 
   // Format duration in minutes to readable format
   const formatDuration = (input) => {
-  let totalSeconds = 0;
+    let totalSeconds = 0;
 
-  // If input is in "mm:ss" format
-  if (typeof input === "string" && input.includes(":")) {
-    const [minStr, secStr] = input.split(":");
-    const minutes = parseInt(minStr, 10);
-    const seconds = parseInt(secStr, 10);
-    totalSeconds = minutes * 60 + seconds;
-  } else {
-    // If input is a number (in minutes)
-    totalSeconds = Number(input) * 60;
-  }
+    // If input is in "mm:ss" format
+    if (typeof input === "string" && input.includes(":")) {
+      const [minStr, secStr] = input.split(":");
+      const minutes = parseInt(minStr, 10);
+      const seconds = parseInt(secStr, 10);
+      totalSeconds = minutes * 60 + seconds;
+    } else {
+      // If input is a number (in minutes)
+      totalSeconds = Number(input) * 60;
+    }
 
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = Math.floor(totalSeconds % 60);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = Math.floor(totalSeconds % 60);
 
-  let result = "";
-  if (hours > 0) result += `${hours}h `;
-  if (minutes > 0) result += `${minutes}m `;
-  if (seconds > 0) result += `${seconds}s`;
+    let result = "";
+    if (hours > 0) result += `${hours}h `;
+    if (minutes > 0) result += `${minutes}m `;
+    if (seconds > 0) result += `${seconds}s`;
 
-  return result.trim();
-};
+    return result.trim();
+  };
 
   // Generate analytics data from real courses and users
   const generateAnalyticsData = () => {
@@ -415,8 +414,7 @@ export default function CourseManagementPage() {
             : "N/A"}
         </div>
         <div>
-          By:{" "}
-          {course.uploadedBy?.username || course.uploadedBy || "Unknown"}
+          By: {course.uploadedBy?.username || course.uploadedBy || "Unknown"}
         </div>
       </div>
 
@@ -1401,7 +1399,7 @@ export default function CourseManagementPage() {
           </div>
 
           {/* Course Statistics */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-3 sm:gap-4 lg:gap-6">
             <Card className="bg-white border border-gray-200">
               <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center justify-between">
@@ -1441,7 +1439,7 @@ export default function CourseManagementPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white border border-gray-200">
+            {/* <Card className="bg-white border border-gray-200">
               <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -1460,9 +1458,9 @@ export default function CourseManagementPage() {
                   </div>
                 </div>
               </CardContent>
-            </Card>
+            </Card> */}
 
-            <Card className="bg-white border border-gray-200">
+            {/* <Card className="bg-white border border-gray-200">
               <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -1484,7 +1482,7 @@ export default function CourseManagementPage() {
                   </div>
                 </div>
               </CardContent>
-            </Card>
+            </Card> */}
           </div>
 
           {/* Course Analytics Chart */}
@@ -1512,17 +1510,18 @@ export default function CourseManagementPage() {
                 </Button>
               </div>
             ) : (
-              <Card className="bg-white border border-gray-200 max-w-2xl mx-auto">
+              <Card className="bg-white border border-gray-200 shadow-sm rounded-xl w-full max-w-4xl mx-auto">
                 <CardContent className="p-4 sm:p-6 lg:p-8">
-                  <div className="relative h-48 sm:h-60 lg:h-80">
+                  {/* Chart Section */}
+                  <div className="relative w-full h-[200px] sm:h-[300px] md:h-[350px] lg:h-[400px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
                           data={analyticsData}
                           cx="50%"
                           cy="50%"
-                          innerRadius={30}
-                          outerRadius={60}
+                          innerRadius="40%"
+                          outerRadius="70%"
                           paddingAngle={2}
                           dataKey="value"
                         >
@@ -1532,9 +1531,11 @@ export default function CourseManagementPage() {
                         </Pie>
                       </PieChart>
                     </ResponsiveContainer>
+
+                    {/* Center Text */}
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="text-center">
-                        <h3 className="text-xs sm:text-sm font-medium text-gray-600">
+                      <div className="text-center hidden md:block">
+                        <h3 className="text-xs sm:text-sm font-medium text-gray-700">
                           Course Summary
                         </h3>
                         <p className="text-xs text-gray-500 mt-1">
@@ -1544,19 +1545,19 @@ export default function CourseManagementPage() {
                     </div>
                   </div>
 
-                  {/* Legend */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 lg:gap-4 mt-4 sm:mt-6">
+                  {/* Legend Section */}
+                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 mt-6">
                     {analyticsData.map((item, index) => (
                       <div key={index} className="flex items-center space-x-2">
                         <div
-                          className="w-3 h-3 rounded-full flex-shrink-0"
+                          className="w-4 h-4  flex-shrink-0"
                           style={{ backgroundColor: item.color }}
                         ></div>
-                        <div className="text-xs min-w-0">
-                          <div className="font-medium text-gray-900 truncate">
+                        <div className="text-xs sm:text-sm min-w-0">
+                          <div className="font-medium text-gray-800 truncate">
                             {item.name}
                           </div>
-                          <div className="text-white bg-gray-800 px-1 rounded text-xs inline-block">
+                          <div className="text-white bg-gray-800 px-2 py-0.5 rounded text-[10px] inline-block">
                             {item.value}%
                           </div>
                         </div>

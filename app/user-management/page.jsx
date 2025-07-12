@@ -1990,7 +1990,7 @@ const EnhancedUserManagement = () => {
       </AnimatePresence>
 
       {/* Enhanced Stat Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
         <DashboardStatCard
           icon={Users}
           label="Total Users"
@@ -2032,7 +2032,7 @@ const EnhancedUserManagement = () => {
           ).toFixed(1)}% usage`}
           trend={stats.calculatorUsers > 0 ? "+3%" : "0%"}
         />
-        <DashboardStatCard
+        {/* <DashboardStatCard
           icon={Smartphone}
           label="Firebase Users"
           value={stats.usersWithFirebase.toString()}
@@ -2041,7 +2041,7 @@ const EnhancedUserManagement = () => {
             100
           ).toFixed(1)}% integrated`}
           trend={stats.usersWithFirebase > 0 ? "+12%" : "0%"}
-        />
+        /> */}
         <DashboardStatCard
           icon={Zap}
           label="Avg Engagement"
@@ -2383,7 +2383,7 @@ const EnhancedUserManagement = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.6 }}
             >
-              <Card className="shadow-sm hover:shadow-md transition-shadow">
+              <Card className="shadow-sm hover:shadow-md transition-shadow md:h-[410px]">
                 <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center justify-between mb-4">
                     <div>
