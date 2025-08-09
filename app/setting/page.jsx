@@ -22,6 +22,7 @@ import {
   ArrowLeft,
   Edit3,
   Trash2,
+  ExternalLink,
 } from "lucide-react"
 import Image from "next/image"
 import { userAPI, userHelpers } from "../../src/lib/api"
@@ -70,10 +71,12 @@ export default function SettingPage() {
 
   const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL
 
+  // Updated notification data state to include link field
   const [notificationData, setNotificationData] = useState({
     title: "Upcoming Zero Koin",
     description:
       "Zero Koin mining is the process of validating transactions and securing the Zero Koin blockchain by solving complex mathematical problems, typically using computing power, to earn rewards in Zero Koin.",
+    link: "", // Added link field
   })
 
   const [isUploading, setIsUploading] = useState(false)
@@ -95,7 +98,7 @@ export default function SettingPage() {
       if (user) {
         const userData = JSON.parse(user)
         setUserRole(userData.role || "")
-        console.log("her i am", userData.role)
+        //console.log("her i am", userData.role)
         // Set default tab based on role
         if (userData.role === "superadmin") {
           setActiveTab("transfer") // Super admin starts with transfer tab
@@ -135,6 +138,7 @@ export default function SettingPage() {
               title: notification.title,
               description: notification.message,
               image: notification.imageUrl,
+              link: notification.link || "", // Added link field
               timestamp: notification.createdAt,
               sentTo:
                 notification.priority === "new-user"
@@ -195,7 +199,6 @@ export default function SettingPage() {
   // Fetch users from API
   const fetchUsers = async () => {
     if (!hasTransferAccess) return
-
     try {
       setLoading(true)
       const response = await userAPI.getUsers(currentPage, 10)
@@ -247,7 +250,6 @@ export default function SettingPage() {
       setMessage({ type: "error", text: "You don't have permission to transfer coins" })
       return
     }
-
     if (!selectedUser || !transferAmount || !selectedUser.email) {
       setMessage({
         type: "error",
@@ -271,7 +273,6 @@ export default function SettingPage() {
       const admin = adminUserStr.username
 
       const response = await userAPI.editUserBalance(selectedUser.email, newBalance, admin)
-
       if (response.success) {
         setMessage({
           type: "success",
@@ -409,7 +410,7 @@ export default function SettingPage() {
       setUploadedImageFile(file)
       const imageUrl = URL.createObjectURL(file)
       setUploadedImage(imageUrl)
-      console.log("Image uploaded successfully")
+      //console.log("Image uploaded successfully")
     } catch (error) {
       console.error("Failed to upload image:", error)
       alert("Failed to upload image. Please try again.")
@@ -418,7 +419,7 @@ export default function SettingPage() {
     }
   }
 
-  // Handle notification sending - Updated to work with new backend
+  // Updated handle notification sending to include link field
   const handleSendNotification = async () => {
     if (userRole === "viewer") {
       alert("You don't have permission to send notifications.")
@@ -467,6 +468,7 @@ export default function SettingPage() {
           title: notificationData.title,
           message: notificationData.description,
           imageUrl: uploadedImage || null,
+          link: notificationData.link || null, // Include link field
           priority: priority,
           limit: 10,
         })
@@ -476,14 +478,17 @@ export default function SettingPage() {
         formData.append("title", notificationData.title)
         formData.append("message", notificationData.description)
         formData.append("priority", priority)
+        if (notificationData.link) {
+          formData.append("link", notificationData.link) // Include link field
+        }
         if (uploadedImageFile) {
           formData.append("image", uploadedImageFile)
         }
         requestBody = formData
       }
 
-      console.log("Sending notification to:", endpoint)
-      console.log("Priority:", priority)
+     // console.log("Sending notification to:", endpoint)
+      //console.log("Priority:", priority)
 
       const response = await fetch(endpoint, {
         method: "POST",
@@ -499,7 +504,7 @@ export default function SettingPage() {
       }
 
       const result = await response.json()
-      console.log("Response:", result)
+     // console.log("Response:", result)
 
       if (response.ok && result.success) {
         // Add the sent notification to the list
@@ -508,6 +513,7 @@ export default function SettingPage() {
           title: notificationData.title,
           description: notificationData.description,
           image: uploadedImage,
+          link: notificationData.link, // Include link field
           timestamp: new Date().toISOString(),
           sentTo: selectedSendTo,
           priority: priority,
@@ -534,6 +540,7 @@ export default function SettingPage() {
             title: "Upcoming Zero Koin",
             description:
               "Zero Koin mining is the process of validating transactions and securing the Zero Koin blockchain by solving complex mathematical problems, typically using computing power, to earn rewards in Zero Koin.",
+            link: "", // Reset link field
           })
         }, 3000)
       } else {
@@ -674,17 +681,17 @@ export default function SettingPage() {
     }
   }
 
-  // Enhanced notification handlers
+  // Updated notification handlers to include link field
   const handleEditNotification = (notification) => {
     if (userRole === "viewer") {
       alert("You don't have permission to edit notifications.")
       return
     }
-
     setEditingNotification(notification)
     setNotificationData({
       title: notification.title,
       description: notification.description,
+      link: notification.link || "", // Include link field
     })
     setUploadedImage(notification.image)
     setSelectedSendTo(
@@ -704,13 +711,11 @@ export default function SettingPage() {
       alert("You don't have permission to delete notifications.")
       return
     }
-
     if (confirm("Are you sure you want to delete this notification?")) {
       try {
         const response = await fetch(`${BASE_URL}/notifications/${notificationId}`, {
           method: "DELETE",
         })
-
         if (response.ok) {
           setSentNotifications((prev) => prev.filter((n) => n.id !== notificationId))
           alert("Notification deleted successfully!")
@@ -746,6 +751,7 @@ export default function SettingPage() {
       ...editingNotification,
       title: notificationData.title,
       description: notificationData.description,
+      link: notificationData.link, // Include link field
       image: uploadedImage,
       priority: priority,
       sentTo: selectedSendTo,
@@ -760,7 +766,6 @@ export default function SettingPage() {
         },
         body: JSON.stringify(updatedNotification),
       })
-
       if (response.ok) {
         setSentNotifications((prev) => prev.map((n) => (n.id === editingNotification.id ? updatedNotification : n)))
         alert("Notification updated successfully!")
@@ -769,6 +774,7 @@ export default function SettingPage() {
           title: "Upcoming Zero Koin",
           description:
             "Zero Koin mining is the process of validating transactions and securing the Zero Koin blockchain by solving complex mathematical problems, typically using computing power, to earn rewards in Zero Koin.",
+          link: "", // Reset link field
         })
         setUploadedImage(null)
         setUploadedImageFile(null)
@@ -857,7 +863,6 @@ export default function SettingPage() {
               </Button>
             </div>
           </div>
-
           {sentNotifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6">
               <div className="w-24 sm:w-32 h-24 sm:h-32 bg-teal-100 rounded-full flex items-center justify-center">
@@ -904,17 +909,23 @@ export default function SettingPage() {
                         </div>
                       </div>
                     )}
-
                     {/* Content Section */}
                     <div className="p-4 space-y-3">
                       {/* Title */}
                       <h3 className="text-lg font-semibold text-gray-900 line-clamp-2 leading-tight">
                         {notification.title}
                       </h3>
-
                       {/* Description */}
                       <p className="text-sm text-gray-600 line-clamp-3 leading-relaxed">{notification.description}</p>
-
+                      {/* Link Display */}
+                      {notification.link && (
+                        <div className="flex items-center gap-2 text-xs text-blue-600 bg-blue-50 p-2 rounded-md">
+                          <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                          <span className="truncate max-w-[200px]" title={notification.link}>
+                            {notification.link}
+                          </span>
+                        </div>
+                      )}
                       {/* Type Badge */}
                       <div className="flex items-center gap-2">
                         <span
@@ -937,7 +948,6 @@ export default function SettingPage() {
                                 : "General User"}
                         </span>
                       </div>
-
                       {/* Created Date */}
                       <p className="text-xs text-gray-500 flex items-center gap-1">
                         <span className="w-1.5 h-1.5 bg-gray-400 rounded-full"></span>
@@ -950,7 +960,6 @@ export default function SettingPage() {
                           minute: "2-digit",
                         })}
                       </p>
-
                       {/* Action Buttons */}
                       {(userRole === "superadmin" || userRole === "editor") && (
                         <div className="flex gap-2 pt-2 border-t border-gray-100">
@@ -984,7 +993,7 @@ export default function SettingPage() {
       )
     }
 
-    // Create Notification View
+    // Create Notification View with Link Field
     if (notificationView === "create") {
       return (
         <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
@@ -1096,6 +1105,22 @@ export default function SettingPage() {
                   disabled={userRole === "viewer"}
                 />
               </div>
+              {/* Link Field */}
+              <div className="space-y-2">
+                <Label htmlFor="notification-link" className="text-sm font-medium text-gray-700">
+                  Link (Optional)
+                </Label>
+                <Input
+                  id="notification-link"
+                  type="url"
+                  value={notificationData.link}
+                  onChange={(e) => setNotificationData({ ...notificationData, link: e.target.value })}
+                  className="border-gray-200"
+                  placeholder="https://example.com"
+                  disabled={userRole === "viewer"}
+                />
+                <p className="text-xs text-gray-500">Add a URL that users can visit when they tap the notification</p>
+              </div>
               {/* Send To Selection */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium text-gray-700">Send To * (Required)</Label>
@@ -1157,7 +1182,7 @@ export default function SettingPage() {
       )
     }
 
-    // Edit Notification View
+    // Edit Notification View with Link Field
     if (notificationView === "edit") {
       return (
         <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
@@ -1170,6 +1195,7 @@ export default function SettingPage() {
                   title: "Upcoming Zero Koin",
                   description:
                     "Zero Koin mining is the process of validating transactions and securing the Zero Koin blockchain by solving complex mathematical problems, typically using computing power, to earn rewards in Zero Koin.",
+                  link: "", // Reset link field
                 })
                 setUploadedImage(null)
                 setUploadedImageFile(null)
@@ -1280,6 +1306,22 @@ export default function SettingPage() {
                   disabled={userRole === "viewer"}
                 />
               </div>
+              {/* Link Field */}
+              <div className="space-y-2">
+                <Label htmlFor="notification-link" className="text-sm font-medium text-gray-700">
+                  Link (Optional)
+                </Label>
+                <Input
+                  id="notification-link"
+                  type="url"
+                  value={notificationData.link}
+                  onChange={(e) => setNotificationData({ ...notificationData, link: e.target.value })}
+                  className="border-gray-200"
+                  placeholder="https://example.com"
+                  disabled={userRole === "viewer"}
+                />
+                <p className="text-xs text-gray-500">Add a URL that users can visit when they tap the notification</p>
+              </div>
               {/* Send To Selection */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium text-gray-700">Send To * (Required)</Label>
@@ -1341,7 +1383,7 @@ export default function SettingPage() {
       )
     }
 
-    // Filter & Send Notification View
+    // Filter & Send Notification View with Link Preview
     if (notificationView === "send") {
       return (
         <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
@@ -1415,6 +1457,15 @@ export default function SettingPage() {
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-gray-900">{notificationData.title}</h3>
               <p className="text-gray-700 text-sm leading-relaxed">{notificationData.description}</p>
+              {/* Link Preview */}
+              {notificationData.link && (
+                <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 p-3 rounded-md">
+                  <ExternalLink className="h-4 w-4 flex-shrink-0" />
+                  <span className="truncate" title={notificationData.link}>
+                    {notificationData.link}
+                  </span>
+                </div>
+              )}
             </div>
             <div className="flex justify-end">
               {(userRole === "superadmin" || userRole === "editor") && (

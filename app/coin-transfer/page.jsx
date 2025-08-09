@@ -32,141 +32,11 @@ import {
   Calculator,
   TrendingUp,
   Filter,
+  ImageIcon,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
+import ViewScreenshots from "@/components/ui/ViewScreenshots"
 import { userAPI, userHelpers } from "../../src/lib/api"
-
-// Enhanced Screenshot Component
-const ViewScreenshots = ({ onBack, onApprove, selectedUser }) => {
-  const [screenshots, setScreenshots] = useState([
-    {
-      id: 1,
-      approved: false,
-      coins: 50,
-      description: "Daily task completion",
-      imageUrl: "/placeholder.svg?height=100&width=100&text=Screenshot+1",
-    },
-    {
-      id: 2,
-      approved: false,
-      coins: 75,
-      description: "Referral bonus",
-      imageUrl: "/placeholder.svg?height=100&width=100&text=Screenshot+2",
-    },
-    {
-      id: 3,
-      approved: false,
-      coins: 25,
-      description: "Survey completion",
-      imageUrl: "/placeholder.svg?height=100&width=100&text=Screenshot+3",
-    },
-  ])
-  const [loading, setLoading] = useState(false)
-
-  const toggleApproval = (id) => {
-    setScreenshots((prev) => prev.map((s) => (s.id === id ? { ...s, approved: !s.approved } : s)))
-  }
-
-  const approveAll = async () => {
-    setLoading(true)
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    const updatedScreenshots = screenshots.map((s) => ({ ...s, approved: true }))
-    setScreenshots(updatedScreenshots)
-    const totalCoins = updatedScreenshots.reduce((sum, s) => sum + s.coins, 0)
-    const approvedCount = updatedScreenshots.filter((s) => s.approved).length
-    onApprove({
-      allScreenshotsApproved: approvedCount === screenshots.length,
-      approvedCount,
-      totalCoins,
-      hasApprovedScreenshots: true,
-    })
-    setLoading(false)
-  }
-
-  const approvedCount = screenshots.filter((s) => s.approved).length
-  const totalCoins = screenshots.filter((s) => s.approved).reduce((sum, s) => sum + s.coins, 0)
-
-  return (
-    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <Button onClick={onBack} variant="outline" className="mb-4 bg-transparent">
-            <ArrowRight className="h-4 w-4 mr-2 rotate-180" />
-            Back to Transfer
-          </Button>
-          <h2 className="text-xl sm:text-2xl font-bold">Screenshots for {selectedUser?.name}</h2>
-          <p className="text-gray-600 text-sm sm:text-base">Review and approve user screenshots</p>
-        </div>
-        <div className="text-right">
-          <p className="text-sm text-gray-600">
-            Approved: {approvedCount}/{screenshots.length}
-          </p>
-          <p className="text-lg font-bold text-green-600">{totalCoins} coins</p>
-        </div>
-      </div>
-
-      <div className="grid gap-4">
-        {screenshots.map((screenshot) => (
-          <Card
-            key={screenshot.id}
-            className={`transition-all ${screenshot.approved ? "ring-2 ring-green-500 bg-green-50" : ""}`}
-          >
-            <CardContent className="p-4">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
-                    <img
-                      src={screenshot.imageUrl || "/placeholder.svg"}
-                      alt={`Screenshot ${screenshot.id}`}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm sm:text-base">{screenshot.description}</p>
-                    <p className="text-sm text-gray-600">{screenshot.coins} coins</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  {screenshot.approved && (
-                    <Badge className="bg-green-100 text-green-800">
-                      <CheckCircle className="h-3 w-3 mr-1" />
-                      Approved
-                    </Badge>
-                  )}
-                  <Button
-                    onClick={() => toggleApproval(screenshot.id)}
-                    variant={screenshot.approved ? "outline" : "default"}
-                    size="sm"
-                    className="w-full sm:w-auto"
-                  >
-                    {screenshot.approved ? "Unapprove" : "Approve"}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <div className="flex flex-col sm:flex-row justify-end gap-2">
-        <Button
-          onClick={approveAll}
-          disabled={loading || approvedCount === screenshots.length}
-          className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Processing...
-            </>
-          ) : (
-            `Approve All (${screenshots.reduce((sum, s) => sum + s.coins, 0)} coins)`
-          )}
-        </Button>
-      </div>
-    </div>
-  )
-}
 
 // Enhanced Transfer History Component
 const TransferHistory = ({ onBack, onRefresh }) => {
@@ -491,6 +361,7 @@ const UserSelector = ({ selectedUser, onUserSelect, className, onUsersRefresh })
           balance: user.balance || user.coins || 0,
           hasWallet: !!(user.walletAddresses && (user.walletAddresses.metamask || user.walletAddresses.trustWallet)),
         }))
+
         setUsers(formattedUsers)
 
         const stats = {
@@ -513,18 +384,24 @@ const UserSelector = ({ selectedUser, onUserSelect, className, onUsersRefresh })
       console.warn("API call failed, using fallback data:", apiError)
       setError("Failed to load users from API - using sample data")
 
+      // Mock users with screenshots array structure
       const mockUsers = [
         {
-          _id: "1",
-          name: "John Doe",
-          email: "john@example.com",
-          balance: 100,
+          _id: "6894b393fa0a8cb4aac53db5",
+          name: "Mr Sulam",
+          email: "yk377623@gmail.com",
+          balance: 4223,
           isActive: true,
           role: "user",
           createdAt: new Date().toISOString(),
           walletAddresses: { metamask: "0x123..." },
           calculatorUsage: 5,
-          firebaseUid: "firebase_uid_1",
+          firebaseUid: "QfnqduUOrlhEctkQvtwIIXPnbcN2",
+          screenshots: [
+            "https://res.cloudinary.com/dw2ybyiek/image/upload/v1754662341/user_scr...",
+            "https://res.cloudinary.com/dw2ybyiek/image/upload/v1754662341/user_scr...",
+            "https://res.cloudinary.com/dw2ybyiek/image/upload/v1754662343/user_scr...",
+          ],
         },
         {
           _id: "2",
@@ -537,6 +414,7 @@ const UserSelector = ({ selectedUser, onUserSelect, className, onUsersRefresh })
           walletAddresses: { trustWallet: "0x456..." },
           calculatorUsage: 12,
           firebaseUid: "firebase_uid_2",
+          screenshots: ["/placeholder.svg?height=800&width=1200", "/placeholder.svg?height=800&width=1200"],
         },
         {
           _id: "3",
@@ -548,6 +426,7 @@ const UserSelector = ({ selectedUser, onUserSelect, className, onUsersRefresh })
           createdAt: new Date().toISOString(),
           calculatorUsage: 3,
           firebaseUid: "firebase_uid_3",
+          screenshots: ["/placeholder.svg?height=800&width=1200"],
         },
       ]
 
@@ -556,8 +435,8 @@ const UserSelector = ({ selectedUser, onUserSelect, className, onUsersRefresh })
         id: user._id,
         hasWallet: !!(user.walletAddresses && (user.walletAddresses.metamask || user.walletAddresses.trustWallet)),
       }))
-      setUsers(formattedMockUsers)
 
+      setUsers(formattedMockUsers)
       if (onUsersRefresh) {
         onUsersRefresh(formattedMockUsers)
       }
@@ -694,6 +573,11 @@ const UserSelector = ({ selectedUser, onUserSelect, className, onUsersRefresh })
                           {user.coins || user.balance || 0} coins
                         </Badge>
                         {user.hasWallet && <Wallet className="h-3 w-3 text-green-500" />}
+                        {user.screenshots && user.screenshots.length > 0 && (
+                          <Badge variant="outline" className="text-xs">
+                            {user.screenshots.length} screenshots
+                          </Badge>
+                        )}
                       </div>
                     </div>
                   </SelectItem>
@@ -751,7 +635,6 @@ export default function CoinTransferPage() {
           email: userData.email || "",
           role: userRoleValue.toLowerCase(),
         })
-
         if (userRoleValue === "superadmin") {
           setActiveTab("transfer")
         } else {
@@ -1173,13 +1056,10 @@ export default function CoinTransferPage() {
                                 </p>
                               </div>
                               <div>
-                                <span className="text-gray-600">Status:</span>
-                                <Badge
-                                  className="ml-2 text-xs"
-                                  variant={selectedUser.isActive ? "default" : "secondary"}
-                                >
-                                  {selectedUser.isActive ? "Active" : "Inactive"}
-                                </Badge>
+                                <span className="text-gray-600">Screenshots:</span>
+                                <p className="font-medium text-gray-900">
+                                  {selectedUser.screenshots?.length || 0} uploaded
+                                </p>
                               </div>
                             </div>
                           </div>
@@ -1191,12 +1071,13 @@ export default function CoinTransferPage() {
                               variant="outline"
                               size="sm"
                               className="flex-1"
+                              disabled={!selectedUser.screenshots || selectedUser.screenshots.length === 0}
                             >
-                              <CheckCircle className="w-4 h-4 mr-2" />
-                              Review Screenshots
+                              <ImageIcon className="w-4 h-4 mr-2" />
+                              Review Screenshots ({selectedUser.screenshots?.length || 0})
                             </Button>
                             <Button onClick={() => setShowHistory(true)} variant="outline" size="sm" className="flex-1">
-                              <History className="w-4 h-4 mr-2" />
+                              <History className="w-4 w-4 mr-2" />
                               View History
                             </Button>
                           </div>
@@ -1353,7 +1234,7 @@ export default function CoinTransferPage() {
                             {Math.round(transferStats.averageAmount)}
                           </p>
                         </div>
-                        <AlertTriangle className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-orange-600" />
+                        <TrendingUp className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-orange-600" />
                       </div>
                     </CardContent>
                   </Card>

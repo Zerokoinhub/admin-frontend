@@ -10,6 +10,14 @@ const getAuthHeaders = () => {
   }
 }
 
+// Helper: Get auth headers for form data
+const getFormDataHeaders = () => {
+  const token = localStorage.getItem("token")
+  return {
+    ...(token && { Authorization: `Bearer ${token}` }),
+  }
+}
+
 // ========================
 // API SERVICE
 // ========================
@@ -29,7 +37,6 @@ export const userAPI = {
       if (!response.ok) throw new Error("Failed to fetch users")
       const result = await response.json()
       console.log("API Response:", result)
-
       // Handle multiple possible response structures
       let users = []
       let pagination = {
@@ -40,7 +47,6 @@ export const userAPI = {
         hasNextPage: false,
         hasPrevPage: false,
       }
-
       if (result.success && result.data) {
         if (result.data.users) {
           // Structure: { success: true, data: { users: [...], pagination: {...} } }
@@ -60,7 +66,6 @@ export const userAPI = {
         users = result
         pagination.totalItems = users.length
       }
-
       return {
         success: true,
         users: users,
@@ -119,7 +124,6 @@ export const userAPI = {
   },
 
   // ===== SESSION MANAGEMENT =====
-
   // Get user sessions
   async getUserSessions(userId) {
     try {
@@ -175,7 +179,6 @@ export const userAPI = {
   },
 
   // ===== NOTIFICATION SETTINGS =====
-
   // Update notification settings
   async updateNotificationSettings(userId, settings) {
     try {
@@ -203,8 +206,235 @@ export const userAPI = {
     }
   },
 
-  // ===== FCM TOKEN MANAGEMENT =====
+  // ===== NOTIFICATION MANAGEMENT =====
+  // Send general notification to all users
+  async sendGeneralNotification(notificationData) {
+    try {
+      const { title, message, imageUrl, link, priority = "old-user" } = notificationData
+      if (!title || !message) {
+        throw new Error("Title and message are required")
+      }
+      const response = await fetch(`${API_BASE_URL}/notifications/general`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          title,
+          message,
+          imageUrl,
+          link,
+          priority,
+        }),
+      })
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || "Failed to send general notification")
+      }
+      const result = await response.json()
+      return {
+        success: true,
+        message: result.message || "General notification sent successfully",
+        data: result.data,
+      }
+    } catch (error) {
+      console.error("Error sending general notification:", error)
+      return {
+        success: false,
+        message: error.message || "Failed to send general notification",
+      }
+    }
+  },
 
+  // Send notification to top users
+  async sendTopUsersNotification(notificationData) {
+    try {
+      const { title, message, imageUrl, link, limit = 10, priority = "top-rated-user" } = notificationData
+      if (!title || !message) {
+        throw new Error("Title and message are required")
+      }
+      const response = await fetch(`${API_BASE_URL}/notifications/top-users`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          title,
+          message,
+          imageUrl,
+          link,
+          limit,
+          priority,
+        }),
+      })
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || "Failed to send notification to top users")
+      }
+      const result = await response.json()
+      return {
+        success: true,
+        message: result.message || "Notification sent to top users successfully",
+        data: result.data,
+      }
+    } catch (error) {
+      console.error("Error sending notification to top users:", error)
+      return {
+        success: false,
+        message: error.message || "Failed to send notification to top users",
+      }
+    }
+  },
+
+  // Send notification to single user
+  async sendSingleUserNotification(notificationData) {
+    try {
+      const { title, message, imageUrl, link, firebaseUid, priority = "old-user" } = notificationData
+      if (!title || !message || !firebaseUid) {
+        throw new Error("Title, message, and firebaseUid are required")
+      }
+      const response = await fetch(`${API_BASE_URL}/notifications/single-user`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          title,
+          message,
+          imageUrl,
+          link,
+          firebaseUid,
+          priority,
+        }),
+      })
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || "Failed to send notification to user")
+      }
+      const result = await response.json()
+      return {
+        success: true,
+        message: result.message || "Notification sent to user successfully",
+        data: result.data,
+      }
+    } catch (error) {
+      console.error("Error sending notification to user:", error)
+      return {
+        success: false,
+        message: error.message || "Failed to send notification to user",
+      }
+    }
+  },
+
+  // Send general notification with image upload
+  async sendGeneralNotificationWithImage(notificationData, imageFile) {
+    try {
+      const { title, message, link, priority = "old-user" } = notificationData
+      if (!title || !message) {
+        throw new Error("Title and message are required")
+      }
+      const formData = new FormData()
+      formData.append("title", title)
+      formData.append("message", message)
+      if (link) formData.append("link", link)
+      formData.append("priority", priority)
+      if (imageFile) formData.append("image", imageFile)
+      const response = await fetch(`${API_BASE_URL}/notifications/general-with-image`, {
+        method: "POST",
+        headers: getFormDataHeaders(),
+        body: formData,
+      })
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || "Failed to send notification with image")
+      }
+      const result = await response.json()
+      return {
+        success: true,
+        message: result.message || "Notification with image sent successfully",
+        data: result.data,
+      }
+    } catch (error) {
+      console.error("Error sending notification with image:", error)
+      return {
+        success: false,
+        message: error.message || "Failed to send notification with image",
+      }
+    }
+  },
+
+  // Get paginated notifications
+  async getNotifications(filters = {}) {
+    try {
+      const { page = 1, limit = 10, type, priority } = filters
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+      })
+      if (type) params.append("type", type)
+      if (priority) params.append("priority", priority)
+      const response = await fetch(`${API_BASE_URL}/notifications?${params}`, {
+        method: "GET",
+        headers: getAuthHeaders(),
+      })
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || "Failed to fetch notifications")
+      }
+      const result = await response.json()
+      return {
+        success: true,
+        data: result.data || [],
+        notifications: result.data || [],
+        pagination: result.pagination || {
+          currentPage: page,
+          totalPages: 1,
+          totalNotifications: 0,
+          hasNext: false,
+          hasPrev: false,
+        },
+      }
+    } catch (error) {
+      console.error("Error fetching notifications:", error)
+      return {
+        success: false,
+        message: error.message || "Failed to fetch notifications",
+        data: [],
+        notifications: [],
+        pagination: {
+          currentPage: 1,
+          totalPages: 1,
+          totalNotifications: 0,
+          hasNext: false,
+          hasPrev: false,
+        },
+      }
+    }
+  },
+
+  // Get single notification by ID
+  async getNotificationById(notificationId) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/notifications/${notificationId}`, {
+        method: "GET",
+        headers: getAuthHeaders(),
+      })
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || "Failed to fetch notification")
+      }
+      const result = await response.json()
+      return {
+        success: true,
+        data: result.data,
+        notification: result.data,
+      }
+    } catch (error) {
+      console.error("Error fetching notification:", error)
+      return {
+        success: false,
+        message: error.message || "Failed to fetch notification",
+        data: null,
+        notification: null,
+      }
+    }
+  },
+
+  // ===== FCM TOKEN MANAGEMENT =====
   // Add FCM token
   async addFcmToken(userId, token) {
     try {
@@ -260,6 +490,34 @@ export const userAPI = {
   },
 
   // ===== SCREENSHOT MANAGEMENT =====
+  // Get user screenshots by user ID
+  async getUserScreenshots(userId) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/${userId}/screenshots`, {
+        method: "GET",
+        headers: getAuthHeaders(),
+      })
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || "Failed to fetch user screenshots")
+      }
+      const result = await response.json()
+      return {
+        success: true,
+        screenshots: result.screenshots || [],
+        data: result.screenshots || [],
+        message: result.message || "Screenshots fetched successfully",
+      }
+    } catch (error) {
+      console.error("Error fetching user screenshots:", error)
+      return {
+        success: false,
+        message: error.message || "Failed to fetch user screenshots",
+        screenshots: [],
+        data: [],
+      }
+    }
+  },
 
   // Add screenshot
   async addScreenshot(userId, screenshotData) {
@@ -289,7 +547,6 @@ export const userAPI = {
   },
 
   // ===== ENHANCED STATISTICS =====
-
   // Get comprehensive user statistics
   async getUserStats() {
     try {
@@ -317,7 +574,6 @@ export const userAPI = {
   },
 
   // ===== USER MANAGEMENT ACTIONS =====
-
   // Ban a user
   async banUser(userId) {
     try {
@@ -443,7 +699,6 @@ export const userAPI = {
   },
 
   // ===== TRANSFER HISTORY =====
-
   // Get Transfer History
   async getTransferHistory(filters = {}) {
     try {
@@ -454,7 +709,6 @@ export const userAPI = {
       if (filters.status) params.append("status", filters.status)
       if (filters.dateRange) params.append("dateRange", filters.dateRange)
       if (filters.userId) params.append("userId", filters.userId)
-
       const url = `${API_BASE_URL}/transfer/transferHistory?${params.toString()}`
       const response = await fetch(url, {
         method: "GET",
@@ -465,7 +719,6 @@ export const userAPI = {
         throw new Error(errorData.message || "Failed to fetch transfer history")
       }
       const result = await response.json()
-
       // Handle the exact API response structure where data is directly an array
       if (result.success && result.data) {
         return {
@@ -526,7 +779,6 @@ export const userAPI = {
   },
 
   // ===== AUTHENTICATION & PROFILE =====
-
   // Change user password
   async changePassword(oldPassword, newPassword, confirmPassword) {
     try {
@@ -620,7 +872,6 @@ export const userAPI = {
   },
 
   // ===== LEGACY STATISTICS ENDPOINTS =====
-
   // Get total referrals
   async getTotalReferrals() {
     try {
@@ -714,10 +965,8 @@ export const userHelpers = {
         totalRecentAmount: 0,
       }
     }
-
     const now = new Date()
     const recentThreshold = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) // 7 days ago
-
     const stats = {
       totalUsers: users.length,
       activeUsers: users.filter((user) => user.isActive === true).length,
@@ -744,7 +993,6 @@ export const userHelpers = {
       pendingWallets: users.filter((user) => user.walletStatus === "Pending").length,
       totalRecentAmount: users.reduce((sum, user) => sum + (user.recentAmount || 0), 0),
     }
-
     return stats
   },
 
@@ -785,10 +1033,8 @@ export const userHelpers = {
   getUserActivityStatus(user) {
     // Check if user is explicitly inactive
     if (user.isActive === false) return "inactive"
-
     // Check if user has never signed in
     if (!user.lastSignInAt && !user.updatedAt) return "new"
-
     // Use lastSignInAt or updatedAt for activity calculation
     const lastActivity = user.lastSignInAt || user.updatedAt
     if (lastActivity) {
@@ -808,18 +1054,15 @@ export const userHelpers = {
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
-
     const newUsersLast30Days = users.filter(
       (user) => user.createdAt && new Date(user.createdAt) >= thirtyDaysAgo,
     ).length
     const newUsersLast7Days = users.filter((user) => user.createdAt && new Date(user.createdAt) >= sevenDaysAgo).length
     const newUsersToday = users.filter((user) => user.createdAt && new Date(user.createdAt) >= oneDayAgo).length
-
     const activeUsersLast7Days = users.filter((user) => {
       const lastActivity = user.lastSignInAt || user.updatedAt
       return lastActivity && new Date(lastActivity) >= sevenDaysAgo
     }).length
-
     return {
       newUsersLast30Days,
       newUsersLast7Days,
@@ -887,12 +1130,10 @@ export const userHelpers = {
         progressPercentage: 0,
       }
     }
-
     const totalSessions = user.sessions.length
     const unlockedSessions = user.sessions.filter((s) => !s.isLocked).length
     const completedSessions = user.sessions.filter((s) => s.completedAt).length
     const claimedSessions = user.sessions.filter((s) => s.isClaimed).length
-
     return {
       totalSessions,
       unlockedSessions,
@@ -948,12 +1189,10 @@ export const userHelpers = {
         monthTransfers: 0,
       }
     }
-
     const now = new Date()
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
     const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-
     const stats = {
       totalTransfers: transfers.length,
       totalAmount: transfers.reduce((sum, transfer) => sum + (Number(transfer.amount) || 0), 0),
@@ -965,7 +1204,6 @@ export const userHelpers = {
       weekTransfers: transfers.filter((t) => new Date(t.createdAt || t.dateTime) >= weekAgo).length,
       monthTransfers: transfers.filter((t) => new Date(t.createdAt || t.dateTime) >= monthAgo).length,
     }
-
     stats.averageAmount = stats.totalTransfers > 0 ? stats.totalAmount / stats.totalTransfers : 0
     return stats
   },
@@ -981,20 +1219,16 @@ export const userHelpers = {
         walletStatus: user.walletStatus || "Not Connected",
       }
     }
-
     const walletTypes = []
     let primaryWallet = null
-
     if (user.walletAddresses.metamask) {
       walletTypes.push("MetaMask")
       if (!primaryWallet) primaryWallet = { type: "MetaMask", address: user.walletAddresses.metamask }
     }
-
     if (user.walletAddresses.trustWallet) {
       walletTypes.push("Trust Wallet")
       if (!primaryWallet) primaryWallet = { type: "Trust Wallet", address: user.walletAddresses.trustWallet }
     }
-
     return {
       hasWallet: walletTypes.length > 0,
       walletTypes,
@@ -1009,18 +1243,14 @@ export const userHelpers = {
   // Get user engagement score - Enhanced
   getUserEngagementScore(user) {
     let score = 0
-
     // Base score for being active
     if (user.isActive === true) score += 20
-
     // Score for having wallet
     if (this.hasWallet(user)) score += 15
-
     // Score for calculator usage
     if (user.calculatorUsage > 0) {
       score += Math.min(user.calculatorUsage * 2, 20) // Max 20 points
     }
-
     // Score for recent activity
     const activityStatus = this.getUserActivityStatus(user)
     switch (activityStatus) {
@@ -1036,27 +1266,21 @@ export const userHelpers = {
       default:
         score += 0
     }
-
     // Score for having referrals
     if (user.referredBy) score += 10
-
     // Score for balance
     if (user.balance > 0) {
       score += Math.min(Math.floor(user.balance / 100), 10) // 1 point per 100 coins, max 10
     }
-
     // Score for session progress
     const sessionProgress = this.getSessionProgress(user)
     if (sessionProgress.totalSessions > 0) {
       score += Math.floor(sessionProgress.progressPercentage / 10) // 1 point per 10% progress
     }
-
     // Score for having notifications enabled
     if (user.notificationSettings && user.notificationSettings.pushEnabled) score += 5
-
     // Score for having FCM tokens (active on mobile)
     if (user.fcmTokens && user.fcmTokens.length > 0) score += 5
-
     return Math.min(score, 100) // Cap at 100
   },
 
@@ -1066,7 +1290,6 @@ export const userHelpers = {
     const walletInfo = this.getUserWalletInfo(user)
     const engagementScore = this.getUserEngagementScore(user)
     const sessionProgress = this.getSessionProgress(user)
-
     return {
       ID: formatted.id,
       Name: formatted.name,
@@ -1106,7 +1329,6 @@ export const userHelpers = {
         tokenCount: 0,
       }
     }
-
     return {
       pushEnabled: user.notificationSettings.pushEnabled || false,
       sessionUnlocked: user.notificationSettings.sessionUnlocked || false,
@@ -1122,9 +1344,99 @@ export const userHelpers = {
       const country = user.country || "Unknown"
       countryCount[country] = (countryCount[country] || 0) + 1
     })
-
     return Object.entries(countryCount)
       .map(([country, count]) => ({ country, count }))
       .sort((a, b) => b.count - a.count)
+  },
+
+  // New helper: Format notification data for display
+  formatNotificationData(notification) {
+    if (!notification) return null
+    return {
+      id: notification._id,
+      _id: notification._id,
+      title: notification.title,
+      message: notification.message,
+      imageUrl: notification.imageUrl,
+      link: notification.link,
+      type: notification.type,
+      priority: notification.priority,
+      recipient: notification.recipient,
+      recipientName: notification.recipient?.name || "All Users",
+      recipientEmail: notification.recipient?.email || "N/A",
+      sentBy: notification.sentBy,
+      sentByName: notification.sentBy?.name || "System",
+      sentByEmail: notification.sentBy?.email || "N/A",
+      createdAt: notification.createdAt,
+      updatedAt: notification.updatedAt,
+      formattedDate: notification.createdAt ? new Date(notification.createdAt).toLocaleDateString() : "N/A",
+      formattedTime: notification.createdAt ? new Date(notification.createdAt).toLocaleTimeString() : "N/A",
+      typeLabel: this.getNotificationTypeLabel(notification.type),
+      priorityLabel: this.getNotificationPriorityLabel(notification.priority),
+    }
+  },
+
+  // New helper: Get notification type label
+  getNotificationTypeLabel(type) {
+    const typeLabels = {
+      general: "General (All Users)",
+      "top-users": "Top Users",
+      "single-user": "Single User",
+    }
+    return typeLabels[type] || type
+  },
+
+  // New helper: Get notification priority label
+  getNotificationPriorityLabel(priority) {
+    const priorityLabels = {
+      "new-user": "New User",
+      "old-user": "Old User",
+      "top-rated-user": "Top Rated User",
+    }
+    return priorityLabels[priority] || priority
+  },
+
+  // New helper: Calculate notification statistics
+  calculateNotificationStats(notifications) {
+    if (!Array.isArray(notifications)) {
+      return {
+        totalNotifications: 0,
+        generalNotifications: 0,
+        topUserNotifications: 0,
+        singleUserNotifications: 0,
+        newUserPriority: 0,
+        oldUserPriority: 0,
+        topRatedUserPriority: 0,
+        todayNotifications: 0,
+        weekNotifications: 0,
+        monthNotifications: 0,
+        notificationsWithImages: 0,
+        notificationsWithLinks: 0,
+      }
+    }
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+    return {
+      totalNotifications: notifications.length,
+      generalNotifications: notifications.filter((n) => n.type === "general").length,
+      topUserNotifications: notifications.filter((n) => n.type === "top-users").length,
+      singleUserNotifications: notifications.filter((n) => n.type === "single-user").length,
+      newUserPriority: notifications.filter((n) => n.priority === "new-user").length,
+      oldUserPriority: notifications.filter((n) => n.priority === "old-user").length,
+      topRatedUserPriority: notifications.filter((n) => n.priority === "top-rated-user").length,
+      todayNotifications: notifications.filter((n) => new Date(n.createdAt) >= today).length,
+      weekNotifications: notifications.filter((n) => new Date(n.createdAt) >= weekAgo).length,
+      monthNotifications: notifications.filter((n) => new Date(n.createdAt) >= monthAgo).length,
+      notificationsWithImages: notifications.filter((n) => n.imageUrl && n.imageUrl !== null).length,
+      notificationsWithLinks: notifications.filter((n) => n.link && n.link !== null).length,
+    }
+  },
+
+  // New helper: Format notification list for display
+  formatNotificationList(notifications) {
+    if (!Array.isArray(notifications)) return []
+    return notifications.map((notification) => this.formatNotificationData(notification))
   },
 }
