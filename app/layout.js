@@ -1,7 +1,6 @@
-// app/layout.jsx
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
-import ClientLayout from './ClientLayout'; // ✅ Client logic wrapper
+import ClientLayout from './ClientLayout';
 import SplashScreen from '@/components/ui/SplashScreen';
 
 const geistSans = Geist({
@@ -14,8 +13,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: 'Sign in | ZeroKoin',
-  description: 'Sign in into ZeroKoin admin panel',
+  title: {
+    default: 'ZeroKoin',
+    template: '%s | ZeroKoin',
+  },
+  description: 'Admin dashboard for managing the ZeroKoin platform.',
 };
 
 export default function RootLayout({ children }) {

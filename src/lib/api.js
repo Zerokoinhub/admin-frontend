@@ -1440,3 +1440,74 @@ export const userHelpers = {
     return notifications.map((notification) => this.formatNotificationData(notification))
   },
 }
+
+
+
+// ========================
+// WITHDRAWAL API SERVICE
+// ========================
+export const withdrawalAPI = {
+  async getWithdrawalRequests(filters = {}) {
+    const params = new URLSearchParams({
+      page: filters.page || 1,
+      limit: filters.limit || 20,
+      status: filters.status || 'all',
+      search: filters.search || '',
+    }).toString();
+    try {
+      const response = await fetch(`${API_BASE_URL}/withdrawals?${params}`, {
+        method: "GET",
+        headers: getAuthHeaders(),
+      });
+      if (!response.ok) throw new Error("Failed to fetch withdrawal requests");
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error("Error fetching withdrawal requests:", error);
+      throw error;
+    }
+  },
+
+  async updateWithdrawalStatus(id, status) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/withdrawals/${id}/status`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ status }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to update status");
+      }
+      return await response.json();
+    } catch (error) {
+      console.error("Error updating withdrawal status:", error);
+      throw error;
+    }
+  },
+};
+
+
+// ========================
+// WITHDRAWAL HELPER FUNCTIONS
+// ========================
+export const withdrawalHelpers = {
+  formatWithdrawalData(withdrawal) {
+    if (!withdrawal) return null;
+    return {
+      ...withdrawal,
+      id: withdrawal._id,
+      userName: withdrawal.user?.name || "N/A",
+      userEmail: withdrawal.user?.email || "N/A",
+      date: new Date(withdrawal.createdAt).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      }),
+      time: new Date(withdrawal.createdAt).toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    };
+  },
+};

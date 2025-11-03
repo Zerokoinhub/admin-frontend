@@ -12,7 +12,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "Sign In | ZeroKoin",
+  title: "Sign In",
   description: "ZeroKoin Course Managment Facility",
 };
 

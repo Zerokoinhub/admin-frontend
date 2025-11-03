@@ -12,6 +12,7 @@ import {
   Trophy,
   Calculator,
   Settings,
+  ArrowRightLeft, // <<< NEW ICON IMPORTED HERE
 } from "lucide-react";
 import MenuButton from "./MenuButton";
 
@@ -38,7 +39,7 @@ export default function Sidebar({ isOpen, onClose }) {
             exit={{ x: "-100%" }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
           >
-            <SidebarContent />
+            <SidebarContent onClose={onClose} />
           </motion.div>
         </>
       )}
@@ -67,7 +68,7 @@ function SidebarContent({ onClose }) {
           className="text-[1.5rem] sm:text-[1.5rem] font-semibold pt-2 text-cyan-700"
           style={{
             fontFamily: "Roboto, sans-serif",
-            lineHeight: "35px", // perfectly matches logo height
+            lineHeight: "35px",
           }}
         >
           ZERO KOIN
@@ -102,6 +103,16 @@ function SidebarContent({ onClose }) {
               onClick={onClose}
             />
           </li>
+          {/* // <<< NEW MENU ITEM ADDED HERE */}
+          <li>
+            <MenuButton
+              label="Withdrawals"
+              Icon={ArrowRightLeft}
+              path="/withdrawals"
+              onClick={onClose}
+            />
+          </li>
+          {/* // END OF NEW ITEM */}
           <li>
             <MenuButton
               label="Zero Analytics"
@@ -149,7 +160,7 @@ function SidebarContent({ onClose }) {
           onClick={() => {
             localStorage.removeItem("token");
             localStorage.removeItem("user");
-            window.location.href = "/"; // or use router.push('/')
+            window.location.href = "/";
           }}
           className="flex items-center w-full gap-3 px-4 py-2 text-red-600 hover:bg-red-50 rounded-md mt-6 transition"
         >

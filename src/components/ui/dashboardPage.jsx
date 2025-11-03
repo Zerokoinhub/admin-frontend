@@ -27,8 +27,10 @@ import {
   Smartphone,
   Clock,
   Zap,
+  CheckCircle,
 } from "lucide-react";
-import { userAPI, userHelpers } from "../../../src/lib/api";
+
+import { userAPI, userHelpers, withdrawalAPI } from "../../../src/lib/api";
 
 export default function DashboardPage() {
   const [dashboardStats, setDashboardStats] = useState({
@@ -45,6 +47,7 @@ export default function DashboardPage() {
     usersWithFirebase: 0,
     usersWithSessions: 0,
     recentlyUpdated: 0,
+    totalCompletedWithdrawals: 0,
     growthMetrics: {
       newUsersLast30Days: 0,
       newUsersLast7Days: 0,
@@ -72,7 +75,6 @@ export default function DashboardPage() {
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
 
-  // Get user data from localStorage
   const getUserData = () => {
     if (typeof window !== "undefined") {
       try {
@@ -98,7 +100,6 @@ export default function DashboardPage() {
     };
   };
 
-  // Get role display name
   const getRoleDisplayName = (role) => {
     switch (role) {
       case "superadmin":
@@ -114,7 +115,6 @@ export default function DashboardPage() {
     }
   };
 
-  // Get role color scheme
   const getRoleColorScheme = (role) => {
     switch (role) {
       case "superadmin":
@@ -145,17 +145,14 @@ export default function DashboardPage() {
     }
   };
 
-  // Check if user has permission to view revenue data
   const canViewRevenue = (role) => {
     return role === "superadmin" || role === "admin";
   };
 
-  // Check if user has permission to view sensitive data
   const canViewSensitiveData = (role) => {
     return role === "superadmin" || role === "admin";
   };
 
-  // Get permissions description
   const getPermissionsDescription = (role) => {
     switch (role) {
       case "superadmin":
@@ -170,12 +167,10 @@ export default function DashboardPage() {
     }
   };
 
-  // Format number with commas
   const formatNumber = (num) => {
     return new Intl.NumberFormat().format(num);
   };
 
-  // Format currency
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -185,12 +180,10 @@ export default function DashboardPage() {
     }).format(amount);
   };
 
-  // Format percentage
   const formatPercentage = (num) => {
     return `${num >= 0 ? "+" : ""}${num.toFixed(1)}%`;
   };
 
-  // Calculate engagement metrics
   const calculateEngagementMetrics = (users) => {
     if (!Array.isArray(users) || users.length === 0) {
       return {
@@ -215,7 +208,6 @@ export default function DashboardPage() {
     };
   };
 
-  // Load dashboard data
   const loadDashboardData = useCallback(async (isRefresh = false) => {
     try {
       if (isRefresh) {
@@ -225,10 +217,11 @@ export default function DashboardPage() {
       }
       setError(null);
 
-      // Fetch all users with pagination to get comprehensive data
-      const usersResponse = await userAPI.getUsers(1, 1000);
+      const [usersResponse, withdrawalsResponse] = await Promise.all([
+        userAPI.getUsers(1, 1000),
+        withdrawalAPI.getWithdrawalRequests({ limit: 5000, status: 'all' })
+      ]);
 
-      // Handle the updated API response structure
       let usersData = [];
       if (
         usersResponse.success &&
@@ -237,20 +230,24 @@ export default function DashboardPage() {
       ) {
         usersData = usersResponse.data.users;
       } else if (usersResponse.users) {
-        // Fallback for different response structures
         usersData = usersResponse.users;
       } else if (Array.isArray(usersResponse.data)) {
         usersData = usersResponse.data;
       }
 
+      let completedWithdrawalsCount = 0;
+      if (withdrawalsResponse && withdrawalsResponse.success) {
+        completedWithdrawalsCount = withdrawalsResponse.data.filter(
+          (req) => req.status === "completed"
+        ).length;
+      }
+
       console.log("Users data loaded:", usersData.length, "users");
 
-      // Calculate comprehensive stats using updated helpers
       const stats = userHelpers.calculateStats(usersData);
       const growthMetrics = userHelpers.calculateGrowthMetrics(usersData);
       const engagementMetrics = calculateEngagementMetrics(usersData);
 
-      // Try to get additional data from specific endpoints
       let calculatorUsersCount = stats.calculatorUsers;
       let totalWalletsCount = stats.usersWithWallets;
       let totalReferralsCount = stats.totalReferrals;
@@ -289,7 +286,6 @@ export default function DashboardPage() {
         );
       }
 
-      // Update dashboard stats with all the new metrics
       setDashboardStats({
         totalUsers: stats.totalUsers,
         activeUsers: stats.activeUsers,
@@ -304,6 +300,7 @@ export default function DashboardPage() {
         usersWithFirebase: stats.usersWithFirebase,
         usersWithSessions: stats.usersWithSessions,
         recentlyUpdated: stats.recentlyUpdated,
+        totalCompletedWithdrawals: completedWithdrawalsCount,
         growthMetrics,
         engagementMetrics,
       });
@@ -319,12 +316,10 @@ export default function DashboardPage() {
     }
   }, []);
 
-  // Refresh dashboard data
   const handleRefresh = () => {
     loadDashboardData(true);
   };
 
-  // Initialize dashboard
   useEffect(() => {
     const userData = getUserData();
     setUserName(userData.username);
@@ -336,7 +331,6 @@ export default function DashboardPage() {
 
   const colorScheme = getRoleColorScheme(userRole);
 
-  // Enhanced stats configuration with new metrics
   const stats = [
     {
       label: "Total Users",
@@ -361,14 +355,13 @@ export default function DashboardPage() {
       color: "from-green-500 to-green-600",
       bgColor: "bg-green-50",
       textColor: "text-green-600",
-      change: `${
-        dashboardStats.totalUsers > 0
-          ? (
-              (dashboardStats.activeUsers / dashboardStats.totalUsers) *
-              100
-            ).toFixed(1)
-          : 0
-      }%`,
+      change: `${dashboardStats.totalUsers > 0
+        ? (
+          (dashboardStats.activeUsers / dashboardStats.totalUsers) *
+          100
+        ).toFixed(1)
+        : 0
+        }%`,
       changeType: "neutral",
       description: "Currently active users",
     },
@@ -380,14 +373,13 @@ export default function DashboardPage() {
       color: "from-emerald-500 to-emerald-600",
       bgColor: "bg-emerald-50",
       textColor: "text-emerald-600",
-      change: `${
-        dashboardStats.totalUsers > 0
-          ? (
-              (dashboardStats.usersWithWallets / dashboardStats.totalUsers) *
-              100
-            ).toFixed(1)
-          : 0
-      }%`,
+      change: `${dashboardStats.totalUsers > 0
+        ? (
+          (dashboardStats.usersWithWallets / dashboardStats.totalUsers) *
+          100
+        ).toFixed(1)
+        : 0
+        }%`,
       changeType: "neutral",
       description: "Users with connected wallets",
     },
@@ -399,14 +391,13 @@ export default function DashboardPage() {
       color: "from-purple-500 to-purple-600",
       bgColor: "bg-purple-50",
       textColor: "text-purple-600",
-      change: `${
-        dashboardStats.totalUsers > 0
-          ? (
-              (dashboardStats.totalReferrals / dashboardStats.totalUsers) *
-              100
-            ).toFixed(1)
-          : 0
-      }%`,
+      change: `${dashboardStats.totalUsers > 0
+        ? (
+          (dashboardStats.totalReferrals / dashboardStats.totalUsers) *
+          100
+        ).toFixed(1)
+        : 0
+        }%`,
       changeType: "neutral",
       description: "Users referred by others",
     },
@@ -418,41 +409,16 @@ export default function DashboardPage() {
       color: "from-orange-500 to-orange-600",
       bgColor: "bg-orange-50",
       textColor: "text-orange-600",
-      change: `${
-        dashboardStats.totalUsers > 0
-          ? (
-              (dashboardStats.calculatorUsers / dashboardStats.totalUsers) *
-              100
-            ).toFixed(1)
-          : 0
-      }%`,
+      change: `${dashboardStats.totalUsers > 0
+        ? (
+          (dashboardStats.calculatorUsers / dashboardStats.totalUsers) *
+          100
+        ).toFixed(1)
+        : 0
+        }%`,
       changeType: "neutral",
       description: "Users who used calculator",
     },
-    // {
-    //   label: "Firebase Users",
-    //   value: dashboardStats.usersWithFirebase,
-    //   icon: <Smartphone className="h-4 w-4 sm:h-5 sm:w-5" />,
-    //   allowedRoles: ["superadmin", "admin", "editor"],
-    //   color: "from-cyan-500 to-cyan-600",
-    //   bgColor: "bg-cyan-50",
-    //   textColor: "text-cyan-600",
-    //   change: `${dashboardStats.totalUsers > 0 ? ((dashboardStats.usersWithFirebase / dashboardStats.totalUsers) * 100).toFixed(1) : 0}%`,
-    //   changeType: "neutral",
-    //   description: "Users with Firebase authentication",
-    // },
-    // {
-    //   label: "Admin Users",
-    //   value: dashboardStats.adminUsers,
-    //   icon: <Crown className="h-4 w-4 sm:h-5 sm:w-5" />,
-    //   allowedRoles: ["superadmin", "admin"],
-    //   color: "from-indigo-500 to-indigo-600",
-    //   bgColor: "bg-indigo-50",
-    //   textColor: "text-indigo-600",
-    //   change: `${dashboardStats.totalUsers > 0 ? ((dashboardStats.adminUsers / dashboardStats.totalUsers) * 100).toFixed(1) : 0}%`,
-    //   changeType: "neutral",
-    //   description: "Administrative users",
-    // },
     {
       label: "Inactive Users",
       value: dashboardStats.inactiveUsers,
@@ -461,14 +427,13 @@ export default function DashboardPage() {
       color: "from-red-500 to-red-600",
       bgColor: "bg-red-50",
       textColor: "text-red-600",
-      change: `${
-        dashboardStats.totalUsers > 0
-          ? (
-              (dashboardStats.inactiveUsers / dashboardStats.totalUsers) *
-              100
-            ).toFixed(1)
-          : 0
-      }%`,
+      change: `${dashboardStats.totalUsers > 0
+        ? (
+          (dashboardStats.inactiveUsers / dashboardStats.totalUsers) *
+          100
+        ).toFixed(1)
+        : 0
+        }%`,
       changeType:
         dashboardStats.inactiveUsers > dashboardStats.activeUsers * 0.1
           ? "negative"
@@ -500,34 +465,20 @@ export default function DashboardPage() {
       changeType: "positive",
       description: "Total coins distributed",
     },
-    // {
-    //   label: "Avg Engagement",
-    //   value: dashboardStats.engagementMetrics.averageEngagementScore,
-    //   icon: <Zap className="h-4 w-4 sm:h-5 sm:w-5" />,
-    //   allowedRoles: ["superadmin", "admin", "editor"],
-    //   color: "from-pink-500 to-pink-600",
-    //   bgColor: "bg-pink-50",
-    //   textColor: "text-pink-600",
-    //   change: `${dashboardStats.engagementMetrics.highEngagementUsers} high`,
-    //   changeType: "neutral",
-    //   description: "Average user engagement score",
-    //   suffix: "/100",
-    // },
-    // {
-    //   label: "Recent Updates",
-    //   value: dashboardStats.recentlyUpdated,
-    //   icon: <Clock className="h-4 w-4 sm:h-5 sm:w-5" />,
-    //   allowedRoles: ["superadmin", "admin", "editor"],
-    //   color: "from-violet-500 to-violet-600",
-    //   bgColor: "bg-violet-50",
-    //   textColor: "text-violet-600",
-    //   change: "Last 7 days",
-    //   changeType: "neutral",
-    //   description: "Recently updated users",
-    // },
+    {
+      label: "Completed Withdrawals",
+      value: dashboardStats.totalCompletedWithdrawals,
+      icon: <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />,
+      allowedRoles: ["superadmin", "admin", "editor", "viewer"],
+      color: "from-sky-500 to-sky-600",
+      bgColor: "bg-sky-50",
+      textColor: "text-sky-600",
+      change: "All time",
+      changeType: "neutral",
+      description: "Total successful withdrawals",
+    },
   ];
 
-  // Filter stats based on user role
   const filteredStats = stats.filter((stat) => {
     return stat.allowedRoles.includes(userRole);
   });
@@ -567,7 +518,6 @@ export default function DashboardPage() {
     );
   }
 
-  // Show error state if no user data
   if (!userName || !userRole) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
@@ -595,11 +545,9 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
-      {/* Enhanced Header Section */}
       <div className={`${colorScheme.bg} border-b border-gray-200/50`}>
         <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6">
           <div className="flex flex-col space-y-4">
-            {/* Main Header */}
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
               <div className="space-y-2 flex-1 min-w-0">
                 <div className="flex items-center gap-2 sm:gap-3">
@@ -625,7 +573,6 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 sm:flex-shrink-0">
                 <Button
                   onClick={handleRefresh}
@@ -635,9 +582,8 @@ export default function DashboardPage() {
                   className="w-full sm:w-auto text-xs sm:text-sm bg-transparent"
                 >
                   <RefreshCw
-                    className={`h-3 w-3 sm:h-4 sm:w-4 mr-2 ${
-                      isRefreshing ? "animate-spin" : ""
-                    }`}
+                    className={`h-3 w-3 sm:h-4 sm:w-4 mr-2 ${isRefreshing ? "animate-spin" : ""
+                      }`}
                   />
                   {isRefreshing ? "Refreshing..." : "Refresh"}
                 </Button>
@@ -658,7 +604,6 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Enhanced Growth Metrics Summary */}
             <div className="overflow-x-auto -mx-3 sm:mx-0">
               <div
                 className="flex sm:grid sm:grid-cols-3 md:grid-cols-6 gap-3 sm:gap-4 px-3 sm:px-0 pb-2 sm:pb-0"
@@ -719,7 +664,6 @@ export default function DashboardPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
-        {/* Revenue Access Notice */}
         {!canViewRevenue(userRole) && (
           <Alert className="mb-6 sm:mb-8 border-amber-200 bg-amber-50">
             <EyeOff className="h-4 w-4 text-amber-600" />
@@ -731,7 +675,6 @@ export default function DashboardPage() {
           </Alert>
         )}
 
-        {/* Enhanced Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
           {filteredStats.map((item, index) => (
             <Card
@@ -766,13 +709,12 @@ export default function DashboardPage() {
                         : formatNumber(item.value) + (item.suffix || "")}
                     </p>
                     <div
-                      className={`flex items-center gap-1 text-xs font-medium ${
-                        item.changeType === "positive"
-                          ? "text-green-600"
-                          : item.changeType === "negative"
+                      className={`flex items-center gap-1 text-xs font-medium ${item.changeType === "positive"
+                        ? "text-green-600"
+                        : item.changeType === "negative"
                           ? "text-red-600"
                           : "text-gray-500"
-                      }`}
+                        }`}
                     >
                       {item.changeType === "positive" && (
                         <TrendingUp className="h-3 w-3" />
@@ -794,7 +736,6 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* Enhanced Engagement Metrics */}
         {canViewSensitiveData(userRole) && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
             <Card className="border-0 shadow-sm">
@@ -876,9 +817,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Enhanced Charts Section */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 sm:gap-8">
-          {/* User Growth Chart */}
           <Card className="border-0 shadow-sm">
             <CardHeader className="pb-3 sm:pb-4">
               <div className="flex items-center justify-between">
@@ -902,7 +841,6 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Revenue Chart or Placeholder */}
           {canViewRevenue(userRole) ? (
             <Card className="border rounded-2xl shadow-sm w-full">
               <CardHeader className="pb-3 sm:pb-4">
@@ -962,7 +900,6 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Enhanced Footer */}
         <div className="mt-8 sm:mt-12 pt-6 sm:pt-8 border-t border-gray-200">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 text-center sm:text-left">
@@ -978,9 +915,8 @@ export default function DashboardPage() {
                 className="text-xs sm:text-sm"
               >
                 <RefreshCw
-                  className={`h-3 w-3 mr-1 ${
-                    isRefreshing ? "animate-spin" : ""
-                  }`}
+                  className={`h-3 w-3 mr-1 ${isRefreshing ? "animate-spin" : ""
+                    }`}
                 />
                 Refresh
               </Button>
