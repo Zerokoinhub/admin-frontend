@@ -43,9 +43,22 @@ export default function CourseManagementPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [currentLanguage, setCurrentLanguage] = useState("en");
+  const [availableLanguages] = useState([
+    { code: "en", name: "English" },
+    { code: "es", name: "Español" },
+    { code: "fr", name: "Français" },
+    { code: "de", name: "Deutsch" },
+    { code: "zh", name: "中文" },
+    { code: "ar", name: "العربية" },
+  ]);
   const [formData, setFormData] = useState({
-    courseName: "",
-    pages: [{ title: "", content: "", time: "" }],
+    languages: {
+      en: {
+        courseName: "",
+        pages: [{ title: "", content: "", time: "" }],
+      },
+    },
   });
 
   // Fetch courses and users data
@@ -104,9 +117,14 @@ export default function CourseManagementPage() {
       userRole
     );
     setCurrentView("upload");
+    setCurrentLanguage("en");
     setFormData({
-      courseName: "",
-      pages: [{ title: "", content: "", time: "" }],
+      languages: {
+        en: {
+          courseName: "",
+          pages: [{ title: "", content: "", time: "" }],
+        },
+      },
     });
     setIsEditing(false);
     setSelectedCourse(null);
@@ -119,23 +137,19 @@ export default function CourseManagementPage() {
       return;
     }
 
-    // Validate form data
-    if (!formData.courseName.trim()) {
-      alert("Please enter a course name");
+    // Validate form data - at least English should be filled
+    const englishData = formData.languages.en;
+    if (!englishData || !englishData.courseName.trim()) {
+      alert("Please enter a course name in English");
       return;
     }
 
     if (
-      formData.pages.some((page) => !page.title.trim() || !page.content.trim())
+      englishData.pages.some((page) => !page.title.trim() || !page.content.trim())
     ) {
-      alert("Please fill in all page titles and content");
+      alert("Please fill in all page titles and content in English");
       return;
     }
-
-    // if (formData.pages.some((page) => page.time < 0)) {
-    //   alert("Duration must be a positive number");
-    //   return;
-    // }
 
     setIsSubmitting(true);
     console.log("Submitting course with user context:", userData?.email);
@@ -147,17 +161,46 @@ export default function CourseManagementPage() {
         console.log("Updating existing course:", selectedCourse._id);
         // Create a clean payload for editing
         const editPayload = {
-          courseName: formData.courseName.trim(),
-          pages: formData.pages.map((page) => ({
-            title: page.title.trim(),
-            content: page.content.trim(),
-            time: String(page.time) || 0,
-          })),
+          languages: Object.entries(formData.languages).reduce(
+            (acc, [langCode, langData]) => {
+              if (langData && langData.courseName.trim()) {
+                acc[langCode] = {
+                  courseName: langData.courseName.trim(),
+                  pages: langData.pages.map((page) => ({
+                    title: page.title.trim(),
+                    content: page.content.trim(),
+                    time: String(page.time) || 0,
+                  })),
+                };
+              }
+              return acc;
+            },
+            {}
+          ),
         };
         result = await updateCourse(selectedCourse._id, editPayload);
       } else {
         console.log("Creating new course");
-        result = await createCourse(formData);
+        // Create payload with languages
+        const coursePayload = {
+          languages: Object.entries(formData.languages).reduce(
+            (acc, [langCode, langData]) => {
+              if (langData && langData.courseName.trim()) {
+                acc[langCode] = {
+                  courseName: langData.courseName.trim(),
+                  pages: langData.pages.map((page) => ({
+                    title: page.title.trim(),
+                    content: page.content.trim(),
+                    time: String(page.time) || 0,
+                  })),
+                };
+              }
+              return acc;
+            },
+            {}
+          ),
+        };
+        result = await createCourse(coursePayload);
       }
 
       if (result.success) {
@@ -169,9 +212,14 @@ export default function CourseManagementPage() {
           setSelectedCourse(null);
           setIsEditing(false);
           // Reset form
+          setCurrentLanguage("en");
           setFormData({
-            courseName: "",
-            pages: [{ title: "", content: "", time: "" }],
+            languages: {
+              en: {
+                courseName: "",
+                pages: [{ title: "", content: "", time: "" }],
+              },
+            },
           });
         }, 2000);
       } else {
@@ -234,23 +282,51 @@ export default function CourseManagementPage() {
 
     console.log(
       "Editing course:",
-      course.courseName,
+      course.courseName || course.languages?.en?.courseName,
       "by user:",
       userData?.email
     );
     setSelectedCourse(course);
-    // Properly set form data for editing
-    setFormData({
-      courseName: course.courseName || "",
-      pages:
-        course.pages && course.pages.length > 0
-          ? course.pages.map((page) => ({
-              title: page.title || "",
-              content: page.content || "",
-              time: String(page.time) || 0,
-            }))
-          : [{ title: "", content: "", time: "" }],
-    });
+
+    // Handle both old format (courseName) and new format (languages)
+    let languagesData = {};
+    if (course.languages && typeof course.languages === "object") {
+      languagesData = Object.entries(course.languages).reduce(
+        (acc, [langCode, langData]) => {
+          acc[langCode] = {
+            courseName: langData.courseName || "",
+            pages:
+              langData.pages && langData.pages.length > 0
+                ? langData.pages.map((page) => ({
+                    title: page.title || "",
+                    content: page.content || "",
+                    time: String(page.time) || 0,
+                  }))
+                : [{ title: "", content: "", time: "" }],
+          };
+          return acc;
+        },
+        {}
+      );
+    } else {
+      // Fallback for old format
+      languagesData = {
+        en: {
+          courseName: course.courseName || "",
+          pages:
+            course.pages && course.pages.length > 0
+              ? course.pages.map((page) => ({
+                  title: page.title || "",
+                  content: page.content || "",
+                  time: String(page.time) || 0,
+                }))
+              : [{ title: "", content: "", time: "" }],
+        },
+      };
+    }
+
+    setFormData({ languages: languagesData });
+    setCurrentLanguage("en");
     setIsEditing(true);
     setCurrentView("upload");
   };
@@ -261,33 +337,96 @@ export default function CourseManagementPage() {
   };
 
   const addPage = () => {
+    const currentLangData = formData.languages[currentLanguage];
+    if (!currentLangData) return;
+
     setFormData({
       ...formData,
-      pages: [...formData.pages, { title: "", content: "", time: "" }],
+      languages: {
+        ...formData.languages,
+        [currentLanguage]: {
+          ...currentLangData,
+          pages: [...currentLangData.pages, { title: "", content: "", time: "" }],
+        },
+      },
     });
   };
 
   const removePage = (index) => {
-    if (formData.pages.length > 1) {
-      setFormData({
-        ...formData,
-        pages: formData.pages.filter((_, i) => i !== index),
-      });
-    }
+    const currentLangData = formData.languages[currentLanguage];
+    if (!currentLangData || currentLangData.pages.length <= 1) return;
+
+    setFormData({
+      ...formData,
+      languages: {
+        ...formData.languages,
+        [currentLanguage]: {
+          ...currentLangData,
+          pages: currentLangData.pages.filter((_, i) => i !== index),
+        },
+      },
+    });
   };
 
   const updatePage = (index, field, value) => {
-    const updatedPages = formData.pages.map((page, i) =>
+    const currentLangData = formData.languages[currentLanguage];
+    if (!currentLangData) return;
+
+    const updatedPages = currentLangData.pages.map((page, i) =>
       i === index
         ? { ...page, [field]: field === "time" ? String(value) || "0" : value }
         : page
     );
-    setFormData({ ...formData, pages: updatedPages });
+    setFormData({
+      ...formData,
+      languages: {
+        ...formData.languages,
+        [currentLanguage]: {
+          ...currentLangData,
+          pages: updatedPages,
+        },
+      },
+    });
   };
 
-  // Calculate total duration for a course
+  const updateCourseName = (value) => {
+    const currentLangData = formData.languages[currentLanguage];
+    if (!currentLangData) return;
+
+    setFormData({
+      ...formData,
+      languages: {
+        ...formData.languages,
+        [currentLanguage]: {
+          ...currentLangData,
+          courseName: value,
+        },
+      },
+    });
+  };
+
+  const ensureLanguageExists = (langCode) => {
+    if (!formData.languages[langCode]) {
+      setFormData({
+        ...formData,
+        languages: {
+          ...formData.languages,
+          [langCode]: {
+            courseName: "",
+            pages: [{ title: "", content: "", time: "" }],
+          },
+        },
+      });
+    }
+  };
+
+  // Calculate total duration for a course (using current language data)
   const getTotalDuration = (pages) => {
-    return pages.reduce((total, page) => total + (page.time || "0"), 0);
+    if (!Array.isArray(pages)) return 0;
+    return pages.reduce((total, page) => {
+      const timeVal = typeof page.time === "string" ? parseInt(page.time) : page.time;
+      return total + (isNaN(timeVal) ? 0 : timeVal);
+    }, 0);
   };
 
   // Format duration in minutes to readable format
@@ -378,74 +517,80 @@ export default function CourseManagementPage() {
   const analyticsData = generateAnalyticsData();
 
   // Mobile Course Card Component
-  const CourseCard = ({ course }) => (
-    <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 shadow-sm">
-      <div className="flex justify-between items-start mb-3">
-        <h3 className="font-semibold text-gray-900 text-sm leading-tight pr-2">
-          {course.courseName}
-        </h3>
-        <Badge
-          className={
-            course.isActive !== false
-              ? "bg-green-100 text-green-800 hover:bg-green-100 border-0 text-xs flex-shrink-0"
-              : "bg-red-100 text-red-800 hover:bg-red-100 border-0 text-xs flex-shrink-0"
-          }
-        >
-          {course.isActive !== false ? "Active" : "Inactive"}
-        </Badge>
-      </div>
+  const CourseCard = ({ course }) => {
+    // Handle both old format (courseName) and new format (languages)
+    const displayName = course.languages?.en?.courseName || course.courseName || "";
+    const displayPages = course.languages?.en?.pages || course.pages || [];
 
-      <div className="grid grid-cols-2 gap-3 mb-3 text-xs text-gray-600">
-        <div className="flex items-center gap-1">
-          <FileText className="h-3 w-3 flex-shrink-0" />
-          <span>{course.pages?.length || 0} pages</span>
+    return (
+      <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 shadow-sm">
+        <div className="flex justify-between items-start mb-3">
+          <h3 className="font-semibold text-gray-900 text-sm leading-tight pr-2">
+            {displayName}
+          </h3>
+          <Badge
+            className={
+              course.isActive !== false
+                ? "bg-green-100 text-green-800 hover:bg-green-100 border-0 text-xs flex-shrink-0"
+                : "bg-red-100 text-red-800 hover:bg-red-100 border-0 text-xs flex-shrink-0"
+            }
+          >
+            {course.isActive !== false ? "Active" : "Inactive"}
+          </Badge>
         </div>
-        <div className="flex items-center gap-1">
-          <Clock className="h-3 w-3 flex-shrink-0" />
-          <span>{formatDuration(getTotalDuration(course.pages || []))}</span>
-        </div>
-      </div>
 
-      <div className="text-xs text-gray-500 mb-3 space-y-1">
-        <div>
-          Created:{" "}
-          {course.createdAt
-            ? new Date(course.createdAt).toLocaleDateString()
-            : "N/A"}
+        <div className="grid grid-cols-2 gap-3 mb-3 text-xs text-gray-600">
+          <div className="flex items-center gap-1">
+            <FileText className="h-3 w-3 flex-shrink-0" />
+            <span>{displayPages.length} pages</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Clock className="h-3 w-3 flex-shrink-0" />
+            <span>{formatDuration(getTotalDuration(displayPages))}</span>
+          </div>
         </div>
-        <div>
-          By: {course.uploadedBy?.username || course.uploadedBy || "Unknown"}
-        </div>
-      </div>
 
-      {(hasPermission("edit") || hasPermission("delete")) && (
-        <div className="flex gap-2 pt-3 border-t border-gray-100">
-          {hasPermission("edit") && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleEditCourse(course)}
-              className="flex-1 text-blue-600 border-blue-200 hover:bg-blue-50 text-xs h-8"
-            >
-              <Edit className="h-3 w-3 mr-1" />
-              Edit
-            </Button>
-          )}
-          {hasPermission("delete") && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleDeleteCourse(course._id)}
-              className="flex-1 text-red-600 border-red-200 hover:bg-red-50 text-xs h-8"
-            >
-              <Trash2 className="h-3 w-3 mr-1" />
-              Delete
-            </Button>
-          )}
+        <div className="text-xs text-gray-500 mb-3 space-y-1">
+          <div>
+            Created:{" "}
+            {course.createdAt
+              ? new Date(course.createdAt).toLocaleDateString()
+              : "N/A"}
+          </div>
+          <div>
+            By: {course.uploadedBy?.username || course.uploadedBy || "Unknown"}
+          </div>
         </div>
-      )}
-    </div>
-  );
+
+        {(hasPermission("edit") || hasPermission("delete")) && (
+          <div className="flex gap-2 pt-3 border-t border-gray-100">
+            {hasPermission("edit") && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleEditCourse(course)}
+                className="flex-1 text-blue-600 border-blue-200 hover:bg-blue-50 text-xs h-8"
+              >
+                <Edit className="h-3 w-3 mr-1" />
+                Edit
+              </Button>
+            )}
+            {hasPermission("delete") && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleDeleteCourse(course._id)}
+                className="flex-1 text-red-600 border-red-200 hover:bg-red-50 text-xs h-8"
+              >
+                <Trash2 className="h-3 w-3 mr-1" />
+                Delete
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // Show authentication warning if not authenticated
   if (!isAuthenticated) {
@@ -553,19 +698,44 @@ export default function CourseManagementPage() {
           <div className="max-w-4xl mx-auto">
             <Card className="bg-white border border-gray-200">
               <CardContent className="p-4 sm:p-6">
+                {/* Language Tabs */}
+                <div className="mb-6 border-b border-gray-200">
+                  <div className="flex flex-wrap gap-2 sm:gap-0 sm:flex-nowrap overflow-x-auto">
+                    {availableLanguages.map((lang) => (
+                      <button
+                        key={lang.code}
+                        onClick={() => {
+                          ensureLanguageExists(lang.code);
+                          setCurrentLanguage(lang.code);
+                        }}
+                        className={`px-3 sm:px-4 py-2 sm:py-3 text-sm font-medium whitespace-nowrap transition-colors ${
+                          currentLanguage === lang.code
+                            ? "border-b-2 border-teal-600 text-teal-600"
+                            : "border-b-2 border-transparent text-gray-600 hover:text-gray-900"
+                        }`}
+                      >
+                        {lang.name}
+                        {formData.languages[lang.code]?.courseName && (
+                          <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                            ✓
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="space-y-4 sm:space-y-6">
                   {/* Course Name */}
                   <div className="space-y-2">
                     <Label className="text-sm font-medium text-gray-700">
-                      Course Name *
+                      Course Name ({currentLanguage.toUpperCase()}) *
                     </Label>
                     <Input
-                      value={formData.courseName}
-                      onChange={(e) =>
-                        setFormData({ ...formData, courseName: e.target.value })
-                      }
+                      value={formData.languages[currentLanguage]?.courseName || ""}
+                      onChange={(e) => updateCourseName(e.target.value)}
                       className="border-gray-200 w-full"
-                      placeholder="Enter course name..."
+                      placeholder={`Enter course name in ${availableLanguages.find(l => l.code === currentLanguage)?.name}...`}
                       disabled={isSubmitting}
                     />
                   </div>
@@ -574,7 +744,7 @@ export default function CourseManagementPage() {
                   <div className="space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
                       <Label className="text-sm font-medium text-gray-700">
-                        Course Pages
+                        Course Pages ({currentLanguage.toUpperCase()})
                       </Label>
                       <Button
                         type="button"
@@ -586,76 +756,79 @@ export default function CourseManagementPage() {
                         Add Page
                       </Button>
                     </div>
-                    {formData.pages.map((page, index) => (
-                      <Card key={index} className="border border-gray-200">
-                        <CardContent className="p-3 sm:p-4">
-                          <div className="flex items-center justify-between mb-4">
-                            <h4 className="font-medium text-gray-900 text-sm sm:text-base">
-                              Page {index + 1}
-                            </h4>
-                            {formData.pages.length > 1 && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => removePage(index)}
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50 p-1 h-8 w-8"
-                                disabled={isSubmitting}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
+                    {(formData.languages[currentLanguage]?.pages || []).map(
+                      (page, index) => (
+                        <Card key={index} className="border border-gray-200">
+                          <CardContent className="p-3 sm:p-4">
+                            <div className="flex items-center justify-between mb-4">
+                              <h4 className="font-medium text-gray-900 text-sm sm:text-base">
+                                Page {index + 1}
+                              </h4>
+                              {(formData.languages[currentLanguage]?.pages
+                                ?.length || 0) > 1 && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removePage(index)}
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50 p-1 h-8 w-8"
+                                  disabled={isSubmitting}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
 
-                          <div className="space-y-4">
-                            <div className="space-y-2">
-                              <Label className="text-sm font-medium text-gray-700">
-                                Page Title *
-                              </Label>
-                              <Input
-                                value={page.title}
-                                onChange={(e) =>
-                                  updatePage(index, "title", e.target.value)
-                                }
-                                className="border-gray-200 w-full"
-                                placeholder="Enter page title..."
-                                disabled={isSubmitting}
-                              />
+                            <div className="space-y-4">
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium text-gray-700">
+                                  Page Title *
+                                </Label>
+                                <Input
+                                  value={page.title}
+                                  onChange={(e) =>
+                                    updatePage(index, "title", e.target.value)
+                                  }
+                                  className="border-gray-200 w-full"
+                                  placeholder="Enter page title..."
+                                  disabled={isSubmitting}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium text-gray-700">
+                                  Content *
+                                </Label>
+                                <Textarea
+                                  value={page.content}
+                                  onChange={(e) =>
+                                    updatePage(index, "content", e.target.value)
+                                  }
+                                  className="border-gray-200 min-h-[80px] sm:min-h-[100px] w-full resize-none"
+                                  placeholder="Enter page content..."
+                                  disabled={isSubmitting}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium text-gray-700">
+                                  Duration (minutes) *
+                                </Label>
+                                <Input
+                                  type="text"
+                                  value={page.time}
+                                  onChange={(e) =>
+                                    updatePage(index, "time", e.target.value)
+                                  }
+                                  className="border-gray-200 w-full"
+                                  placeholder="Enter duration in minutes..."
+                                  min="1"
+                                  disabled={isSubmitting}
+                                />
+                              </div>
                             </div>
-                            <div className="space-y-2">
-                              <Label className="text-sm font-medium text-gray-700">
-                                Content *
-                              </Label>
-                              <Textarea
-                                value={page.content}
-                                onChange={(e) =>
-                                  updatePage(index, "content", e.target.value)
-                                }
-                                className="border-gray-200 min-h-[80px] sm:min-h-[100px] w-full resize-none"
-                                placeholder="Enter page content..."
-                                disabled={isSubmitting}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-sm font-medium text-gray-700">
-                                Duration (minutes) *
-                              </Label>
-                              <Input
-                                type="text"
-                                value={page.time}
-                                onChange={(e) =>
-                                  updatePage(index, "time", e.target.value)
-                                }
-                                className="border-gray-200 w-full"
-                                placeholder="Enter duration in minutes..."
-                                min="1"
-                                disabled={isSubmitting}
-                              />
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                          </CardContent>
+                        </Card>
+                      )
+                    )}
                   </div>
 
                   <div className="flex justify-end pt-4">
@@ -1006,84 +1179,101 @@ export default function CourseManagementPage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      courses.map((course) => (
-                        <TableRow
-                          key={course._id}
-                          className="border-b border-gray-100 hover:bg-gray-50"
-                        >
-                          <TableCell className="py-3 text-gray-900 text-sm font-medium">
-                            {course.courseName}
-                          </TableCell>
-                          <TableCell className="py-3 text-gray-900 text-sm">
-                            <div className="flex items-center gap-1">
-                              <FileText className="h-4 w-4 text-gray-500" />
-                              {course.pages?.length || 0}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3 text-gray-900 text-sm">
-                            <div className="flex items-center gap-1">
-                              <Clock className="h-4 w-4 text-gray-500" />
-                              {formatDuration(
-                                getTotalDuration(course.pages || [])
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <Badge
-                              className={
-                                course.isActive !== false
-                                  ? "bg-green-100 text-green-800 hover:bg-green-100 border-0 text-xs"
-                                  : "bg-red-100 text-red-800 hover:bg-red-100 border-0 text-xs"
-                              }
-                            >
-                              {course.isActive !== false
-                                ? "Active"
-                                : "Inactive"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="py-3 text-gray-900 text-sm">
-                            {course.createdAt
-                              ? new Date(course.createdAt).toLocaleDateString()
-                              : "N/A"}
-                          </TableCell>
-                          <TableCell className="py-3 text-gray-900 text-sm">
-                            {course.uploadedBy?.username ||
-                              course.uploadedBy ||
-                              "Administrator"}
-                          </TableCell>
-                          {(hasPermission("edit") ||
-                            hasPermission("delete")) && (
-                            <TableCell className="py-3">
-                              <div className="flex items-center gap-2">
-                                {hasPermission("edit") && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleEditCourse(course)}
-                                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                    title="Edit Course"
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                )}
-                                {hasPermission("delete") && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() =>
-                                      handleDeleteCourse(course._id)
-                                    }
-                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                    title="Delete Course"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
+                      courses.map((course) => {
+                        const displayName =
+                          course.languages?.en?.courseName || course.courseName || "";
+                        const displayPages =
+                          course.languages?.en?.pages || course.pages || [];
+                        const languageCount = course.languages
+                          ? Object.keys(course.languages).length
+                          : 1;
+
+                        return (
+                          <TableRow
+                            key={course._id}
+                            className="border-b border-gray-100 hover:bg-gray-50"
+                          >
+                            <TableCell className="py-3 text-gray-900 text-sm font-medium">
+                              <div>
+                                <div>{displayName}</div>
+                                {languageCount > 1 && (
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    {languageCount} languages
+                                  </div>
                                 )}
                               </div>
                             </TableCell>
-                          )}
-                        </TableRow>
-                      ))
+                            <TableCell className="py-3 text-gray-900 text-sm">
+                              <div className="flex items-center gap-1">
+                                <FileText className="h-4 w-4 text-gray-500" />
+                                {displayPages.length}
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-3 text-gray-900 text-sm">
+                              <div className="flex items-center gap-1">
+                                <Clock className="h-4 w-4 text-gray-500" />
+                                {formatDuration(getTotalDuration(displayPages))}
+                              </div>
+                            </TableCell>
+                            <TableCell className="py-3">
+                              <Badge
+                                className={
+                                  course.isActive !== false
+                                    ? "bg-green-100 text-green-800 hover:bg-green-100 border-0 text-xs"
+                                    : "bg-red-100 text-red-800 hover:bg-red-100 border-0 text-xs"
+                                }
+                              >
+                                {course.isActive !== false
+                                  ? "Active"
+                                  : "Inactive"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="py-3 text-gray-900 text-sm">
+                              {course.createdAt
+                                ? new Date(course.createdAt).toLocaleDateString()
+                                : "N/A"}
+                            </TableCell>
+                            <TableCell className="py-3 text-gray-900 text-sm">
+                              {course.uploadedBy?.username ||
+                                course.uploadedBy ||
+                                "Administrator"}
+                            </TableCell>
+                            {(hasPermission("edit") ||
+                              hasPermission("delete")) && (
+                              <TableCell className="py-3">
+                                <div className="flex items-center gap-2">
+                                  {hasPermission("edit") && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() =>
+                                        handleEditCourse(course)
+                                      }
+                                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                      title="Edit Course"
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                  {hasPermission("delete") && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() =>
+                                        handleDeleteCourse(course._id)
+                                      }
+                                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                      title="Delete Course"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>
@@ -1204,37 +1394,48 @@ export default function CourseManagementPage() {
                         </p>
                       </div>
                     ) : (
-                      courses.map((course, index) => (
-                        <div
-                          key={course._id}
-                          className="flex items-center space-x-2 sm:space-x-3 p-2 sm:p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
-                          onClick={() => handleCourseClick(course)}
-                        >
-                          <div className="w-6 sm:w-8 lg:w-10 h-6 sm:h-8 lg:h-10 bg-teal-600 rounded-lg flex items-center justify-center text-white font-bold text-xs sm:text-sm lg:text-base flex-shrink-0">
-                            {course.courseName.charAt(0).toUpperCase()}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-medium text-gray-900 text-xs sm:text-sm lg:text-base truncate">
-                              {course.courseName}
-                            </h4>
-                            <p className="text-xs sm:text-sm text-gray-500 truncate">
-                              {course.pages?.length || 0} pages •{" "}
-                              {formatDuration(
-                                getTotalDuration(course.pages || [])
-                              )}
-                            </p>
-                          </div>
-                          <Badge
-                            className={
-                              course.isActive !== false
-                                ? "bg-green-100 text-green-800 text-xs"
-                                : "bg-red-100 text-red-800 text-xs"
-                            }
+                      courses.map((course, index) => {
+                        const displayName =
+                          course.languages?.en?.courseName ||
+                          course.courseName ||
+                          "";
+                        const displayPages =
+                          course.languages?.en?.pages || course.pages || [];
+
+                        return (
+                          <div
+                            key={course._id}
+                            className="flex items-center space-x-2 sm:space-x-3 p-2 sm:p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
+                            onClick={() => handleCourseClick(course)}
                           >
-                            {course.isActive !== false ? "Active" : "Inactive"}
-                          </Badge>
-                        </div>
-                      ))
+                            <div className="w-6 sm:w-8 lg:w-10 h-6 sm:h-8 lg:h-10 bg-teal-600 rounded-lg flex items-center justify-center text-white font-bold text-xs sm:text-sm lg:text-base flex-shrink-0">
+                              {displayName.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-gray-900 text-xs sm:text-sm lg:text-base truncate">
+                                {displayName}
+                              </h4>
+                              <p className="text-xs sm:text-sm text-gray-500 truncate">
+                                {displayPages.length} pages •{" "}
+                                {formatDuration(
+                                  getTotalDuration(displayPages)
+                                )}
+                              </p>
+                            </div>
+                            <Badge
+                              className={
+                                course.isActive !== false
+                                  ? "bg-green-100 text-green-800 text-xs"
+                                  : "bg-red-100 text-red-800 text-xs"
+                              }
+                            >
+                              {course.isActive !== false
+                                ? "Active"
+                                : "Inactive"}
+                            </Badge>
+                          </div>
+                        );
+                      })
                     )}
                   </div>
                 </CardContent>
@@ -1254,7 +1455,8 @@ export default function CourseManagementPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-2">
                         <h4 className="font-semibold text-gray-900 text-sm sm:text-base">
-                          {selectedCourse.courseName}
+                          {selectedCourse.languages?.en?.courseName ||
+                            selectedCourse.courseName}
                         </h4>
                         <span className="text-xs sm:text-sm text-gray-500">
                           Created:{" "}
@@ -1268,12 +1470,20 @@ export default function CourseManagementPage() {
                       <div className="flex flex-wrap items-center gap-2 sm:gap-4 mb-3 text-xs sm:text-sm text-gray-600">
                         <div className="flex items-center gap-1">
                           <FileText className="h-3 sm:h-4 w-3 sm:w-4" />
-                          {selectedCourse.pages?.length || 0} pages
+                          {(selectedCourse.languages?.en?.pages ||
+                            selectedCourse.pages ||
+                            []
+                          ).length}{" "}
+                          pages
                         </div>
                         <div className="flex items-center gap-1">
                           <Clock className="h-3 sm:h-4 w-3 sm:w-4" />
                           {formatDuration(
-                            getTotalDuration(selectedCourse.pages || [])
+                            getTotalDuration(
+                              selectedCourse.languages?.en?.pages ||
+                                selectedCourse.pages ||
+                                []
+                            )
                           )}
                         </div>
                         <Badge
@@ -1287,6 +1497,13 @@ export default function CourseManagementPage() {
                             ? "Active"
                             : "Inactive"}
                         </Badge>
+                        {selectedCourse.languages &&
+                          Object.keys(selectedCourse.languages).length > 1 && (
+                            <Badge variant="outline" className="bg-blue-50">
+                              {Object.keys(selectedCourse.languages).length}{" "}
+                              languages
+                            </Badge>
+                          )}
                       </div>
                     </div>
                   </div>
@@ -1305,10 +1522,16 @@ export default function CourseManagementPage() {
                 {/* Course Pages */}
                 <div className="space-y-4">
                   <h5 className="font-medium text-gray-900 text-sm sm:text-base">
-                    Course Content:
+                    Course Content (English):
                   </h5>
-                  {selectedCourse.pages && selectedCourse.pages.length > 0 ? (
-                    selectedCourse.pages.map((page, index) => (
+                  {(selectedCourse.languages?.en?.pages ||
+                    selectedCourse.pages ||
+                    []
+                  ).length > 0 ? (
+                    (selectedCourse.languages?.en?.pages ||
+                      selectedCourse.pages ||
+                      []
+                    ).map((page, index) => (
                       <div
                         key={index}
                         className="border border-gray-200 rounded-lg p-3 sm:p-4"
