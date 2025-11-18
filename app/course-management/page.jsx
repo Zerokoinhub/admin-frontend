@@ -173,46 +173,59 @@ export default function CourseManagementPage() {
       if (isEditing && selectedCourse) {
         console.log("Updating existing course:", selectedCourse._id);
         // Create a clean payload for editing
+        const cleanedLanguages = Object.entries(formData.languages).reduce(
+          (acc, [langCode, langData]) => {
+            if (langData && langData.courseName.trim()) {
+              acc[langCode] = {
+                courseName: langData.courseName.trim(),
+                pages: langData.pages.map((page) => ({
+                  title: page.title.trim(),
+                  content: page.content.trim(),
+                  time: parseInt(page.time) || 0,
+                })),
+              };
+            }
+            return acc;
+          },
+          {}
+        );
+
         const editPayload = {
-          languages: Object.entries(formData.languages).reduce(
-            (acc, [langCode, langData]) => {
-              if (langData && langData.courseName.trim()) {
-                acc[langCode] = {
-                  courseName: langData.courseName.trim(),
-                  pages: langData.pages.map((page) => ({
-                    title: page.title.trim(),
-                    content: page.content.trim(),
-                    time: String(page.time) || 0,
-                  })),
-                };
-              }
-              return acc;
-            },
-            {}
-          ),
+          languages: cleanedLanguages,
         };
         result = await updateCourse(selectedCourse._id, editPayload);
       } else {
         console.log("Creating new course");
         // Create payload with languages
+        const cleanedLanguages = Object.entries(formData.languages).reduce(
+          (acc, [langCode, langData]) => {
+            if (langData && langData.courseName.trim()) {
+              acc[langCode] = {
+                courseName: langData.courseName.trim(),
+                pages: langData.pages.map((page) => ({
+                  title: page.title.trim(),
+                  content: page.content.trim(),
+                  time: parseInt(page.time) || 0,
+                })),
+              };
+            }
+            return acc;
+          },
+          {}
+        );
+
+        // Get the first language that has data (for backward compatibility)
+        const firstLangCode = Object.keys(cleanedLanguages)[0];
+        const firstLangData = cleanedLanguages[firstLangCode];
+
         const coursePayload = {
-          languages: Object.entries(formData.languages).reduce(
-            (acc, [langCode, langData]) => {
-              if (langData && langData.courseName.trim()) {
-                acc[langCode] = {
-                  courseName: langData.courseName.trim(),
-                  pages: langData.pages.map((page) => ({
-                    title: page.title.trim(),
-                    content: page.content.trim(),
-                    time: String(page.time) || 0,
-                  })),
-                };
-              }
-              return acc;
-            },
-            {}
-          ),
+          languages: cleanedLanguages,
+          // Include root-level fields for backward compatibility
+          courseName: firstLangData?.courseName || "",
+          pages: firstLangData?.pages || [],
         };
+        
+        console.log("Course payload being sent:", coursePayload);
         result = await createCourse(coursePayload);
       }
 
