@@ -44,6 +44,7 @@ export default function CourseManagementPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState("en");
+  const [timeUnit, setTimeUnit] = useState("minutes"); // "minutes" or "seconds"
   const [availableLanguages] = useState([
     { code: "en", name: "English" },
     { code: "es", name: "Español" },
@@ -56,7 +57,7 @@ export default function CourseManagementPage() {
     languages: {
       en: {
         courseName: "",
-        pages: [{ title: "", content: "", time: "" }],
+        pages: [{ title: "", content: "", time: "", timeUnit: "minutes" }],
       },
     },
   });
@@ -118,11 +119,12 @@ export default function CourseManagementPage() {
     );
     setCurrentView("upload");
     setCurrentLanguage("en");
+    setTimeUnit("minutes");
     setFormData({
       languages: {
         en: {
           courseName: "",
-          pages: [{ title: "", content: "", time: "" }],
+          pages: [{ title: "", content: "", time: "", timeUnit: "minutes" }],
         },
       },
     });
@@ -181,11 +183,18 @@ export default function CourseManagementPage() {
 
         const editPayload = {
           courseName: firstLangData?.courseName.trim() || "",
-          pages: (firstLangData?.pages || []).map((page) => ({
-            title: page.title.trim(),
-            content: page.content.trim(),
-            time: page.time || "0",
-          })),
+          pages: (firstLangData?.pages || []).map((page) => {
+            // Convert time to seconds if needed
+            let timeInSeconds = parseInt(page.time) || 0;
+            if (page.timeUnit === "minutes") {
+              timeInSeconds = timeInSeconds * 60;
+            }
+            return {
+              title: page.title.trim(),
+              content: page.content.trim(),
+              time: String(timeInSeconds),
+            };
+          }),
           language: firstLangCode,
         };
 
@@ -202,11 +211,18 @@ export default function CourseManagementPage() {
 
         const coursePayload = {
           courseName: firstLangData?.courseName.trim() || "",
-          pages: (firstLangData?.pages || []).map((page) => ({
-            title: page.title.trim(),
-            content: page.content.trim(),
-            time: page.time || "0",
-          })),
+          pages: (firstLangData?.pages || []).map((page) => {
+            // Convert time to seconds if needed
+            let timeInSeconds = parseInt(page.time) || 0;
+            if (page.timeUnit === "minutes") {
+              timeInSeconds = timeInSeconds * 60;
+            }
+            return {
+              title: page.title.trim(),
+              content: page.content.trim(),
+              time: String(timeInSeconds),
+            };
+          }),
           language: firstLangCode,
           uploadedBy: userData?.username || "Administrator",
         };
@@ -225,11 +241,12 @@ export default function CourseManagementPage() {
           setIsEditing(false);
           // Reset form
           setCurrentLanguage("en");
+          setTimeUnit("minutes");
           setFormData({
             languages: {
               en: {
                 courseName: "",
-                pages: [{ title: "", content: "", time: "" }],
+                pages: [{ title: "", content: "", time: "", timeUnit: "minutes" }],
               },
             },
           });
@@ -302,43 +319,48 @@ export default function CourseManagementPage() {
 
     // Handle both old format (courseName) and new format (languages)
     let languagesData = {};
+    const langCode = course.language || "en";
+    
     if (course.languages && typeof course.languages === "object") {
       languagesData = Object.entries(course.languages).reduce(
-        (acc, [langCode, langData]) => {
-          acc[langCode] = {
+        (acc, [lCode, langData]) => {
+          acc[lCode] = {
             courseName: langData.courseName || "",
             pages:
               langData.pages && langData.pages.length > 0
                 ? langData.pages.map((page) => ({
                     title: page.title || "",
                     content: page.content || "",
-                    time: String(page.time) || 0,
+                    time: String(page.time) || "0",
+                    timeUnit: "minutes",
                   }))
-                : [{ title: "", content: "", time: "" }],
+                : [{ title: "", content: "", time: "", timeUnit: "minutes" }],
           };
           return acc;
         },
         {}
       );
     } else {
-      // Fallback for old format
+      // Fallback for old format (single language)
       languagesData = {
-        en: {
+        [langCode]: {
           courseName: course.courseName || "",
           pages:
             course.pages && course.pages.length > 0
               ? course.pages.map((page) => ({
                   title: page.title || "",
                   content: page.content || "",
-                  time: String(page.time) || 0,
+                  time: String(page.time) || "0",
+                  timeUnit: "minutes",
                 }))
-              : [{ title: "", content: "", time: "" }],
+              : [{ title: "", content: "", time: "", timeUnit: "minutes" }],
         },
       };
     }
 
     setFormData({ languages: languagesData });
-    setCurrentLanguage("en");
+    setCurrentLanguage(langCode);
+    setTimeUnit("minutes");
     setIsEditing(true);
     setCurrentView("upload");
   };
@@ -358,7 +380,7 @@ export default function CourseManagementPage() {
         ...formData.languages,
         [currentLanguage]: {
           ...currentLangData,
-          pages: [...currentLangData.pages, { title: "", content: "", time: "" }],
+          pages: [...currentLangData.pages, { title: "", content: "", time: "", timeUnit: timeUnit }],
         },
       },
     });
@@ -384,11 +406,16 @@ export default function CourseManagementPage() {
     const currentLangData = formData.languages[currentLanguage];
     if (!currentLangData) return;
 
-    const updatedPages = currentLangData.pages.map((page, i) =>
-      i === index
-        ? { ...page, [field]: field === "time" ? String(value) || "0" : value }
-        : page
-    );
+    const updatedPages = currentLangData.pages.map((page, i) => {
+      if (i === index) {
+        if (field === "timeUnit") {
+          return { ...page, timeUnit: value };
+        }
+        return { ...page, [field]: field === "time" ? String(value) || "0" : value };
+      }
+      return page;
+    });
+    
     setFormData({
       ...formData,
       languages: {
@@ -425,7 +452,7 @@ export default function CourseManagementPage() {
           ...formData.languages,
           [langCode]: {
             courseName: "",
-            pages: [{ title: "", content: "", time: "" }],
+            pages: [{ title: "", content: "", time: "", timeUnit: "minutes" }],
           },
         },
       });
@@ -822,19 +849,32 @@ export default function CourseManagementPage() {
                               </div>
                               <div className="space-y-2">
                                 <Label className="text-sm font-medium text-gray-700">
-                                  Duration (minutes) *
+                                  Duration *
                                 </Label>
-                                <Input
-                                  type="text"
-                                  value={page.time}
-                                  onChange={(e) =>
-                                    updatePage(index, "time", e.target.value)
-                                  }
-                                  className="border-gray-200 w-full"
-                                  placeholder="Enter duration in minutes..."
-                                  min="1"
-                                  disabled={isSubmitting}
-                                />
+                                <div className="flex gap-2">
+                                  <Input
+                                    type="number"
+                                    value={page.time}
+                                    onChange={(e) =>
+                                      updatePage(index, "time", e.target.value)
+                                    }
+                                    className="border-gray-200 flex-1"
+                                    placeholder="Enter duration..."
+                                    min="1"
+                                    disabled={isSubmitting}
+                                  />
+                                  <select
+                                    value={page.timeUnit || "minutes"}
+                                    onChange={(e) =>
+                                      updatePage(index, "timeUnit", e.target.value)
+                                    }
+                                    className="border border-gray-200 rounded-md px-3 py-2 text-sm bg-white disabled:bg-gray-50"
+                                    disabled={isSubmitting}
+                                  >
+                                    <option value="seconds">Seconds</option>
+                                    <option value="minutes">Minutes</option>
+                                  </select>
+                                </div>
                               </div>
                             </div>
                           </CardContent>
