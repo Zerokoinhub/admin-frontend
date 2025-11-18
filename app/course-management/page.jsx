@@ -137,17 +137,30 @@ export default function CourseManagementPage() {
       return;
     }
 
-    // Validate form data - at least English should be filled
-    const englishData = formData.languages.en;
-    if (!englishData || !englishData.courseName.trim()) {
-      alert("Please enter a course name in English");
+    // Validate form data - at least ONE language should be filled
+    const hasAnyLanguageData = Object.entries(formData.languages).some(
+      ([langCode, langData]) =>
+        langData && langData.courseName.trim() && langData.pages.length > 0
+    );
+
+    if (!hasAnyLanguageData) {
+      alert("Please enter course name and pages in at least one language");
       return;
     }
 
-    if (
-      englishData.pages.some((page) => !page.title.trim() || !page.content.trim())
-    ) {
-      alert("Please fill in all page titles and content in English");
+    // Validate that all filled languages have complete page data
+    const invalidLanguages = Object.entries(formData.languages)
+      .filter(([_, langData]) => langData && langData.courseName.trim())
+      .filter(
+        ([_, langData]) =>
+          langData.pages.some((page) => !page.title.trim() || !page.content.trim())
+      )
+      .map(([langCode]) => langCode.toUpperCase());
+
+    if (invalidLanguages.length > 0) {
+      alert(
+        `Please fill in all page titles and content for: ${invalidLanguages.join(", ")}`
+      );
       return;
     }
 
