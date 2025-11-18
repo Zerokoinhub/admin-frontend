@@ -172,57 +172,43 @@ export default function CourseManagementPage() {
 
       if (isEditing && selectedCourse) {
         console.log("Updating existing course:", selectedCourse._id);
-        // Create a clean payload for editing
-        const cleanedLanguages = Object.entries(formData.languages).reduce(
-          (acc, [langCode, langData]) => {
-            if (langData && langData.courseName.trim()) {
-              acc[langCode] = {
-                courseName: langData.courseName.trim(),
-                pages: langData.pages.map((page) => ({
-                  title: page.title.trim(),
-                  content: page.content.trim(),
-                  time: parseInt(page.time) || 0,
-                })),
-              };
-            }
-            return acc;
-          },
-          {}
+        
+        // Get the first language that has data
+        const firstLangCode = Object.keys(formData.languages).find(
+          (code) => formData.languages[code]?.courseName.trim()
         );
+        const firstLangData = formData.languages[firstLangCode];
 
         const editPayload = {
-          languages: cleanedLanguages,
+          courseName: firstLangData?.courseName.trim() || "",
+          pages: (firstLangData?.pages || []).map((page) => ({
+            title: page.title.trim(),
+            content: page.content.trim(),
+            time: page.time || "0",
+          })),
+          language: firstLangCode,
         };
+
+        console.log("Update payload:", editPayload);
         result = await updateCourse(selectedCourse._id, editPayload);
       } else {
         console.log("Creating new course");
-        // Create payload with languages
-        const cleanedLanguages = Object.entries(formData.languages).reduce(
-          (acc, [langCode, langData]) => {
-            if (langData && langData.courseName.trim()) {
-              acc[langCode] = {
-                courseName: langData.courseName.trim(),
-                pages: langData.pages.map((page) => ({
-                  title: page.title.trim(),
-                  content: page.content.trim(),
-                  time: parseInt(page.time) || 0,
-                })),
-              };
-            }
-            return acc;
-          },
-          {}
+        
+        // Get the first language that has data
+        const firstLangCode = Object.keys(formData.languages).find(
+          (code) => formData.languages[code]?.courseName.trim()
         );
-
-        // Get the first language that has data (for backward compatibility)
-        const firstLangCode = Object.keys(cleanedLanguages)[0];
-        const firstLangData = cleanedLanguages[firstLangCode];
+        const firstLangData = formData.languages[firstLangCode];
 
         const coursePayload = {
-          languages: cleanedLanguages,
-          // Include root-level fields for backward compatibility
-          courseName: firstLangData?.courseName || "",
-          pages: firstLangData?.pages || [],
+          courseName: firstLangData?.courseName.trim() || "",
+          pages: (firstLangData?.pages || []).map((page) => ({
+            title: page.title.trim(),
+            content: page.content.trim(),
+            time: page.time || "0",
+          })),
+          language: firstLangCode,
+          uploadedBy: userData?.username || "Administrator",
         };
         
         console.log("Course payload being sent:", coursePayload);
