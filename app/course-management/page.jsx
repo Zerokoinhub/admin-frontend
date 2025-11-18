@@ -183,18 +183,14 @@ export default function CourseManagementPage() {
 
         const editPayload = {
           courseName: firstLangData?.courseName.trim() || "",
-          pages: (firstLangData?.pages || []).map((page) => {
-            // Convert time to seconds if needed
-            let timeInSeconds = parseInt(page.time) || 0;
-            if (page.timeUnit === "minutes") {
-              timeInSeconds = timeInSeconds * 60;
-            }
-            return {
-              title: page.title.trim(),
-              content: page.content.trim(),
-              time: String(timeInSeconds),
-            };
-          }),
+          pages: (firstLangData?.pages || []).map((page) => ({
+            title: page.title.trim(),
+            content: page.content.trim(),
+            time: JSON.stringify({
+              value: parseInt(page.time) || 0,
+              unit: page.timeUnit || "minutes",
+            }),
+          })),
           language: firstLangCode,
         };
 
@@ -211,18 +207,14 @@ export default function CourseManagementPage() {
 
         const coursePayload = {
           courseName: firstLangData?.courseName.trim() || "",
-          pages: (firstLangData?.pages || []).map((page) => {
-            // Convert time to seconds if needed
-            let timeInSeconds = parseInt(page.time) || 0;
-            if (page.timeUnit === "minutes") {
-              timeInSeconds = timeInSeconds * 60;
-            }
-            return {
-              title: page.title.trim(),
-              content: page.content.trim(),
-              time: String(timeInSeconds),
-            };
-          }),
+          pages: (firstLangData?.pages || []).map((page) => ({
+            title: page.title.trim(),
+            content: page.content.trim(),
+            time: JSON.stringify({
+              value: parseInt(page.time) || 0,
+              unit: page.timeUnit || "minutes",
+            }),
+          })),
           language: firstLangCode,
           uploadedBy: userData?.username || "Administrator",
         };
@@ -328,12 +320,26 @@ export default function CourseManagementPage() {
             courseName: langData.courseName || "",
             pages:
               langData.pages && langData.pages.length > 0
-                ? langData.pages.map((page) => ({
-                    title: page.title || "",
-                    content: page.content || "",
-                    time: String(page.time) || "0",
-                    timeUnit: "minutes",
-                  }))
+                ? langData.pages.map((page) => {
+                    // Parse time if it's a JSON string, otherwise use as is
+                    let timeValue = page.time || "0";
+                    let timeUnit = "minutes";
+                    
+                    try {
+                      const parsed = JSON.parse(page.time);
+                      timeValue = String(parsed.value || 0);
+                      timeUnit = parsed.unit || "minutes";
+                    } catch (e) {
+                      timeValue = String(page.time || 0);
+                    }
+                    
+                    return {
+                      title: page.title || "",
+                      content: page.content || "",
+                      time: timeValue,
+                      timeUnit: timeUnit,
+                    };
+                  })
                 : [{ title: "", content: "", time: "", timeUnit: "minutes" }],
           };
           return acc;
@@ -347,12 +353,26 @@ export default function CourseManagementPage() {
           courseName: course.courseName || "",
           pages:
             course.pages && course.pages.length > 0
-              ? course.pages.map((page) => ({
-                  title: page.title || "",
-                  content: page.content || "",
-                  time: String(page.time) || "0",
-                  timeUnit: "minutes",
-                }))
+              ? course.pages.map((page) => {
+                  // Parse time if it's a JSON string, otherwise use as is
+                  let timeValue = page.time || "0";
+                  let timeUnit = "minutes";
+                  
+                  try {
+                    const parsed = JSON.parse(page.time);
+                    timeValue = String(parsed.value || 0);
+                    timeUnit = parsed.unit || "minutes";
+                  } catch (e) {
+                    timeValue = String(page.time || 0);
+                  }
+                  
+                  return {
+                    title: page.title || "",
+                    content: page.content || "",
+                    time: timeValue,
+                    timeUnit: timeUnit,
+                  };
+                })
               : [{ title: "", content: "", time: "", timeUnit: "minutes" }],
         },
       };
@@ -463,12 +483,31 @@ export default function CourseManagementPage() {
   const getTotalDuration = (pages) => {
     if (!Array.isArray(pages)) return 0;
     return pages.reduce((total, page) => {
-      const timeVal = typeof page.time === "string" ? parseInt(page.time) : page.time;
-      return total + (isNaN(timeVal) ? 0 : timeVal);
+      let timeValue = 0;
+      let timeUnit = "minutes";
+      
+      try {
+        // Try to parse as JSON (new format)
+        const parsed = JSON.parse(page.time);
+        timeValue = parsed.value || 0;
+        timeUnit = parsed.unit || "minutes";
+      } catch (e) {
+        // Fallback to old format
+        timeValue = typeof page.time === "string" ? parseInt(page.time) : page.time;
+        timeUnit = "minutes";
+      }
+      
+      // Convert to seconds for calculation
+      let seconds = timeValue;
+      if (timeUnit === "minutes") {
+        seconds = timeValue * 60;
+      }
+      
+      return total + seconds;
     }, 0);
   };
 
-  // Format duration in minutes to readable format
+  // Format duration in seconds to readable format
   const formatDuration = (input) => {
     let totalSeconds = 0;
 
@@ -479,8 +518,8 @@ export default function CourseManagementPage() {
       const seconds = parseInt(secStr, 10);
       totalSeconds = minutes * 60 + seconds;
     } else {
-      // If input is a number (in minutes)
-      totalSeconds = Number(input) * 60;
+      // If input is a number (in seconds)
+      totalSeconds = Number(input);
     }
 
     const hours = Math.floor(totalSeconds / 3600);
