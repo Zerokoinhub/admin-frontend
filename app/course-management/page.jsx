@@ -150,6 +150,12 @@ export default function CourseManagementPage() {
       return;
     }
 
+    // Validate that English is filled
+    if (!formData.languages.en || !formData.languages.en.courseName.trim()) {
+      alert("Course Name in English is required.");
+      return;
+    }
+
     // Validate that all filled languages have complete page data
     const invalidLanguages = Object.entries(formData.languages)
       .filter(([_, langData]) => langData && langData.courseName.trim())
@@ -171,51 +177,56 @@ export default function CourseManagementPage() {
 
     try {
       let result;
+      const filledLanguages = Object.fromEntries(
+        Object.entries(formData.languages).filter(
+          ([, langData]) => langData && langData.courseName.trim()
+        )
+      );
+
+      const courseNamePayload = {};
+      Object.entries(filledLanguages).forEach(([langCode, langData]) => {
+        courseNamePayload[langCode] = langData.courseName.trim();
+      });
+
+      // Assuming all languages share the same page structure and time.
+      // Using 'en' pages as the base for structure.
+      const enPages = formData.languages.en.pages || [];
+      const pagesPayload = enPages.map((enPage, pageIndex) => {
+        const titlePayload = {};
+        const contentPayload = {};
+
+        Object.keys(filledLanguages).forEach((langCode) => {
+          const langPage = formData.languages[langCode]?.pages[pageIndex];
+          if (langPage) {
+            titlePayload[langCode] = langPage.title.trim();
+            contentPayload[langCode] = langPage.content.trim();
+          }
+        });
+
+        return {
+          title: titlePayload,
+          content: contentPayload,
+          time: JSON.stringify({
+            value: parseInt(enPage.time) || 0,
+            unit: enPage.timeUnit || "minutes",
+          }),
+        };
+      });
 
       if (isEditing && selectedCourse) {
         console.log("Updating existing course:", selectedCourse._id);
-        
-        // Get the first language that has data
-        const firstLangCode = Object.keys(formData.languages).find(
-          (code) => formData.languages[code]?.courseName.trim()
-        );
-        const firstLangData = formData.languages[firstLangCode];
-
         const editPayload = {
-          courseName: firstLangData?.courseName.trim() || "",
-          pages: (firstLangData?.pages || []).map((page) => ({
-            title: page.title.trim(),
-            content: page.content.trim(),
-            time: JSON.stringify({
-              value: parseInt(page.time) || 0,
-              unit: page.timeUnit || "minutes",
-            }),
-          })),
-          language: firstLangCode,
+          courseName: courseNamePayload,
+          pages: pagesPayload,
         };
 
         console.log("Update payload:", editPayload);
         result = await updateCourse(selectedCourse._id, editPayload);
       } else {
         console.log("Creating new course");
-        
-        // Get the first language that has data
-        const firstLangCode = Object.keys(formData.languages).find(
-          (code) => formData.languages[code]?.courseName.trim()
-        );
-        const firstLangData = formData.languages[firstLangCode];
-
         const coursePayload = {
-          courseName: firstLangData?.courseName.trim() || "",
-          pages: (firstLangData?.pages || []).map((page) => ({
-            title: page.title.trim(),
-            content: page.content.trim(),
-            time: JSON.stringify({
-              value: parseInt(page.time) || 0,
-              unit: page.timeUnit || "minutes",
-            }),
-          })),
-          language: firstLangCode,
+          courseName: courseNamePayload,
+          pages: pagesPayload,
           uploadedBy: userData?.username || "Administrator",
         };
         
@@ -310,76 +321,62 @@ export default function CourseManagementPage() {
     setSelectedCourse(course);
 
     // Handle both old format (courseName) and new format (languages)
-    let languagesData = {};
-    const langCode = course.language || "en";
-    
-    if (course.languages && typeof course.languages === "object") {
-      languagesData = Object.entries(course.languages).reduce(
-        (acc, [lCode, langData]) => {
-          acc[lCode] = {
-            courseName: langData.courseName || "",
-            pages:
-              langData.pages && langData.pages.length > 0
-                ? langData.pages.map((page) => {
-                    // Parse time if it's a JSON string, otherwise use as is
-                    let timeValue = page.time || "0";
-                    let timeUnit = "minutes";
-                    
-                    try {
-                      const parsed = JSON.parse(page.time);
-                      timeValue = String(parsed.value || 0);
-                      timeUnit = parsed.unit || "minutes";
-                    } catch (e) {
-                      timeValue = String(page.time || 0);
-                    }
-                    
-                    return {
-                      title: page.title || "",
-                      content: page.content || "",
-                      time: timeValue,
-                      timeUnit: timeUnit,
-                    };
-                  })
-                : [{ title: "", content: "", time: "", timeUnit: "minutes" }],
-          };
-          return acc;
-        },
-        {}
-      );
-    } else {
-      // Fallback for old format (single language)
-      languagesData = {
-        [langCode]: {
-          courseName: course.courseName || "",
-          pages:
-            course.pages && course.pages.length > 0
-              ? course.pages.map((page) => {
-                  // Parse time if it's a JSON string, otherwise use as is
-                  let timeValue = page.time || "0";
-                  let timeUnit = "minutes";
-                  
-                  try {
-                    const parsed = JSON.parse(page.time);
-                    timeValue = String(parsed.value || 0);
-                    timeUnit = parsed.unit || "minutes";
-                  } catch (e) {
-                    timeValue = String(page.time || 0);
-                  }
-                  
-                  return {
-                    title: page.title || "",
-                    content: page.content || "",
-                    time: timeValue,
-                    timeUnit: timeUnit,
-                  };
-                })
-              : [{ title: "", content: "", time: "", timeUnit: "minutes" }],
-        },
-      };
+    const languagesData = {};
+    const courseLangs =
+      typeof course.courseName === "object" ? Object.keys(course.courseName) : [];
+
+    if (courseLangs.length === 0 && course.language) {
+      // Fallback for old single-language format
+      courseLangs.push(course.language);
+    }
+    if (courseLangs.length === 0) {
+      courseLangs.push("en"); // Default to 'en' if no language info
     }
 
+    availableLanguages.forEach((lang) => {
+      const langCode = lang.code;
+      const courseName =
+        (typeof course.courseName === "object"
+          ? course.courseName[langCode]
+          : course.courseName) || "";
+
+      languagesData[langCode] = {
+        courseName: courseName,
+        pages:
+          course.pages && course.pages.length > 0
+            ? course.pages.map((page) => {
+                let timeValue = "0";
+                let timeUnit = "minutes";
+                try {
+                  const parsed = JSON.parse(page.time);
+                  timeValue = String(parsed.value || 0);
+                  timeUnit = parsed.unit || "minutes";
+                } catch (e) {
+                  timeValue = String(page.time || 0);
+                }
+
+                const title =
+                  (typeof page.title === "object"
+                    ? page.title[langCode]
+                    : page.title) || "";
+                const content =
+                  (typeof page.content === "object"
+                    ? page.content[langCode]
+                    : page.content) || "";
+
+                return {
+                  title: title,
+                  content: content,
+                  time: timeValue,
+                  timeUnit: timeUnit,
+                };
+              })
+            : [{ title: "", content: "", time: "", timeUnit: "minutes" }],
+      };
+    });
+
     setFormData({ languages: languagesData });
-    setCurrentLanguage(langCode);
+    setCurrentLanguage(courseLangs[0] || "en");
     setTimeUnit("minutes");
     setIsEditing(true);
     setCurrentView("upload");
@@ -1620,16 +1617,17 @@ export default function CourseManagementPage() {
                     []
                   ).length > 0 ? (
                     (selectedCourse.languages?.en?.pages ||
-                      selectedCourse.pages ||
-                      []
-                    ).map((page, index) => (
+                      selectedCourse.pages || []).map((page, index) => {
+                      const pageTitle = typeof page.title === 'object' ? page.title.en : page.title;
+                      const pageContent = typeof page.content === 'object' ? page.content.en : page.content;
+                      return (
                       <div
                         key={index}
                         className="border border-gray-200 rounded-lg p-3 sm:p-4"
                       >
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 gap-1 sm:gap-2">
                           <h6 className="font-medium text-gray-900 text-sm sm:text-base">
-                            Page {index + 1}: {page.title}
+                            Page {index + 1}: {pageTitle}
                           </h6>
                           <span className="text-xs sm:text-sm text-gray-500 flex items-center gap-1">
                             <Clock className="h-3 w-3" />
@@ -1637,10 +1635,10 @@ export default function CourseManagementPage() {
                           </span>
                         </div>
                         <p className="text-gray-700 text-xs sm:text-sm leading-relaxed">
-                          {page.content}
+                          {pageContent}
                         </p>
                       </div>
-                    ))
+                    )})
                   ) : (
                     <div className="text-center py-4 text-gray-500">
                       <p className="text-sm">
