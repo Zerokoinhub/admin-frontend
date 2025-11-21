@@ -47,11 +47,12 @@ export default function CourseManagementPage() {
   const [timeUnit, setTimeUnit] = useState("minutes"); // "minutes" or "seconds"
   const [availableLanguages] = useState([
     { code: "en", name: "English" },
-    { code: "es", name: "Español" },
-    { code: "fr", name: "Français" },
-    { code: "de", name: "Deutsch" },
-    { code: "zh", name: "中文" },
-    { code: "ar", name: "العربية" },
+    { code: "ur", name: "Urdu" },
+    { code: "ar", name: "Arabic" },
+    { code: "tr", name: "Turkish" },
+    { code: "hi", name: "Hindi" },
+    { code: "fr", name: "French" },
+    { code: "zh", name: "Chinese" },
   ]);
   const [formData, setFormData] = useState({
     languages: {
