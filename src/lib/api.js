@@ -1,5 +1,7 @@
 // API service for handling user data and helpers
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL
+
+// const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL
+const API_BASE_URL = "http://localhost:3002"
 
 // Helper: Get auth headers with token
 const getAuthHeaders = () => {
@@ -30,7 +32,7 @@ export const userAPI = {
       ...filters,
     })
     try {
-      const response = await fetch(`${API_BASE_URL}/users?${params}`, {
+      const response = await fetch(`${API_BASE_URL}/api/users?${params}`, {
         method: "GET",
         headers: getAuthHeaders(),
       })
@@ -81,7 +83,7 @@ export const userAPI = {
   // Get user by ID
   async getUserById(userId) {
     try {
-      const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
         method: "GET",
         headers: getAuthHeaders(),
       })
@@ -97,7 +99,7 @@ export const userAPI = {
   async updateUser(userId, userData) {
     try {
       console.log("Updating user:", userId, "with data:", userData)
-      const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
         method: "PUT",
         headers: getAuthHeaders(),
         body: JSON.stringify(userData),
@@ -127,7 +129,7 @@ export const userAPI = {
   // Get user sessions
   async getUserSessions(userId) {
     try {
-      const response = await fetch(`${API_BASE_URL}/users/${userId}/sessions`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/${userId}/sessions`, {
         method: "GET",
         headers: getAuthHeaders(),
       })
@@ -151,7 +153,7 @@ export const userAPI = {
   // Update user session (unlock, complete, claim, lock)
   async updateUserSession(userId, sessionNumber, action) {
     try {
-      const response = await fetch(`${API_BASE_URL}/users/${userId}/sessions`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/${userId}/sessions`, {
         method: "PUT",
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -182,7 +184,7 @@ export const userAPI = {
   // Update notification settings
   async updateNotificationSettings(userId, settings) {
     try {
-      const response = await fetch(`${API_BASE_URL}/users/${userId}/notifications`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/${userId}/notifications`, {
         method: "PUT",
         headers: getAuthHeaders(),
         body: JSON.stringify(settings),
@@ -214,7 +216,7 @@ export const userAPI = {
       if (!title || !message) {
         throw new Error("Title and message are required")
       }
-      const response = await fetch(`${API_BASE_URL}/notifications/general`, {
+      const response = await fetch(`${API_BASE_URL}/api/notifications/general`, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -251,7 +253,7 @@ export const userAPI = {
       if (!title || !message) {
         throw new Error("Title and message are required")
       }
-      const response = await fetch(`${API_BASE_URL}/notifications/top-users`, {
+      const response = await fetch(`${API_BASE_URL}/api/notifications/top-users`, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -289,7 +291,7 @@ export const userAPI = {
       if (!title || !message || !firebaseUid) {
         throw new Error("Title, message, and firebaseUid are required")
       }
-      const response = await fetch(`${API_BASE_URL}/notifications/single-user`, {
+      const response = await fetch(`${API_BASE_URL}/api/notifications/single-user`, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -333,7 +335,7 @@ export const userAPI = {
       if (link) formData.append("link", link)
       formData.append("priority", priority)
       if (imageFile) formData.append("image", imageFile)
-      const response = await fetch(`${API_BASE_URL}/notifications/general-with-image`, {
+      const response = await fetch(`${API_BASE_URL}/api/notifications/general-with-image`, {
         method: "POST",
         headers: getFormDataHeaders(),
         body: formData,
@@ -367,7 +369,7 @@ export const userAPI = {
       })
       if (type) params.append("type", type)
       if (priority) params.append("priority", priority)
-      const response = await fetch(`${API_BASE_URL}/notifications?${params}`, {
+      const response = await fetch(`${API_BASE_URL}/api/notifications?${params}`, {
         method: "GET",
         headers: getAuthHeaders(),
       })
@@ -409,7 +411,7 @@ export const userAPI = {
   // Get single notification by ID
   async getNotificationById(notificationId) {
     try {
-      const response = await fetch(`${API_BASE_URL}/notifications/${notificationId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/notifications/${notificationId}`, {
         method: "GET",
         headers: getAuthHeaders(),
       })
@@ -438,7 +440,7 @@ export const userAPI = {
   // Add FCM token
   async addFcmToken(userId, token) {
     try {
-      const response = await fetch(`${API_BASE_URL}/users/${userId}/fcm-token`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/${userId}/fcm-token`, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({ token }),
@@ -465,7 +467,7 @@ export const userAPI = {
   // Remove FCM token
   async removeFcmToken(userId, token) {
     try {
-      const response = await fetch(`${API_BASE_URL}/users/${userId}/fcm-token`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/${userId}/fcm-token`, {
         method: "DELETE",
         headers: getAuthHeaders(),
         body: JSON.stringify({ token }),
@@ -493,7 +495,7 @@ export const userAPI = {
   // Get user screenshots by user ID
   async getUserScreenshots(userId) {
     try {
-      const response = await fetch(`${API_BASE_URL}/users/${userId}/screenshots`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/${userId}/screenshots`, {
         method: "GET",
         headers: getAuthHeaders(),
       })
@@ -522,7 +524,7 @@ export const userAPI = {
   // Add screenshot
   async addScreenshot(userId, screenshotData) {
     try {
-      const response = await fetch(`${API_BASE_URL}/users/${userId}/screenshots`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/${userId}/screenshots`, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({ screenshot: screenshotData }),
@@ -550,7 +552,7 @@ export const userAPI = {
   // Get comprehensive user statistics
   async getUserStats() {
     try {
-      const response = await fetch(`${API_BASE_URL}/users/stats/overview`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/stats/overview`, {
         method: "GET",
         headers: getAuthHeaders(),
       })
@@ -577,7 +579,7 @@ export const userAPI = {
   // Ban a user
   async banUser(userId) {
     try {
-      const response = await fetch(`${API_BASE_URL}/users/${userId}/ban`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/${userId}/ban`, {
         method: "PUT",
         headers: getAuthHeaders(),
       })
@@ -592,7 +594,7 @@ export const userAPI = {
   // Unban a user
   async unbanUser(userId) {
     try {
-      const response = await fetch(`${API_BASE_URL}/users/${userId}/unban`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/${userId}/unban`, {
         method: "PUT",
         headers: getAuthHeaders(),
       })
@@ -628,7 +630,7 @@ export const userAPI = {
   // Manual coin transfer - Enhanced with reason parameter
   async transferCoins(userId, amount, reason = "Manual transfer") {
     try {
-      const response = await fetch(`${API_BASE_URL}/users/${userId}/transfer`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/${userId}/transfer`, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -668,7 +670,7 @@ export const userAPI = {
       if (!email || typeof newBalance !== "number") {
         throw new Error("Invalid input: email and numeric newBalance are required.")
       }
-      const response = await fetch(`${API_BASE_URL}/users/edit-balance`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/edit-balance`, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({ email, newBalance, admin }),
@@ -709,7 +711,7 @@ export const userAPI = {
       if (filters.status) params.append("status", filters.status)
       if (filters.dateRange) params.append("dateRange", filters.dateRange)
       if (filters.userId) params.append("userId", filters.userId)
-      const url = `${API_BASE_URL}/transfer/transferHistory?${params.toString()}`
+      const url = `${API_BASE_URL}/api/transfer/transferHistory?${params.toString()}`
       const response = await fetch(url, {
         method: "GET",
         headers: getAuthHeaders(),
@@ -744,7 +746,7 @@ export const userAPI = {
   // Get Transfer By ID
   async getTransferById(transferId) {
     try {
-      const response = await fetch(`${API_BASE_URL}/transfers/${transferId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/transfers/${transferId}`, {
         method: "GET",
         headers: getAuthHeaders(),
       })
@@ -762,7 +764,7 @@ export const userAPI = {
   // Update Transfer Status
   async updateTransferStatus(transferId, status) {
     try {
-      const response = await fetch(`${API_BASE_URL}/transfers/${transferId}/status`, {
+      const response = await fetch(`${API_BASE_URL}/api/transfers/${transferId}/status`, {
         method: "PATCH",
         headers: getAuthHeaders(),
         body: JSON.stringify({ status }),
@@ -782,7 +784,7 @@ export const userAPI = {
   // Change user password
   async changePassword(oldPassword, newPassword, confirmPassword) {
     try {
-      const response = await fetch(`${API_BASE_URL}/users/change-password`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/change-password`, {
         method: "PUT",
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -815,7 +817,7 @@ export const userAPI = {
   // Get logged-in user's profile
   async getProfile() {
     try {
-      const response = await fetch(`${API_BASE_URL}/users/profile`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/profile`, {
         method: "GET",
         headers: getAuthHeaders(),
       })
@@ -844,7 +846,7 @@ export const userAPI = {
   // Update logged-in user's profile
   async updateProfile(data) {
     try {
-      const response = await fetch(`${API_BASE_URL}/users/profile`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/profile`, {
         method: "PUT",
         headers: getAuthHeaders(),
         body: JSON.stringify(data),
@@ -875,7 +877,7 @@ export const userAPI = {
   // Get total referrals
   async getTotalReferrals() {
     try {
-      const response = await fetch(`${API_BASE_URL}/users/stats/referrals`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/stats/referrals`, {
         headers: getAuthHeaders(),
       })
       if (!response.ok) throw new Error("Failed to fetch total referrals")
@@ -889,7 +891,7 @@ export const userAPI = {
   // Get total connected wallets
   async getTotalWallets() {
     try {
-      const response = await fetch(`${API_BASE_URL}/users/stats/wallets`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/stats/wallets`, {
         headers: getAuthHeaders(),
       })
       if (!response.ok) throw new Error("Failed to fetch wallet count")
@@ -903,7 +905,7 @@ export const userAPI = {
   // Get users with calculator usage
   async getCalculatorUsers() {
     try {
-      const response = await fetch(`${API_BASE_URL}/users/calculator-users`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/calculator-users`, {
         headers: getAuthHeaders(),
       })
       if (!response.ok) throw new Error("Failed to fetch calculator users")
@@ -917,7 +919,7 @@ export const userAPI = {
   // Get total calculator usage
   async getTotalCalculatorUsage() {
     try {
-      const response = await fetch(`${API_BASE_URL}/users/stats/calculator-usage`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/stats/calculator-usage`, {
         headers: getAuthHeaders(),
       })
       if (!response.ok) throw new Error("Failed to fetch calculator usage")
@@ -1455,7 +1457,7 @@ export const withdrawalAPI = {
       search: filters.search || '',
     }).toString();
     try {
-      const response = await fetch(`${API_BASE_URL}/withdrawals?${params}`, {
+      const response = await fetch(`${API_BASE_URL}/api/withdrawals?${params}`, {
         method: "GET",
         headers: getAuthHeaders(),
       });

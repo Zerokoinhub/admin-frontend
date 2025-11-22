@@ -12,7 +12,8 @@ import {
 } from "@/lib/auth";
 
 // Use environment variable for base URL
-const API_BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL}/courses`;
+// const API_BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/courses`;
+const API_BASE = `http://localhost:3002/api/courses`;
 
 export const useCourses = () => {
   const [courses, setCourses] = useState([]);
@@ -60,7 +61,8 @@ export const useCourses = () => {
   };
 
   // Create a new course
-  const createCourse = async (courseData) => {
+  const createCourse = async (courseData) => { 
+    console.log(courseData)
     try {
       if (!isAuthenticated()) {
         throw new Error("User not authenticated. Please log in again.");

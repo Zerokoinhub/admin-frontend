@@ -81,7 +81,14 @@ export default function CourseManagementPage() {
   } = useCourses();
 
   const { users, loading, error } = useUsers(1, 100);
-
+const getText = (field, lang = "en") => {
+  if (!field) return "Untitled";
+  if (typeof field === "string") return field;
+  if (typeof field === "object" && field !== null) {
+    return field[lang] || field.en || Object.values(field)[0] || "Untitled";
+  }
+  return "Untitled";
+};
   // Check authentication status on component mount
   useEffect(() => {
     console.log("Course Management Page - Current user:", userData);
@@ -595,9 +602,10 @@ export default function CourseManagementPage() {
   // Mobile Course Card Component
   const CourseCard = ({ course }) => {
     // Handle both old format (courseName) and new format (languages)
-    const displayName = course.languages?.en?.courseName || course.courseName || "";
-    const displayPages = course.languages?.en?.pages || course.pages || [];
-
+    // const displayName = course.languages?.en?.courseName || course.courseName || "";
+    // const displayPages = course.languages?.en?.pages || course.pages || [];
+const displayName = getText(course.courseName);
+const displayPages = course.pages || [];
     return (
       <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4 shadow-sm">
         <div className="flex justify-between items-start mb-3">
@@ -800,7 +808,65 @@ export default function CourseManagementPage() {
                     ))}
                   </div>
                 </div>
+                   {/* Clear Current Language Button – Special behavior for English */}
+<div className="flex justify-end mb-4">
+  <Button
+    variant="outline"
+    size="sm"
+    className="text-red-600 border-red-200 hover:bg-red-50"
+    onClick={() => {
+      const langName = availableLanguages.find(l => l.code === currentLanguage)?.name || currentLanguage.toUpperCase();
 
+      // if (!confirm(`Clear ALL fields in ${langName} (including time if English)?\n\nThis cannot be undone.`)) {
+      //   return;
+      // }
+
+      if (currentLanguage === "en") {
+        // ENGLISH: clear EVERYTHING including time
+        setFormData({
+          ...formData,
+          languages: {
+            ...formData.languages,
+            en: {
+              courseName: "",
+              pages: formData.languages.en.pages.map(() => ({
+                title: "",
+                content: "",
+                time: "",          
+                timeUnit: "minutes", 
+              })),
+            },
+          },
+        });
+      } else {
+        // OTHER LANGUAGES: clear only title & content, keep time from English
+        const enPages = formData.languages.en?.pages || [];
+
+        setFormData({
+          ...formData,
+          languages: {
+            ...formData.languages,
+            [currentLanguage]: {
+              courseName: "",
+              pages: enPages.length > 0
+                ? enPages.map(p => ({
+                    title: "",
+                    content: "",
+                    time: p.time || "",
+                    timeUnit: p.timeUnit || "minutes",
+                  }))
+                : [{ title: "", content: "", time: "", timeUnit: "minutes" }],
+            },
+          },
+        });
+      }
+    }}
+    disabled={isSubmitting}
+  >
+    <Trash2 className="h-4 w-4 mr-1" />
+    Clear {currentLanguage.toUpperCase()}
+  </Button>
+</div>
                 <div className="space-y-4 sm:space-y-6">
                   {/* Course Name */}
                   <div className="space-y-2">
@@ -884,7 +950,7 @@ export default function CourseManagementPage() {
                                   disabled={isSubmitting}
                                 />
                               </div>
-                              <div className="space-y-2">
+                              {/* <div className="space-y-2">
                                 <Label className="text-sm font-medium text-gray-700">
                                   Duration *
                                 </Label>
@@ -912,7 +978,57 @@ export default function CourseManagementPage() {
                                     <option value="minutes">Minutes</option>
                                   </select>
                                 </div>
-                              </div>
+                              </div> */}
+
+                              {/* Time field — only editable in English */}
+{currentLanguage === "en" ? (
+  <div className="space-y-2">
+    <Label className="text-sm font-medium text-gray-700">
+      Duration * (Applies to all languages)
+    </Label>
+    <div className="flex gap-2">
+      <Input
+        type="number"
+        value={page.time}
+        onChange={(e) => updatePage(index, "time", e.target.value)}
+        className="border-gray-200 flex-1"
+        placeholder="Enter duration..."
+        min="1"
+        disabled={isSubmitting}
+      />
+      <select
+        value={page.timeUnit || "minutes"}
+        onChange={(e) => updatePage(index, "timeUnit", e.target.value)}
+        className="border border-gray-200 rounded-md px-3 py-2 text-sm bg-white"
+        disabled={isSubmitting}
+      >
+        <option value="seconds">Seconds</option>
+        <option value="minutes">Minutes</option>
+      </select>
+    </div>
+  </div>
+) : (
+  <div className="space-y-2 opacity-60">
+    <Label className="text-sm font-medium text-gray-500">
+      Duration (Set in English)
+    </Label>
+    <div className="flex gap-2">
+      <Input
+        value={formData.languages.en.pages[index]?.time || "0"}
+        disabled
+        className="bg-gray-50"
+      />
+      <Input
+        value={formData.languages.en.pages[index]?.timeUnit === "seconds" ? "Seconds" : "Minutes"}
+        disabled
+        className="bg-gray-50"
+      />
+    </div>
+    <p className="text-xs text-gray-500">
+      Time is shared across all languages. Edit in English tab.
+    </p>
+  </div>
+)}
                             </div>
                           </CardContent>
                         </Card>
@@ -1269,10 +1385,12 @@ export default function CourseManagementPage() {
                       </TableRow>
                     ) : (
                       courses.map((course) => {
-                        const displayName =
-                          course.languages?.en?.courseName || course.courseName || "";
-                        const displayPages =
-                          course.languages?.en?.pages || course.pages || [];
+                        // const displayName =
+                        //   course.languages?.en?.courseName || course.courseName || "";
+                        // const displayPages =
+                        //   course.languages?.en?.pages || course.pages || [];
+                        const displayName = getText(course.courseName);
+                        const displayPages = course.pages || [];
                         const languageCount = course.languages
                           ? Object.keys(course.languages).length
                           : 1;
@@ -1484,13 +1602,14 @@ export default function CourseManagementPage() {
                       </div>
                     ) : (
                       courses.map((course, index) => {
-                        const displayName =
-                          course.languages?.en?.courseName ||
-                          course.courseName ||
-                          "";
-                        const displayPages =
-                          course.languages?.en?.pages || course.pages || [];
-
+                        // const displayName =
+                        //   course.languages?.en?.courseName ||
+                        //   course.courseName ||
+                        //   "";
+                        // const displayPages =
+                        //   course.languages?.en?.pages || course.pages || [];
+                        const displayName = getText(course.courseName);
+                        const displayPages = course.pages || [];
                         return (
                           <div
                             key={course._id}
@@ -1544,8 +1663,9 @@ export default function CourseManagementPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-2">
                         <h4 className="font-semibold text-gray-900 text-sm sm:text-base">
-                          {selectedCourse.languages?.en?.courseName ||
-                            selectedCourse.courseName}
+                          {/* {selectedCourse.languages?.en?.courseName ||
+                            selectedCourse.courseName} */}
+                            {getText(selectedCourse.courseName)}
                         </h4>
                         <span className="text-xs sm:text-sm text-gray-500">
                           Created:{" "}
@@ -1619,8 +1739,10 @@ export default function CourseManagementPage() {
                   ).length > 0 ? (
                     (selectedCourse.languages?.en?.pages ||
                       selectedCourse.pages || []).map((page, index) => {
-                      const pageTitle = typeof page.title === 'object' ? page.title.en : page.title;
-                      const pageContent = typeof page.content === 'object' ? page.content.en : page.content;
+                      // const pageTitle = typeof page.title === 'object' ? page.title.en : page.title;
+                      // const pageContent = typeof page.content === 'object' ? page.content.en : page.content;
+                      const pageTitle = getText(page.title);
+                      const pageContent = getText(page.content);
                       return (
                       <div
                         key={index}

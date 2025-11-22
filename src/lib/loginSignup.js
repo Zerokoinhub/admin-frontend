@@ -1,6 +1,7 @@
 
 'use client';
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
+// const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
+const API_BASE = "http://localhost:3002";
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -23,7 +24,7 @@ export default function useLogin() {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(API_BASE+'/admin/login', {
+      const res = await fetch(API_BASE+'/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
