@@ -1,6 +1,7 @@
 // API service for handling user data and helpers
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL
+// const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL
+const API_BASE_URL = "https://admin-backend-production-4ff2.up.railway.app";
 // const API_BASE_URL = "http://localhost:3002"
 
 // Helper: Get auth headers with token
