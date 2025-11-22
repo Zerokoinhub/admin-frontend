@@ -1,7 +1,7 @@
 
 'use client';
-// const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
-const API_BASE = "http://localhost:3002";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
+// const API_BASE = "http://localhost:3002";
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
