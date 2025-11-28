@@ -46,12 +46,11 @@ export default function CourseManagementPage() {
   const [currentLanguage, setCurrentLanguage] = useState("en");
   const [timeUnit, setTimeUnit] = useState("minutes"); // "minutes" or "seconds"
   const [availableLanguages] = useState([
+    { code: "hi", name: "हिंदी" },
     { code: "en", name: "English" },
-    { code: "es", name: "Español" },
-    { code: "fr", name: "Français" },
-    { code: "de", name: "Deutsch" },
-    { code: "zh", name: "中文" },
     { code: "ar", name: "العربية" },
+    { code: "ur", name: "اردو" },
+    { code: "es", name: "Español" },
   ]);
   const [formData, setFormData] = useState({
     languages: {
