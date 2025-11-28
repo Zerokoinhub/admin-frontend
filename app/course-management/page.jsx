@@ -1819,6 +1819,7 @@ export default function CourseManagementPage() {
                   size="sm"
                   variant="outline"
                   className="mt-2 bg-transparent"
+                  
                 >
                   Retry
                 </Button>
