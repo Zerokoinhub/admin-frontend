@@ -1139,7 +1139,7 @@ const UserTable = ({ users, onView, onStatusChange, userRole, refreshing, search
                         <div className="flex items-center gap-2 sm:gap-3">
                           <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
                             <User className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600" />
-                            {console.log(user.name + hi i am tester); console.log(user.photoURL)}
+                            {console.log(user.name + "i am tester"); console.log(user.photoURL)}
                           </div>
                           <div className="min-w-0">
                             <p className="font-medium text-xs sm:text-sm truncate">{user.name || "Unnamed"}</p>
