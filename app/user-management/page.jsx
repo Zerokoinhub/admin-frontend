@@ -1277,29 +1277,14 @@ const UserTable = ({ users, onView, onStatusChange, userRole, refreshing, search
                       <td className="p-2 sm:p-3">
                         <div className="flex items-center gap-2 sm:gap-3">
                           {/* Profile Image - Only show if photoURL exists */}
-                          {user.photoURL ? (
+                          
                             <img 
                               src={user.photoURL} 
                               alt={user.name || "User"}
-                              className="w-6 h-6 sm:w-8 sm:h-8 rounded-full object-cover flex-shrink-0 border border-blue-100"
-                              onError={(e) => {
-                                console.error(`Failed to load profile image for ${user.name}:`, user.photoURL);
-                                e.target.style.display = 'none';
-                                const parent = e.target.parentElement;
-                                parent.innerHTML = `
-                                  <div class="w-6 h-6 sm:w-8 sm:h-8 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0 border border-gray-200">
-                                    <User class="h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
-                                  </div>
-                                `;
-                              }}
+                              className="w-6 h-6 sm:w-8 sm:h-8 rounded-full object-cover flex-shrink-0 border border-blue-100"     
                             />
-                          ) : (
-                            <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0 border border-gray-200">
-                              <User className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
-                            </div>
-                          )}
                           <div className="min-w-0">
-                            <p className="font-medium text-xs sm:text-sm truncate">{user.name || "Unnamed"}</p>
+                            <p className="font-medium text-xs sm:text-sm truncate">{user.name +"test"|| "Unnamed"}</p>
                             <p className="text-xs text-gray-500 truncate">{user.inviteCode || "No code"}</p>
                           </div>
                         </div>
