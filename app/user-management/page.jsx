@@ -46,6 +46,7 @@ import {
   CheckSquare,
   Target,
   MapPin,
+  Upload,
 } from "lucide-react"
 import {
   LineChart,
@@ -77,6 +78,23 @@ const CoinHistoryView = ({ selectedUser, onBack }) => {
     status: "",
   })
   const [stats, setStats] = useState(null)
+
+  // Log user details when component mounts
+  useEffect(() => {
+    if (selectedUser) {
+      console.log("=== Coin History - User Details ===");
+      console.log("User Name:", selectedUser.name);
+      console.log("User Email:", selectedUser.email);
+      console.log("User ID:", selectedUser.id || selectedUser._id);
+      if (selectedUser.photoURL) {
+        console.log("Profile Image:", selectedUser.photoURL);
+      } else {
+        console.log("No profile image available");
+      }
+      console.log("Balance:", selectedUser.balance || 0);
+      console.log("=== End User Details ===");
+    }
+  }, [selectedUser]);
 
   const fetchTransferHistory = useCallback(async () => {
     if (!selectedUser) return
@@ -423,6 +441,45 @@ const EnhancedUserModal = ({ user, open, onClose, onStatusChange, userRole, read
     return { completed, total, percentage: total > 0 ? (completed / total) * 100 : 0 }
   }
 
+  // Log user details when modal opens
+  useEffect(() => {
+    if (open && user) {
+      console.log("=== User Profile Details ===");
+      console.log("User Name:", user.name);
+      console.log("User Email:", user.email);
+      console.log("User ID:", user._id || user.id);
+      
+      // Log image path if it exists
+      if (user.photoURL) {
+        console.log("Profile Image Path:", user.photoURL);
+        console.log("Full Image URL:", user.photoURL);
+        
+        // Check if it's a valid URL
+        try {
+          const url = new URL(user.photoURL);
+          console.log("Valid URL: Yes", `(${url.protocol}//${url.hostname})`);
+        } catch {
+          console.log("Valid URL: No (might be relative path or base64)");
+        }
+      } else {
+        console.log("No profile image available");
+      }
+      
+      // Log all image-related fields
+      console.log("All Screenshots:", user.screenshots || []);
+      console.log("Screenshot Count:", user.screenshots?.length || 0);
+      
+      if (user.screenshots && user.screenshots.length > 0) {
+        console.log("=== Screenshot Details ===");
+        user.screenshots.forEach((screenshot, index) => {
+          console.log(`${index + 1}. ${screenshot}`);
+        });
+      }
+      
+      console.log("=== End User Details ===");
+    }
+  }, [open, user]);
+
   if (!open || !user) return null
 
   // Show coin history view
@@ -467,6 +524,15 @@ const EnhancedUserModal = ({ user, open, onClose, onStatusChange, userRole, read
                     src={user.photoURL} 
                     alt={user.name}
                     className="w-12 h-12 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-blue-200"
+                    onError={(e) => {
+                      console.error("Failed to load profile image:", user.photoURL);
+                      e.target.style.display = 'none';
+                      e.target.parentElement.innerHTML = `
+                        <div class="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 rounded-full flex items-center justify-center border-2 border-gray-200 flex-shrink-0">
+                          <User class="h-5 w-5 sm:h-6 sm:w-6 text-gray-400" />
+                        </div>
+                      `;
+                    }}
                   />
                   <div className="absolute -bottom-1 -right-1 bg-blue-500 rounded-full p-1">
                     <Camera className="h-3 w-3 text-white" />
@@ -614,6 +680,7 @@ const EnhancedUserModal = ({ user, open, onClose, onStatusChange, userRole, read
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="p-2 bg-blue-100 hover:bg-blue-200 rounded-md transition-colors"
+                    onClick={() => console.log("Opening image URL:", user.photoURL)}
                   >
                     <Eye className="h-4 w-4 text-blue-600" />
                   </a>
@@ -1096,6 +1163,38 @@ const UserTable = ({ users, onView, onStatusChange, userRole, refreshing, search
     }
   }
 
+  // Handle view user with logging
+  const handleViewUser = (user) => {
+    console.log("=== User Clicked ===");
+    console.log("User ID:", user._id || user.id);
+    console.log("User Name:", user.name);
+    console.log("User Email:", user.email);
+    
+    if (user.photoURL) {
+      console.log("Profile Image:", user.photoURL);
+    } else {
+      console.log("No profile image");
+    }
+    
+    console.log("Country:", user.country || "Unknown");
+    console.log("Balance:", user.balance || 0);
+    console.log("Screenshot Count:", user.screenshots?.length || 0);
+    
+    if (user.screenshots && user.screenshots.length > 0) {
+      console.log("Screenshot URLs:");
+      user.screenshots.forEach((screenshot, index) => {
+        console.log(`  ${index + 1}. ${screenshot}`);
+      });
+    }
+    
+    console.log("=== End User Info ===");
+    
+    // Call the original onView function
+    if (onView) {
+      onView(user);
+    }
+  }
+
   const getStatusBadge = (user) => {
     return (
       <Badge
@@ -1183,6 +1282,16 @@ const UserTable = ({ users, onView, onStatusChange, userRole, refreshing, search
                               src={user.photoURL} 
                               alt={user.name || "User"}
                               className="w-6 h-6 sm:w-8 sm:h-8 rounded-full object-cover flex-shrink-0 border border-blue-100"
+                              onError={(e) => {
+                                console.error(`Failed to load profile image for ${user.name}:`, user.photoURL);
+                                e.target.style.display = 'none';
+                                const parent = e.target.parentElement;
+                                parent.innerHTML = `
+                                  <div class="w-6 h-6 sm:w-8 sm:h-8 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0 border border-gray-200">
+                                    <User class="h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
+                                  </div>
+                                `;
+                              }}
                             />
                           ) : (
                             <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0 border border-gray-200">
@@ -1245,7 +1354,7 @@ const UserTable = ({ users, onView, onStatusChange, userRole, refreshing, search
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => onView(user)}
+                              onClick={() => handleViewUser(user)}
                               className="bg-transparent hover:bg-gray-50 h-7 w-7 sm:h-8 sm:w-8 p-0"
                             >
                               <Eye className="h-3 w-3" />
@@ -1525,7 +1634,80 @@ const EnhancedUserManagement = () => {
     }
   }
 
-  // Enhanced user loading with comprehensive data handling
+  // Function to log all user images
+  const logAllUserImages = () => {
+    console.log("=== Extracting All User Image Paths ===");
+    
+    const usersWithImages = users.filter(user => user.photoURL);
+    const usersWithoutImages = users.filter(user => !user.photoURL);
+    
+    console.log(`Total Users: ${users.length}`);
+    console.log(`Users with Profile Images: ${usersWithImages.length}`);
+    console.log(`Users without Profile Images: ${usersWithoutImages.length}`);
+    
+    console.log("\n=== Users with Profile Images ===");
+    usersWithImages.forEach((user, index) => {
+      console.log(`${index + 1}. ${user.name}`);
+      console.log(`   Email: ${user.email}`);
+      console.log(`   Image URL: ${user.photoURL}`);
+      
+      // Check if it's a valid URL
+      try {
+        const url = new URL(user.photoURL);
+        console.log(`   Valid URL: Yes (${url.protocol})`);
+      } catch {
+        console.log(`   Valid URL: No (might be relative path or base64)`);
+      }
+    });
+    
+    console.log("\n=== Screenshot Summary ===");
+    let totalScreenshots = 0;
+    users.forEach(user => {
+      if (user.screenshots && user.screenshots.length > 0) {
+        totalScreenshots += user.screenshots.length;
+        console.log(`${user.name}: ${user.screenshots.length} screenshots`);
+      }
+    });
+    console.log(`Total Screenshots: ${totalScreenshots}`);
+    
+    // Log all screenshot URLs
+    console.log("\n=== All Screenshot URLs ===");
+    users.forEach(user => {
+      if (user.screenshots && user.screenshots.length > 0) {
+        console.log(`${user.name}:`);
+        user.screenshots.forEach((screenshot, index) => {
+          console.log(`  ${index + 1}. ${screenshot}`);
+        });
+      }
+    });
+    
+    console.log("=== End Image Extraction ===");
+  };
+
+  // Handle image file upload
+  const handleImageUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    console.log("=== Image File Info ===");
+    console.log("File Name:", file.name);
+    console.log("File Size:", file.size, "bytes");
+    console.log("File Type:", file.type);
+    console.log("Last Modified:", new Date(file.lastModified).toLocaleString());
+    const objectUrl = URL.createObjectURL(file);
+    console.log("Temporary File URL:", objectUrl);
+    console.log("=== End File Info ===");
+    
+    // You can also display a preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      console.log("Base64 Data URL (first 100 chars):", e.target.result.substring(0, 100) + "...");
+      console.log("Full Base64 length:", e.target.result.length, "chars");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Enhanced user loading with image path logging
   const loadUsers = useCallback(async (showLoader = true, page = 1, limit = 1000) => {
     try {
       if (showLoader) setLoading(true)
@@ -1536,6 +1718,27 @@ const EnhancedUserManagement = () => {
       let allUsers = []
       if (response.success) {
         allUsers = response.users || response.data || []
+        
+        // LOG ALL USERS WITH IMAGE PATHS
+        console.log("=== All Users with Image Paths ===");
+        allUsers.forEach((user, index) => {
+          console.log(`${index + 1}. ${user.name || "Unnamed"} (${user.email})`);
+          if (user.photoURL) {
+            console.log(`   Profile Image: ${user.photoURL}`);
+          } else {
+            console.log(`   No profile image`);
+          }
+          
+          // Log all image fields
+          if (user.screenshots && user.screenshots.length > 0) {
+            console.log(`   Screenshots: ${user.screenshots.length}`);
+            user.screenshots.forEach((screenshot, idx) => {
+              console.log(`     ${idx + 1}. ${screenshot}`);
+            });
+          }
+        });
+        console.log("=== End User List ===");
+        
         setPagination(
           response.pagination || {
             currentPage: 1,
@@ -1548,8 +1751,10 @@ const EnhancedUserManagement = () => {
         throw new Error("Failed to fetch users")
       }
 
-      console.log("Loaded users:", allUsers)
-      console.log("Sample user with photoURL:", allUsers[7]?.photoURL)
+      console.log("Loaded users:", allUsers.length);
+      if (allUsers.length > 0) {
+        console.log("Sample user with photoURL:", allUsers[0]?.photoURL || "No photoURL found");
+      }
 
       // Set users directly - NO FORMATTING
       setUsers(allUsers)
@@ -1749,8 +1954,8 @@ const EnhancedUserManagement = () => {
 
   // Handle user selection for profile view
   const handleUserSelect = (user) => {
-    console.log("Selected user:", user)
-    console.log("Selected user photoURL:", user.photoURL)
+    console.log("Selected user:", user.name);
+    console.log("Selected user photoURL:", user.photoURL);
     setSelectedUser(user)
     setModalOpen(true)
   }
@@ -1820,10 +2025,26 @@ const EnhancedUserManagement = () => {
           <Button
             variant="outline"
             className="flex items-center gap-2 bg-transparent hover:bg-gray-50 flex-1 sm:flex-none"
+            onClick={logAllUserImages}
           >
-            <Download className="h-4 w-4" />
-            <span className="hidden sm:inline">Export</span>
+            <Camera className="h-4 w-4" />
+            <span className="hidden sm:inline">Log Images</span>
           </Button>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleImageUpload}
+            className="hidden"
+            id="image-upload"
+          />
+          <label htmlFor="image-upload">
+            <Button variant="outline" className="flex items-center gap-2 bg-transparent hover:bg-gray-50 flex-1 sm:flex-none" asChild>
+              <span>
+                <Upload className="h-4 w-4" />
+                <span className="hidden sm:inline">Upload Image</span>
+              </span>
+            </Button>
+          </label>
         </div>
       </div>
 
