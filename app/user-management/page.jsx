@@ -322,7 +322,6 @@ const EnhancedUserModal = ({ user, open, onClose, onStatusChange, userRole, read
   const [showCoinHistory, setShowCoinHistory] = useState(false)
 
   const canEdit = userRole === "superadmin"
-  const formattedUser = user ? userHelpers.formatUserData(user) : null
 
   // Initialize edit form with current user data including new fields
   const initializeEditForm = (userData) => {
@@ -449,12 +448,6 @@ const EnhancedUserModal = ({ user, open, onClose, onStatusChange, userRole, read
 
   const sessionProgress = getSessionProgress()
 
-  // Generate fallback avatar based on user name
-  const getFallbackAvatar = (name) => {
-    const initials = name ? name.charAt(0).toUpperCase() : 'U';
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=0F82F4&color=fff&bold=true&size=128`;
-  };
-
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
       <motion.div
@@ -467,35 +460,27 @@ const EnhancedUserModal = ({ user, open, onClose, onStatusChange, userRole, read
           {/* Header */}
           <div className="flex items-start justify-between mb-6">
             <div className="min-w-0 flex-1 flex items-center gap-3">
-              {/* Profile Image with fallback */}
-              <div className="relative flex-shrink-0">
-                {formattedUser?.photoURL ? (
-                  <>
-                    <img 
-                      src={formattedUser.photoURL} 
-                      alt={formattedUser?.name}
-                      className="w-12 h-12 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-blue-200"
-                      onError={(e) => {
-                        e.target.onerror = null;
-                        e.target.src = getFallbackAvatar(formattedUser?.name);
-                      }}
-                    />
-                    <div className="absolute -bottom-1 -right-1 bg-blue-500 rounded-full p-1">
-                      <Camera className="h-3 w-3 text-white" />
-                    </div>
-                  </>
-                ) : (
-                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center border-2 border-blue-200">
-                    <span className="text-white font-bold text-lg sm:text-xl">
-                      {formattedUser?.name ? formattedUser.name.charAt(0).toUpperCase() : 'U'}
-                    </span>
+              {/* Profile Image - Only show if photoURL exists */}
+              {user.photoURL ? (
+                <div className="relative flex-shrink-0">
+                  <img 
+                    src={user.photoURL} 
+                    alt={user.name}
+                    className="w-12 h-12 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-blue-200"
+                  />
+                  <div className="absolute -bottom-1 -right-1 bg-blue-500 rounded-full p-1">
+                    <Camera className="h-3 w-3 text-white" />
                   </div>
-                )}
-              </div>
+                </div>
+              ) : (
+                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 rounded-full flex items-center justify-center border-2 border-gray-200 flex-shrink-0">
+                  <User className="h-5 w-5 sm:h-6 sm:w-6 text-gray-400" />
+                </div>
+              )}
               
               <div className="min-w-0 flex-1">
-                <h2 className="text-xl sm:text-2xl font-bold truncate">{formattedUser?.name}</h2>
-                <p className="text-sm sm:text-base text-gray-600 truncate">{formattedUser?.email}</p>
+                <h2 className="text-xl sm:text-2xl font-bold truncate">{user.name}</h2>
+                <p className="text-sm sm:text-base text-gray-600 truncate">{user.email}</p>
                 <div className="flex items-center gap-2 mt-1">
                   {readOnly && (
                     <Badge
@@ -511,10 +496,10 @@ const EnhancedUserModal = ({ user, open, onClose, onStatusChange, userRole, read
             </div>
             <div className="flex flex-col items-end gap-2 flex-shrink-0">
               <Badge
-                variant={formattedUser?.isActive ? "default" : "secondary"}
-                className={formattedUser?.isActive ? "bg-green-100 text-green-800" : "bg-red-500 text-white"}
+                variant={user.isActive ? "default" : "secondary"}
+                className={user.isActive ? "bg-green-100 text-green-800" : "bg-red-500 text-white"}
               >
-                {formattedUser?.isActive ? "Active" : "Inactive"}
+                {user.isActive ? "Active" : "Inactive"}
               </Badge>
             </div>
             <Button variant="ghost" size="sm" onClick={onClose} className="flex-shrink-0 ml-2">
@@ -590,7 +575,7 @@ const EnhancedUserModal = ({ user, open, onClose, onStatusChange, userRole, read
                   className="h-9 sm:h-10"
                 />
               ) : (
-                <Input value={formattedUser?.name} readOnly className="bg-gray-50 h-9 sm:h-10" />
+                <Input value={user.name} readOnly className="bg-gray-50 h-9 sm:h-10" />
               )}
             </div>
 
@@ -608,7 +593,7 @@ const EnhancedUserModal = ({ user, open, onClose, onStatusChange, userRole, read
                   className="h-9 sm:h-10"
                 />
               ) : (
-                <Input value={formattedUser?.email} readOnly className="bg-gray-50 h-9 sm:h-10" />
+                <Input value={user.email} readOnly className="bg-gray-50 h-9 sm:h-10" />
               )}
             </div>
 
@@ -619,7 +604,7 @@ const EnhancedUserModal = ({ user, open, onClose, onStatusChange, userRole, read
               </label>
               <div className="flex items-center gap-2">
                 <Input 
-                  value={user.photoURL || "No image set"} 
+                  value={user.photoURL || "No profile image"} 
                   readOnly 
                   className="bg-gray-50 text-xs h-9 sm:h-10 truncate flex-1" 
                 />
@@ -668,7 +653,7 @@ const EnhancedUserModal = ({ user, open, onClose, onStatusChange, userRole, read
                 />
               ) : (
                 <Input
-                  value={`${formattedUser?.balance} coins`}
+                  value={`${user.balance} coins`}
                   readOnly
                   className="bg-gray-50 font-semibold text-green-600 h-9 sm:h-10"
                 />
@@ -1086,7 +1071,7 @@ const UserTable = ({ users, onView, onStatusChange, userRole, refreshing, search
 
     // Wallet filter
     if (walletFilter !== "all") {
-      const hasWallet = userHelpers.hasWallet(user)
+      const hasWallet = user.walletStatus === "Connected"
       if (walletFilter === "wallet-connected" && !hasWallet) return false
       if (walletFilter === "wallet-not-connected" && hasWallet) return false
     }
@@ -1147,11 +1132,6 @@ const UserTable = ({ users, onView, onStatusChange, userRole, refreshing, search
     return `${completed}/${total}`
   }
 
-  // Generate fallback avatar based on user name
-  const getFallbackAvatar = (name) => {
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=0F82F4&color=fff&bold=true&size=64`;
-  };
-
   return (
     <div className="space-y-4">
       {/* Table */}
@@ -1194,25 +1174,19 @@ const UserTable = ({ users, onView, onStatusChange, userRole, refreshing, search
                 </thead>
                 <tbody>
                   {currentUsers.map((user) => (
-                    <tr key={user.id || user._id} className="border-b hover:bg-gray-50 transition-colors">
+                    <tr key={user._id} className="border-b hover:bg-gray-50 transition-colors">
                       <td className="p-2 sm:p-3">
                         <div className="flex items-center gap-2 sm:gap-3">
-                          {/* Profile Image with fallback */}
+                          {/* Profile Image - Only show if photoURL exists */}
                           {user.photoURL ? (
                             <img 
                               src={user.photoURL} 
                               alt={user.name || "User"}
                               className="w-6 h-6 sm:w-8 sm:h-8 rounded-full object-cover flex-shrink-0 border border-blue-100"
-                              onError={(e) => {
-                                e.target.onerror = null;
-                                e.target.src = getFallbackAvatar(user.name);
-                              }}
                             />
                           ) : (
-                            <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
-                              <span className="text-white font-bold text-xs">
-                                {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
-                              </span>
+                            <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0 border border-gray-200">
+                              <User className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
                             </div>
                           )}
                           <div className="min-w-0">
@@ -1249,7 +1223,7 @@ const UserTable = ({ users, onView, onStatusChange, userRole, refreshing, search
                       <td className="p-2 sm:p-3">{getUserTypeBadge(user)}</td>
                       <td className="p-2 sm:p-3">
                         <div className="flex items-center gap-1">
-                          {userHelpers.hasWallet(user) ? (
+                          {user.walletStatus === "Connected" ? (
                             <Badge className="bg-green-100 text-green-800 text-xs">
                               <Wallet className="h-3 w-3 mr-1" />
                               <span className="hidden sm:inline">{user.walletStatus || "Connected"}</span>
@@ -1282,7 +1256,7 @@ const UserTable = ({ users, onView, onStatusChange, userRole, refreshing, search
                               size="sm"
                               variant={user.isActive ? "destructive" : "default"}
                               onClick={() =>
-                                handleStatusChange(user.id || user._id, user.isActive ? "Active" : "Banned")
+                                handleStatusChange(user._id, user.isActive ? "Active" : "Banned")
                               }
                               disabled={refreshing}
                               className="h-7 w-7 sm:h-8 sm:w-8 p-0"
@@ -1470,7 +1444,15 @@ const EnhancedUserManagement = () => {
         lowEngagementUsers: 0,
       }
     }
-    const engagementScores = users.map((user) => userHelpers.getUserEngagementScore(user))
+    const engagementScores = users.map((user) => {
+      let score = 0
+      if (user.balance > 100) score += 20
+      if (user.recentAmount > 0) score += 15
+      if (user.sessions && user.sessions.length > 0) score += 25
+      if (user.sessions && user.sessions.some(s => s.completedAt)) score += 30
+      if (user.walletStatus === "Connected") score += 10
+      return Math.min(100, score)
+    })
     const averageScore = engagementScores.reduce((sum, score) => sum + score, 0) / engagementScores.length
     return {
       averageEngagementScore: Math.round(averageScore),
@@ -1494,10 +1476,9 @@ const EnhancedUserManagement = () => {
     let totalRecentAmount = 0
     let completedSessions = 0
     let totalSessions = 0
-    let usersWithProfileImages = 0
 
     users.forEach((user) => {
-      const balance = user.balance || user.coins || 0
+      const balance = user.balance || 0
       const userCreatedAt = new Date(user.createdAt)
       const daysDiff = Math.floor((now - userCreatedAt) / (1000 * 60 * 60 * 24))
 
@@ -1505,9 +1486,6 @@ const EnhancedUserManagement = () => {
       if (balance > 1000) topUsers++
       if (daysDiff < 15) newUsers++
       if (daysDiff >= 15) oldUsers++
-
-      // Profile image metrics
-      if (user.photoURL) usersWithProfileImages++
 
       // Notification and FCM metrics
       if (user.notificationSettings) usersWithNotifications++
@@ -1535,7 +1513,6 @@ const EnhancedUserManagement = () => {
       topUsers,
       newUsers,
       oldUsers,
-      usersWithProfileImages,
       usersWithNotifications,
       usersWithFcmTokens,
       usersWithScreenshots,
@@ -1571,64 +1548,59 @@ const EnhancedUserManagement = () => {
         throw new Error("Failed to fetch users")
       }
 
-      console.log("Loaded users:", allUsers.length)
+      console.log("Loaded users:", allUsers)
+      console.log("Sample user with photoURL:", allUsers[7]?.photoURL)
 
-      // Format users with enhanced helper
-      const formattedUsers = userHelpers.formatUserList(allUsers)
-      setUsers(formattedUsers)
-      setFilteredUsers(formattedUsers)
+      // Set users directly - NO FORMATTING
+      setUsers(allUsers)
+      setFilteredUsers(allUsers)
 
-      // Calculate comprehensive stats using enhanced helpers
-      const calculatedStats = userHelpers.calculateStats(allUsers)
-      const growthMetrics = userHelpers.calculateGrowthMetrics(allUsers)
-      const engagementMetrics = calculateEngagementMetrics(allUsers)
+      // Calculate comprehensive stats
+      const totalUsers = allUsers.length
+      const activeUsers = allUsers.filter(u => u.isActive).length
+      const inactiveUsers = totalUsers - activeUsers
+      const usersWithWallets = allUsers.filter(u => u.walletStatus === "Connected").length
+      const totalBalance = allUsers.reduce((sum, user) => sum + (user.balance || 0), 0)
+      const calculatorUsers = allUsers.filter(u => u.calculatorUsage > 0).length
+      const adminUsers = allUsers.filter(u => u.role === "admin" || u.role === "superadmin").length
+      const regularUsers = totalUsers - adminUsers
+      const usersWithFirebase = allUsers.filter(u => u.firebaseUid).length
+      const usersWithSessions = allUsers.filter(u => u.sessions && u.sessions.length > 0).length
+      const recentlyUpdated = allUsers.filter(u => {
+        const updatedAt = new Date(u.updatedAt)
+        const now = new Date()
+        const daysDiff = (now - updatedAt) / (1000 * 60 * 60 * 24)
+        return daysDiff < 7
+      }).length
+      const totalReferrals = allUsers.filter(u => u.referredBy).length
+
       const additionalMetrics = calculateAdditionalMetrics(allUsers)
-
-      // Try to get additional data from specific endpoints
-      let calculatorUsersCount = calculatedStats.calculatorUsers
-      let totalWalletsCount = calculatedStats.usersWithWallets
-      let totalReferralsCount = calculatedStats.totalReferrals
-
-      try {
-        const [calculatorRes, walletsRes, referralsRes] = await Promise.allSettled([
-          userAPI.getCalculatorUsers(),
-          userAPI.getTotalWallets(),
-          userAPI.getTotalReferrals(),
-        ])
-
-        if (calculatorRes.status === "fulfilled" && calculatorRes.value?.data) {
-          calculatorUsersCount = Array.isArray(calculatorRes.value.data)
-            ? calculatorRes.value.data.length
-            : calculatorRes.value.data.count || calculatorUsersCount
-        }
-
-        if (walletsRes.status === "fulfilled" && walletsRes.value?.data) {
-          totalWalletsCount = walletsRes.value.data.count || walletsRes.value.data || totalWalletsCount
-        }
-
-        if (referralsRes.status === "fulfilled" && referralsRes.value?.data) {
-          totalReferralsCount = referralsRes.value.data.count || referralsRes.value.data || totalReferralsCount
-        }
-      } catch (apiError) {
-        console.warn("Some API endpoints failed, using calculated values:", apiError)
-      }
+      const engagementMetrics = calculateEngagementMetrics(allUsers)
 
       // Set enhanced stats with API response data
       setStats({
-        totalUsers: calculatedStats.totalUsers,
-        activeUsers: calculatedStats.activeUsers,
-        inactiveUsers: calculatedStats.inactiveUsers,
-        usersWithWallets: totalWalletsCount,
-        totalBalance: calculatedStats.totalBalance,
-        calculatorUsers: calculatorUsersCount,
-        adminUsers: calculatedStats.adminUsers,
-        regularUsers: calculatedStats.regularUsers,
-        usersWithFirebase: calculatedStats.usersWithFirebase,
-        usersWithSessions: calculatedStats.usersWithSessions,
-        recentlyUpdated: calculatedStats.recentlyUpdated,
-        totalReferrals: totalReferralsCount,
+        totalUsers,
+        activeUsers,
+        inactiveUsers,
+        usersWithWallets,
+        totalBalance,
+        calculatorUsers,
+        adminUsers,
+        regularUsers,
+        usersWithFirebase,
+        usersWithSessions,
+        recentlyUpdated,
+        totalReferrals,
         ...additionalMetrics,
-        growthMetrics,
+        growthMetrics: {
+          newUsersLast30Days: 0,
+          newUsersLast7Days: 0,
+          newUsersToday: 0,
+          activeUsersLast7Days: 0,
+          growthRate30Days: 0,
+          growthRate7Days: 0,
+          weeklyActivityRate: 0,
+        },
         engagementMetrics,
       })
     } catch (err) {
@@ -1667,7 +1639,7 @@ const EnhancedUserManagement = () => {
       // Update users list immediately for better UX
       const updateUsersList = (prevUsers) => {
         return prevUsers.map((user) =>
-          (user.id || user._id) === userId
+          user._id === userId
             ? {
                 ...user,
                 isActive: newStatus,
@@ -1682,14 +1654,15 @@ const EnhancedUserManagement = () => {
 
       // Recalculate stats with updated data
       const updatedUserList = users.map((user) =>
-        (user.id || user._id) === userId ? { ...user, isActive: newStatus } : user,
+        user._id === userId ? { ...user, isActive: newStatus } : user,
       )
-      const calculatedStats = userHelpers.calculateStats(updatedUserList)
+      const activeUsers = updatedUserList.filter(u => u.isActive).length
+      const inactiveUsers = updatedUserList.length - activeUsers
       const engagementMetrics = calculateEngagementMetrics(updatedUserList)
       setStats((prevStats) => ({
         ...prevStats,
-        activeUsers: calculatedStats.activeUsers,
-        inactiveUsers: calculatedStats.inactiveUsers,
+        activeUsers,
+        inactiveUsers,
         engagementMetrics,
       }))
 
@@ -1713,7 +1686,7 @@ const EnhancedUserManagement = () => {
     if (!users.length) return []
     // Group users by month with better date handling
     const groupedByMonth = users.reduce((acc, user) => {
-      const date = new Date(user.joinedDate || user.createdAt)
+      const date = new Date(user.createdAt)
       if (isNaN(date.getTime())) return acc // Skip invalid dates
       const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
       acc[monthYear] = (acc[monthYear] || 0) + 1
@@ -1751,9 +1724,9 @@ const EnhancedUserManagement = () => {
         color: "#8B5CF6",
       },
       {
-        name: "With Profile Images",
-        value: stats.usersWithProfileImages || 0,
-        color: "#EC4899",
+        name: "With Notifications",
+        value: stats.usersWithNotifications,
+        color: "#06B6D4",
       },
     ]
   }
@@ -1776,6 +1749,8 @@ const EnhancedUserManagement = () => {
 
   // Handle user selection for profile view
   const handleUserSelect = (user) => {
+    console.log("Selected user:", user)
+    console.log("Selected user photoURL:", user.photoURL)
     setSelectedUser(user)
     setModalOpen(true)
   }
@@ -1785,7 +1760,7 @@ const EnhancedUserManagement = () => {
     // Update the users list with the updated user
     const updateUsersList = (prevUsers) => {
       return prevUsers.map((u) =>
-        (u.id || u._id) === (updatedUser.id || updatedUser._id)
+        u._id === updatedUser._id
           ? {
               ...u,
               ...updatedUser,
@@ -1801,14 +1776,15 @@ const EnhancedUserManagement = () => {
 
     // Recalculate stats
     const updatedUserList = users.map((user) =>
-      (user.id || user._id) === (updatedUser.id || updatedUser._id) ? { ...user, ...updatedUser } : user,
+      user._id === updatedUser._id ? { ...user, ...updatedUser } : user,
     )
-    const calculatedStats = userHelpers.calculateStats(updatedUserList)
+    const activeUsers = updatedUserList.filter(u => u.isActive).length
+    const inactiveUsers = updatedUserList.length - activeUsers
     const engagementMetrics = calculateEngagementMetrics(updatedUserList)
     setStats((prevStats) => ({
       ...prevStats,
-      activeUsers: calculatedStats.activeUsers,
-      inactiveUsers: calculatedStats.inactiveUsers,
+      activeUsers,
+      inactiveUsers,
       engagementMetrics,
     }))
 
@@ -1959,11 +1935,11 @@ const EnhancedUserManagement = () => {
           trend={stats.connectedWallets > 0 ? "+8%" : "0%"}
         />
         <DashboardStatCard
-          icon={Camera}
-          label="Profile Images"
-          value={stats.usersWithProfileImages?.toString() || "0"}
-          subtitle={`${Math.round((stats.usersWithProfileImages / Math.max(stats.totalUsers, 1)) * 100)}% have photo`}
-          trend="+25%"
+          icon={Play}
+          label="Sessions"
+          value={`${stats.completedSessions}/${stats.totalSessions}`}
+          subtitle={`${((stats.completedSessions / Math.max(stats.totalSessions, 1)) * 100).toFixed(1)}% completed`}
+          trend={stats.completedSessions > 0 ? "+15%" : "0%"}
         />
         <DashboardStatCard
           icon={Bell}
