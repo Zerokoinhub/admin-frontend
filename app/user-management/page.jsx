@@ -449,6 +449,12 @@ const EnhancedUserModal = ({ user, open, onClose, onStatusChange, userRole, read
 
   const sessionProgress = getSessionProgress()
 
+  // Generate fallback avatar based on user name
+  const getFallbackAvatar = (name) => {
+    const initials = name ? name.charAt(0).toUpperCase() : 'U';
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=0F82F4&color=fff&bold=true&size=128`;
+  };
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
       <motion.div
@@ -460,23 +466,48 @@ const EnhancedUserModal = ({ user, open, onClose, onStatusChange, userRole, read
         <div className="p-4 sm:p-6">
           {/* Header */}
           <div className="flex items-start justify-between mb-6">
-            <div className="min-w-0 flex-1">
-              <h2 className="text-xl sm:text-2xl font-bold flex items-center gap-2 mb-2">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <User className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
-                </div>
-                <span className="truncate">{formattedUser?.name}</span>
-                {readOnly && (
-                  <Badge
-                    variant="outline"
-                    className="ml-2 bg-orange-50 text-orange-700 border-orange-200 flex-shrink-0"
-                  >
-                    <Lock className="h-3 w-3 mr-1" />
-                    <span className="hidden sm:inline">Read Only</span>
-                  </Badge>
+            <div className="min-w-0 flex-1 flex items-center gap-3">
+              {/* Profile Image with fallback */}
+              <div className="relative flex-shrink-0">
+                {formattedUser?.photoURL ? (
+                  <>
+                    <img 
+                      src={formattedUser.photoURL} 
+                      alt={formattedUser?.name}
+                      className="w-12 h-12 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-blue-200"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = getFallbackAvatar(formattedUser?.name);
+                      }}
+                    />
+                    <div className="absolute -bottom-1 -right-1 bg-blue-500 rounded-full p-1">
+                      <Camera className="h-3 w-3 text-white" />
+                    </div>
+                  </>
+                ) : (
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center border-2 border-blue-200">
+                    <span className="text-white font-bold text-lg sm:text-xl">
+                      {formattedUser?.name ? formattedUser.name.charAt(0).toUpperCase() : 'U'}
+                    </span>
+                  </div>
                 )}
-              </h2>
-              <p className="text-sm sm:text-base text-gray-600">{formattedUser?.email}</p>
+              </div>
+              
+              <div className="min-w-0 flex-1">
+                <h2 className="text-xl sm:text-2xl font-bold truncate">{formattedUser?.name}</h2>
+                <p className="text-sm sm:text-base text-gray-600 truncate">{formattedUser?.email}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  {readOnly && (
+                    <Badge
+                      variant="outline"
+                      className="bg-orange-50 text-orange-700 border-orange-200 flex-shrink-0"
+                    >
+                      <Lock className="h-3 w-3 mr-1" />
+                      <span className="hidden sm:inline">Read Only</span>
+                    </Badge>
+                  )}
+                </div>
+              </div>
             </div>
             <div className="flex flex-col items-end gap-2 flex-shrink-0">
               <Badge
@@ -486,7 +517,7 @@ const EnhancedUserModal = ({ user, open, onClose, onStatusChange, userRole, read
                 {formattedUser?.isActive ? "Active" : "Inactive"}
               </Badge>
             </div>
-            <Button variant="ghost" size="sm" onClick={onClose} className="flex-shrink-0">
+            <Button variant="ghost" size="sm" onClick={onClose} className="flex-shrink-0 ml-2">
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -579,6 +610,30 @@ const EnhancedUserModal = ({ user, open, onClose, onStatusChange, userRole, read
               ) : (
                 <Input value={formattedUser?.email} readOnly className="bg-gray-50 h-9 sm:h-10" />
               )}
+            </div>
+
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-gray-600 mb-2 flex items-center gap-2">
+                <Camera className="h-3 w-3 sm:h-4 sm:w-4" />
+                Profile Image
+              </label>
+              <div className="flex items-center gap-2">
+                <Input 
+                  value={user.photoURL || "No image set"} 
+                  readOnly 
+                  className="bg-gray-50 text-xs h-9 sm:h-10 truncate flex-1" 
+                />
+                {user.photoURL && (
+                  <a 
+                    href={user.photoURL} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="p-2 bg-blue-100 hover:bg-blue-200 rounded-md transition-colors"
+                  >
+                    <Eye className="h-4 w-4 text-blue-600" />
+                  </a>
+                )}
+              </div>
             </div>
 
             <div>
@@ -918,10 +973,10 @@ const EnhancedUserModal = ({ user, open, onClose, onStatusChange, userRole, read
 
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t">
-            {/* <Button onClick={() => setShowCoinHistory(true)} className="flex-1">
+            <Button onClick={() => setShowCoinHistory(true)} className="flex-1">
               <Coins className="h-4 w-4 mr-2" />
               View Coin History
-            </Button> */}
+            </Button>
             {editMode && canEdit ? (
               <>
                 <Button onClick={handleSaveEdit} disabled={saving} className="flex-1 bg-green-600 hover:bg-green-700">
@@ -1092,6 +1147,11 @@ const UserTable = ({ users, onView, onStatusChange, userRole, refreshing, search
     return `${completed}/${total}`
   }
 
+  // Generate fallback avatar based on user name
+  const getFallbackAvatar = (name) => {
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=0F82F4&color=fff&bold=true&size=64`;
+  };
+
   return (
     <div className="space-y-4">
       {/* Table */}
@@ -1137,10 +1197,24 @@ const UserTable = ({ users, onView, onStatusChange, userRole, refreshing, search
                     <tr key={user.id || user._id} className="border-b hover:bg-gray-50 transition-colors">
                       <td className="p-2 sm:p-3">
                         <div className="flex items-center gap-2 sm:gap-3">
-                          <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                            <User className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600" />
-                            console.log("test" + user.name + ",,," + user.photoURL )
-                          </div>
+                          {/* Profile Image with fallback */}
+                          {user.photoURL ? (
+                            <img 
+                              src={user.photoURL} 
+                              alt={user.name || "User"}
+                              className="w-6 h-6 sm:w-8 sm:h-8 rounded-full object-cover flex-shrink-0 border border-blue-100"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = getFallbackAvatar(user.name);
+                              }}
+                            />
+                          ) : (
+                            <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
+                              <span className="text-white font-bold text-xs">
+                                {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                              </span>
+                            </div>
+                          )}
                           <div className="min-w-0">
                             <p className="font-medium text-xs sm:text-sm truncate">{user.name || "Unnamed"}</p>
                             <p className="text-xs text-gray-500 truncate">{user.inviteCode || "No code"}</p>
@@ -1420,6 +1494,7 @@ const EnhancedUserManagement = () => {
     let totalRecentAmount = 0
     let completedSessions = 0
     let totalSessions = 0
+    let usersWithProfileImages = 0
 
     users.forEach((user) => {
       const balance = user.balance || user.coins || 0
@@ -1430,6 +1505,9 @@ const EnhancedUserManagement = () => {
       if (balance > 1000) topUsers++
       if (daysDiff < 15) newUsers++
       if (daysDiff >= 15) oldUsers++
+
+      // Profile image metrics
+      if (user.photoURL) usersWithProfileImages++
 
       // Notification and FCM metrics
       if (user.notificationSettings) usersWithNotifications++
@@ -1457,6 +1535,7 @@ const EnhancedUserManagement = () => {
       topUsers,
       newUsers,
       oldUsers,
+      usersWithProfileImages,
       usersWithNotifications,
       usersWithFcmTokens,
       usersWithScreenshots,
@@ -1672,9 +1751,9 @@ const EnhancedUserManagement = () => {
         color: "#8B5CF6",
       },
       {
-        name: "With Notifications",
-        value: stats.usersWithNotifications,
-        color: "#06B6D4",
+        name: "With Profile Images",
+        value: stats.usersWithProfileImages || 0,
+        color: "#EC4899",
       },
     ]
   }
@@ -1880,11 +1959,11 @@ const EnhancedUserManagement = () => {
           trend={stats.connectedWallets > 0 ? "+8%" : "0%"}
         />
         <DashboardStatCard
-          icon={Play}
-          label="Sessions"
-          value={`${stats.completedSessions}/${stats.totalSessions}`}
-          subtitle={`${((stats.completedSessions / Math.max(stats.totalSessions, 1)) * 100).toFixed(1)}% completed`}
-          trend={stats.completedSessions > 0 ? "+15%" : "0%"}
+          icon={Camera}
+          label="Profile Images"
+          value={stats.usersWithProfileImages?.toString() || "0"}
+          subtitle={`${Math.round((stats.usersWithProfileImages / Math.max(stats.totalUsers, 1)) * 100)}% have photo`}
+          trend="+25%"
         />
         <DashboardStatCard
           icon={Bell}
