@@ -65,6 +65,92 @@ import { motion, AnimatePresence } from "framer-motion"
 import { userAPI, userHelpers } from "../../src/lib/api"
 import FullScreenLoader from "../../src/components/ui/FullScreenLoader"
 
+// User Avatar Component with profile image and fallback initials
+const UserAvatar = ({ user, size = "sm" }) => {
+  const sizes = {
+    xs: "w-6 h-6",
+    sm: "w-8 h-8",
+    md: "w-10 h-10",
+    lg: "w-12 h-12",
+    xl: "w-16 h-16"
+  };
+  
+  const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  
+  // Get image URL from user object
+  const imageUrl = user?.photoURL || user?.profileImage || user?.avatar || user?.imageUrl;
+  
+  // Get user initials for fallback
+  const getInitials = () => {
+    if (!user?.name) return "NaN";
+    const nameParts = user.name.trim().split(' ');
+    if (nameParts.length >= 2) {
+      return (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase();
+    }
+    return user.name.charAt(0).toUpperCase();
+  };
+  
+  // Get background color based on name
+  const getColorFromName = (name) => {
+    if (!name) return 'bg-blue-500';
+    const colors = [
+      'bg-blue-500', 'bg-green-500', 'bg-purple-500', 
+      'bg-red-500', 'bg-yellow-500', 'bg-indigo-500',
+      'bg-pink-500', 'bg-teal-500'
+    ];
+    const index = name.length % colors.length;
+    return colors[index];
+  };
+  
+  const initials = getInitials();
+  const bgColor = getColorFromName(user?.name);
+  
+  // Reset when user changes
+  useEffect(() => {
+    setImageError(false);
+    setImageLoaded(false);
+  }, [imageUrl]);
+  
+  // Show fallback if no image or image failed to load
+  const showFallback = !imageUrl || imageError || !imageLoaded;
+  
+  return (
+    <div className={`${sizes[size]} rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 ${showFallback ? `${bgColor} text-white` : 'bg-gray-100'}`}>
+      {imageUrl && !imageError ? (
+        <>
+          <img
+            src={imageUrl}
+            alt={user?.name || "User"}
+            className={`w-full h-full object-cover ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+            onLoad={() => {
+              setImageLoaded(true);
+              setImageError(false);
+            }}
+            onError={() => {
+              setImageError(true);
+              setImageLoaded(false);
+            }}
+            loading="lazy"
+          />
+          {!imageLoaded && !imageError && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-300 text-xl"></div>
+            </div>
+          )}
+        </>
+      ) : null}
+      
+      {/* Fallback with initials */}
+      {showFallback && (
+        <div className={`flex items-center justify-center w-full h-full font-semibold${size === 'xl' ? ' text-2xl' : size === 'lg' ? ' text-xl' : size === 'md' ? ' text-lg' : ' text-sm'}`}>
+          {initials}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Enhanced Coin History Component
 const CoinHistoryView = ({ selectedUser, onBack }) => {
   const [transferHistory, setTransferHistory] = useState([])
@@ -98,7 +184,6 @@ const CoinHistoryView = ({ selectedUser, onBack }) => {
     } catch (apiError) {
       console.warn("API call failed, using mock data:", apiError)
       setError("Using mock data - API unavailable")
-      // Enhanced mock data for demonstration
       const mockTransfers = [
         {
           id: "1",
@@ -175,16 +260,19 @@ const CoinHistoryView = ({ selectedUser, onBack }) => {
 
   return (
     <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
-      {/* Header */}
+      {/* Header with user avatar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-2">
           <Button onClick={onBack} variant="outline" className="w-fit bg-transparent hover:bg-gray-50">
             <ChevronLeft className="h-4 w-4 mr-2" />
             Back to Profile
           </Button>
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Coin History - {selectedUser?.name}</h2>
-            <p className="text-sm sm:text-base text-gray-600">Complete transaction history and statistics</p>
+          <div className="flex items-center gap-3">
+            <UserAvatar user={selectedUser} size="md" />
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Coin History - {selectedUser?.name}</h2>
+              <p className="text-sm sm:text-base text-gray-600">Complete transaction history and statistics</p>
+            </div>
           </div>
         </div>
         <Button onClick={fetchTransferHistory} disabled={loading} className="w-fit">
@@ -313,7 +401,7 @@ const CoinHistoryView = ({ selectedUser, onBack }) => {
   )
 }
 
-// Enhanced User Profile Modal with all API fields
+// Enhanced User Profile Modal
 const EnhancedUserModal = ({ user, open, onClose, onStatusChange, userRole, readOnly }) => {
   const [editMode, setEditMode] = useState(false)
   const [editFormData, setEditFormData] = useState({})
@@ -324,7 +412,7 @@ const EnhancedUserModal = ({ user, open, onClose, onStatusChange, userRole, read
   const canEdit = userRole === "superadmin"
   const formattedUser = user ? userHelpers.formatUserData(user) : null
 
-  // Initialize edit form with current user data including new fields
+  // Initialize edit form
   const initializeEditForm = (userData) => {
     setEditFormData({
       name: userData.name || "",
@@ -458,25 +546,23 @@ const EnhancedUserModal = ({ user, open, onClose, onStatusChange, userRole, read
         className="bg-white rounded-lg w-full max-w-5xl max-h-[95vh] overflow-y-auto shadow-2xl"
       >
         <div className="p-4 sm:p-6">
-          {/* Header */}
+          {/* Header with user avatar */}
           <div className="flex items-start justify-between mb-6">
-            <div className="min-w-0 flex-1">
-              <h2 className="text-xl sm:text-2xl font-bold flex items-center gap-2 mb-2">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <User className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
-                </div>
-                <span className="truncate">{formattedUser?.name}</span>
-                {readOnly && (
-                  <Badge
-                    variant="outline"
-                    className="ml-2 bg-orange-50 text-orange-700 border-orange-200 flex-shrink-0"
-                  >
-                    <Lock className="h-3 w-3 mr-1" />
-                    <span className="hidden sm:inline">Read Only</span>
-                  </Badge>
-                )}
-              </h2>
-              <p className="text-sm sm:text-base text-gray-600">{formattedUser?.email}</p>
+            <div className="min-w-0 flex-1 flex items-center gap-3">
+              <UserAvatar user={user} size="xl" />
+              <div className="min-w-0">
+                <h2 className="text-xl sm:text-2xl font-bold truncate">{formattedUser?.name}</h2>
+                <p className="text-sm sm:text-base text-gray-600 truncate">{formattedUser?.email}</p>
+              </div>
+              {readOnly && (
+                <Badge
+                  variant="outline"
+                  className="ml-2 bg-orange-50 text-orange-700 border-orange-200 flex-shrink-0"
+                >
+                  <Lock className="h-3 w-3 mr-1" />
+                  <span className="hidden sm:inline">Read Only</span>
+                </Badge>
+              )}
             </div>
             <div className="flex flex-col items-end gap-2 flex-shrink-0">
               <Badge
@@ -872,7 +958,7 @@ const EnhancedUserModal = ({ user, open, onClose, onStatusChange, userRole, read
             </div>
           </div>
 
-          {/* Account Status Toggle - Only for superadmin in edit mode */}
+          {/* Account Status Toggle */}
           {editMode && canEdit && (
             <div className="mb-6">
               <label className="flex items-center space-x-2">
@@ -918,10 +1004,6 @@ const EnhancedUserModal = ({ user, open, onClose, onStatusChange, userRole, read
 
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t">
-            {/* <Button onClick={() => setShowCoinHistory(true)} className="flex-1">
-              <Coins className="h-4 w-4 mr-2" />
-              View Coin History
-            </Button> */}
             {editMode && canEdit ? (
               <>
                 <Button onClick={handleSaveEdit} disabled={saving} className="flex-1 bg-green-600 hover:bg-green-700">
@@ -983,14 +1065,14 @@ const EnhancedUserModal = ({ user, open, onClose, onStatusChange, userRole, read
   )
 }
 
-// Enhanced User Table Component with new fields
+// Enhanced User Table Component
 const UserTable = ({ users, onView, onStatusChange, userRole, refreshing, searchTerm, statusFilter, walletFilter }) => {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
   const canEdit = userRole === "superadmin" || userRole === "editor"
   const canViewAll = userRole === "superadmin"
 
-  // Filter users based on all criteria
+  // Filter users
   const filteredUsers = users.filter((user) => {
     // Search filter
     if (searchTerm) {
@@ -1137,9 +1219,7 @@ const UserTable = ({ users, onView, onStatusChange, userRole, refreshing, search
                     <tr key={user.id || user._id} className="border-b hover:bg-gray-50 transition-colors">
                       <td className="p-2 sm:p-3">
                         <div className="flex items-center gap-2 sm:gap-3">
-                          <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                            <User className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600" />
-                          </div>
+                          <UserAvatar user={user} size="md" />
                           <div className="min-w-0">
                             <p className="font-medium text-xs sm:text-sm truncate">{user.name || "Unnamed"}</p>
                             <p className="text-xs text-gray-500 truncate">{user.inviteCode || "No code"}</p>
@@ -1298,7 +1378,7 @@ const UserTable = ({ users, onView, onStatusChange, userRole, refreshing, search
 const EnhancedUserManagement = () => {
   const [users, setUsers] = useState([])
   const [filteredUsers, setFilteredUsers] = useState([])
-  const [viewMode, setViewMode] = useState("analytics") // 'analytics', 'profile'
+  const [viewMode, setViewMode] = useState("analytics")
   const [selectedUser, setSelectedUser] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -1317,7 +1397,7 @@ const EnhancedUserManagement = () => {
   const [userRole, setUserRole] = useState(null)
   const [roleLoading, setRoleLoading] = useState(true)
 
-  // Get user role from localStorage with enhanced checking
+  // Get user role
   useEffect(() => {
     try {
       const userStr = localStorage.getItem("user") || localStorage.getItem("role") || '"viewer"'
@@ -1328,7 +1408,6 @@ const EnhancedUserManagement = () => {
       } catch {
         role = userStr || "viewer"
       }
-      console.log("the current mode ", role)
       setUserRole(role)
     } catch (error) {
       console.error("Error getting user role:", error)
@@ -1344,7 +1423,7 @@ const EnhancedUserManagement = () => {
   const canViewGraphs = userRole === "superadmin"
   const isViewer = userRole === "viewer"
 
-  // Enhanced stats with new metrics from API response
+  // Enhanced stats
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeUsers: 0,
@@ -1404,7 +1483,7 @@ const EnhancedUserManagement = () => {
     }
   }
 
-  // Calculate additional user metrics from API response
+  // Calculate additional user metrics
   const calculateAdditionalMetrics = (users) => {
     const now = new Date()
     let topUsers = 0
@@ -1468,13 +1547,13 @@ const EnhancedUserManagement = () => {
     }
   }
 
-  // Enhanced user loading with comprehensive data handling
+  // Enhanced user loading
   const loadUsers = useCallback(async (showLoader = true, page = 1, limit = 1000) => {
     try {
       if (showLoader) setLoading(true)
       setError(null)
 
-      // Fetch users with enhanced API response handling
+      // Fetch users
       const response = await userAPI.getUsers(page, limit)
       let allUsers = []
       if (response.success) {
@@ -1491,20 +1570,18 @@ const EnhancedUserManagement = () => {
         throw new Error("Failed to fetch users")
       }
 
-      console.log("Loaded users:", allUsers.length)
-
-      // Format users with enhanced helper
+      // Format users
       const formattedUsers = userHelpers.formatUserList(allUsers)
       setUsers(formattedUsers)
       setFilteredUsers(formattedUsers)
 
-      // Calculate comprehensive stats using enhanced helpers
+      // Calculate stats
       const calculatedStats = userHelpers.calculateStats(allUsers)
       const growthMetrics = userHelpers.calculateGrowthMetrics(allUsers)
       const engagementMetrics = calculateEngagementMetrics(allUsers)
       const additionalMetrics = calculateAdditionalMetrics(allUsers)
 
-      // Try to get additional data from specific endpoints
+      // Try to get additional data
       let calculatorUsersCount = calculatedStats.calculatorUsers
       let totalWalletsCount = calculatedStats.usersWithWallets
       let totalReferralsCount = calculatedStats.totalReferrals
@@ -1530,10 +1607,10 @@ const EnhancedUserManagement = () => {
           totalReferralsCount = referralsRes.value.data.count || referralsRes.value.data || totalReferralsCount
         }
       } catch (apiError) {
-        console.warn("Some API endpoints failed, using calculated values:", apiError)
+        console.warn("Some API endpoints failed:", apiError)
       }
 
-      // Set enhanced stats with API response data
+      // Set enhanced stats
       setStats({
         totalUsers: calculatedStats.totalUsers,
         activeUsers: calculatedStats.activeUsers,
@@ -1570,7 +1647,7 @@ const EnhancedUserManagement = () => {
     setTimeout(() => setSuccessMessage(""), 3000)
   }
 
-  // Enhanced user status change with better error handling using the updated API
+  // Enhanced user status change
   const handleUserStatusChange = async (userId, currentStatus) => {
     try {
       setRefreshing(true)
@@ -1578,13 +1655,12 @@ const EnhancedUserManagement = () => {
       const isCurrentlyActive = currentStatus === "Active"
       const newStatus = !isCurrentlyActive
 
-      // Use the enhanced updateUserStatus function from api.js
       const result = await userAPI.updateUserStatus(userId, newStatus)
       if (result && !result.success) {
         throw new Error(result.message || "Failed to update user status")
       }
 
-      // Update users list immediately for better UX
+      // Update users list
       const updateUsersList = (prevUsers) => {
         return prevUsers.map((user) =>
           (user.id || user._id) === userId
@@ -1600,7 +1676,7 @@ const EnhancedUserManagement = () => {
       setUsers(updateUsersList)
       setFilteredUsers(updateUsersList)
 
-      // Recalculate stats with updated data
+      // Recalculate stats
       const updatedUserList = users.map((user) =>
         (user.id || user._id) === userId ? { ...user, isActive: newStatus } : user,
       )
@@ -1631,19 +1707,17 @@ const EnhancedUserManagement = () => {
   // Enhanced chart data generation
   const generateChartData = () => {
     if (!users.length) return []
-    // Group users by month with better date handling
     const groupedByMonth = users.reduce((acc, user) => {
       const date = new Date(user.joinedDate || user.createdAt)
-      if (isNaN(date.getTime())) return acc // Skip invalid dates
+      if (isNaN(date.getTime())) return acc
       const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
       acc[monthYear] = (acc[monthYear] || 0) + 1
       return acc
     }, {})
 
-    // Sort by date and create chart data
     return Object.entries(groupedByMonth)
       .sort(([a], [b]) => a.localeCompare(b))
-      .slice(-12) // Show last 12 months
+      .slice(-12)
       .map(([monthYear, count]) => ({
         period: monthYear,
         count,
@@ -1654,7 +1728,7 @@ const EnhancedUserManagement = () => {
       }))
   }
 
-  // Enhanced activity data with more metrics from API response
+  // Enhanced activity data
   const generateActivityData = () => {
     return [
       { name: "Active Users", value: stats.activeUsers, color: "#10B981" },
@@ -1702,7 +1776,6 @@ const EnhancedUserManagement = () => {
 
   // Handle modal status change
   const handleModalStatusChange = (updatedUser) => {
-    // Update the users list with the updated user
     const updateUsersList = (prevUsers) => {
       return prevUsers.map((u) =>
         (u.id || u._id) === (updatedUser.id || updatedUser._id)
@@ -1732,7 +1805,6 @@ const EnhancedUserManagement = () => {
       engagementMetrics,
     }))
 
-    // Show success message
     setSuccessMessage(`User profile updated successfully!`)
     setTimeout(() => setSuccessMessage(""), 3000)
   }
@@ -1844,7 +1916,7 @@ const EnhancedUserManagement = () => {
         )}
       </AnimatePresence>
 
-      {/* Enhanced Stat Cards Grid with API Response Data */}
+      {/* Enhanced Stat Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
         <DashboardStatCard
           icon={Users}
@@ -1894,7 +1966,7 @@ const EnhancedUserManagement = () => {
         />
       </div>
 
-      {/* Additional Stats Row with API Response Data */}
+      {/* Additional Stats Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card className="hover:shadow-md transition-shadow">
           <CardContent className="p-3 sm:p-4">

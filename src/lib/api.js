@@ -1111,6 +1111,8 @@ export const userHelpers = {
       hasWallet: this.hasWallet(user),
       sessionProgress: this.getSessionProgress(user),
       engagementScore: this.getUserEngagementScore(user),
+       // IMPORTANT: Add photoURL
+    photoURL: user.photoURL || user.profileImage || user.avatar || user.imageUrl || null,
     }))
   },
 
