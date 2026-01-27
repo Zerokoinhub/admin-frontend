@@ -2,6 +2,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import ClientLayout from './ClientLayout';
 import SplashScreen from '@/components/ui/SplashScreen';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -31,6 +32,7 @@ export default function RootLayout({ children }) {
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
        
         <ClientLayout>{children}</ClientLayout>
+        <SpeedInsights />
       </body>
     </html>
   );
