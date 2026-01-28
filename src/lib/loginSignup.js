@@ -15,7 +15,7 @@ export default function useLogin() {
     if (!token || !user) return;
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));
-    console.log('🛡️ Logged in as:', user.role || 'unknown');
+    //console.log('🛡️ Logged in as:', user.role || 'unknown');
   };
 
   // ✅ Admin Login

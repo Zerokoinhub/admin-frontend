@@ -96,7 +96,7 @@ export const userAPI = {
   // Update user - Enhanced to handle new fields
   async updateUser(userId, userData) {
     try {
-      console.log("Updating user:", userId, "with data:", userData)
+      // console.log("Updating user:", userId, "with data:", userData)
       const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
         method: "PUT",
         headers: getAuthHeaders(),
@@ -107,7 +107,7 @@ export const userAPI = {
         throw new Error(errorData.message || `Failed to update user: ${response.status}`)
       }
       const result = await response.json()
-      console.log("Update result:", result)
+      // console.log("Update result:", result)
       return {
         success: true,
         user: result.user,

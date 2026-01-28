@@ -12,7 +12,7 @@ export const getCurrentUser = () => {
       const userStr = localStorage.getItem("user")
       if (userStr) {
         const userData = JSON.parse(userStr)
-        console.log("Current logged-in user:", userData)
+        ////console.log("Current logged-in user:", userData)
         return {
           id: userData._id || userData.id || "", // Backend JWT expects decoded.id
           _id: userData._id || userData.id || "", // Keep both for compatibility
@@ -45,7 +45,7 @@ export const getAuthToken = () => {
       localStorage.getItem("jwtToken")
 
     if (token) {
-      console.log("Found JWT token")
+      ////console.log("Found JWT token")
       // Remove 'Bearer ' prefix if it exists (we'll add it in headers)
       return token.replace(/^Bearer\s+/i, "")
     }
@@ -71,7 +71,7 @@ export const getAuthHeaders = () => {
     }
   }
 
-  console.log("Using JWT Bearer token for user:", currentUser?.email || "unknown")
+  ////console.log("Using JWT Bearer token for user:", currentUser?.email || "unknown")
 
   // Backend middleware expects: req.headers.authorization.startsWith('Bearer')
   return {
@@ -119,7 +119,7 @@ export const decodeJWTPayload = (token = null) => {
     if (!jwtToken) return null
 
     const payload = JSON.parse(atob(jwtToken.split(".")[1]))
-    console.log("JWT Payload:", payload)
+    ////console.log("JWT Payload:", payload)
     return payload
   } catch (error) {
     console.error("Error decoding JWT:", error)
@@ -165,7 +165,7 @@ export const validateJWTToken = () => {
     return { valid: false, error: "Token expired" }
   }
 
-  console.log("JWT token validation successful")
+  ////console.log("JWT token validation successful")
   return { valid: true, payload }
 }
 
@@ -182,7 +182,7 @@ export const hasPermission = (action) => {
     return false
   }
 
-  console.log("Checking permission for role:", role, "action:", action)
+  //////console.log("Checking permission for role:", role, "action:", action)
 
   // Match the exact role strings your backend uses
   switch (role) {
@@ -270,7 +270,7 @@ export const handleAuthError = (error) => {
  * Clear all authentication data from localStorage
  */
 export const clearAuthData = () => {
-  console.log("Clearing authentication data")
+  ////console.log("Clearing authentication data")
   localStorage.removeItem("token")
   localStorage.removeItem("authToken")
   localStorage.removeItem("accessToken")
@@ -283,7 +283,7 @@ export const clearAuthData = () => {
  * Store authentication data in localStorage
  */
 export const setAuthData = (token, userData) => {
-  console.log("Storing authentication data for user:", userData?.email)
+  ////console.log("Storing authentication data for user:", userData?.email)
 
   // Store token
   localStorage.setItem("token", token)
@@ -291,7 +291,7 @@ export const setAuthData = (token, userData) => {
   // Store user data
   localStorage.setItem("user", JSON.stringify(userData))
 
-  console.log("Authentication data stored successfully")
+  ////console.log("Authentication data stored successfully")
 }
 
 /**
@@ -316,7 +316,7 @@ export const makeAuthenticatedRequest = async (url, options = {}) => {
       headers,
     })
 
-    console.log(`API Request: ${options.method || "GET"} ${url} - Status: ${response.status}`)
+    ////console.log(`API Request: ${options.method || "GET"} ${url} - Status: ${response.status}`)
 
     // Handle authentication errors
     if (response.status === 401) {
@@ -350,13 +350,13 @@ export const makeAuthenticatedRequest = async (url, options = {}) => {
  * Debug function to check authentication state
  */
 export const debugAuthState = () => {
-  console.log("=== AUTH DEBUG ===")
-  console.log("Token:", getAuthToken() ? "Present" : "Missing")
-  console.log("User data:", getCurrentUser())
-  console.log("Is authenticated:", isAuthenticated())
-  console.log("Auth headers:", getAuthHeaders())
-  console.log("JWT validation:", validateJWTToken())
-  console.log("================")
+  //console.log("=== AUTH DEBUG ===")
+  //console.log("Token:", getAuthToken() ? "Present" : "Missing")
+  //console.log("User data:", getCurrentUser())
+  //console.log("Is authenticated:", isAuthenticated())
+  //console.log("Auth headers:", getAuthHeaders())
+  //console.log("JWT validation:", validateJWTToken())
+  //console.log("================")
 }
 
 /**
