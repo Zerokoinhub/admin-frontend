@@ -26,6 +26,7 @@ import {
 } from "lucide-react"
 
 import { withdrawalAPI, withdrawalHelpers } from "../../src/lib/api"
+import UserAvatar from "@/components/ui/UserAvatar"
 
 
 
@@ -240,9 +241,10 @@ export default function WithdrawalsClientPage() {
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
                         
                         <div className="flex items-center gap-3 md:col-span-1">
-                          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
+                          {/* <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
                             <User className="h-5 w-5 text-blue-600" />
-                          </div>
+                          </div> */}
+                            <UserAvatar user={{ name: req.userName, email: req.userEmail }} size="sm" className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center shrink-0" />
                           <div>
                             <p className="font-medium text-gray-800">{req.userName}</p>
                             <p className="text-sm text-gray-500">{req.userEmail}</p>

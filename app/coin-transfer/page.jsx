@@ -37,6 +37,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion"
 import ViewScreenshots from "@/components/ui/ViewScreenshots"
 import { userAPI, userHelpers } from "../../src/lib/api"
+import UserAvatar from "@/components/ui/UserAvatar"
 
 // Enhanced Transfer History Component
 const TransferHistory = ({ onBack, onRefresh }) => {
@@ -285,9 +286,10 @@ const TransferHistory = ({ onBack, onRefresh }) => {
                 <div key={transfer.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                      {/* <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                         <User className="h-5 w-5 text-blue-600" />
-                      </div>
+                      </div> */}
+                      <UserAvatar user={{ name: transfer.userName, email: transfer.userEmail }} size="sm" className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center shrink-0" />
                       <div>
                         <p className="font-medium">{transfer.userName}</p>
                         <p className="text-sm text-gray-600">{transfer.userEmail}</p>
@@ -674,6 +676,7 @@ export default function CoinTransferPage() {
         const transfers = response.data || []
         const formattedTransfers = transfers.map((transfer) => userHelpers.formatTransferData(transfer))
         setTransferHistory(formattedTransfers)
+        // console.log(formattedTransfers)
       } else {
         setMessage({ type: "error", text: response.message || "Failed to fetch transfer history" })
       }
@@ -1280,6 +1283,7 @@ export default function CoinTransferPage() {
                               <CardContent className="p-3 sm:p-4">
                                 <div className="space-y-2 sm:space-y-3">
                                   <div className="flex justify-between items-start gap-2">
+                                    <UserAvatar user={{ name: transfer.userName, email: transfer.userEmail }} size="sm" className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center shrink-0" />
                                     <div className="flex-1 min-w-0">
                                       <p className="font-medium text-gray-900 text-sm break-words">
                                         {transfer.userName || "Unknown User"}

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { userAPI } from "@/lib/api"
 import CalculatorChart from "@/components/ui/charts/CalculatorChart"
+import UserAvatar from "@/components/ui/UserAvatar"
 
 export default function CalculatorPage() {
   const [calculatorUsers, setCalculatorUsers] = useState([])
@@ -313,9 +314,10 @@ export default function CalculatorPage() {
                     className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
+                      {/* <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
                         <span className="text-xs sm:text-sm font-semibold text-blue-600">#{index + 1}</span>
-                      </div>
+                      </div> */}
+                      <UserAvatar user={{ name: user.name, email: user.email }} size="md" />
                       <div className="min-w-0 flex-1">
                         <p className="font-medium text-sm sm:text-base text-gray-900 truncate">{user.name}</p>
                         <p className="text-xs sm:text-sm text-gray-600 truncate">{user.email}</p>
