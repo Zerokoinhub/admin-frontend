@@ -132,57 +132,51 @@ export default function CourseManagementPage() {
     setIsMobileMenuOpen(false);
   };
 
-  const handleSubmitCourse = async () => {
-    if (!isAuthenticated) {
-      alert("Please log in to create courses");
-      return;
-    }
+ const handleSubmitCourse = async () => {
+  if (!isAuthenticated) {
+    alert("Please log in to create courses");
+    return;
+  }
 
-    // Validate form data - at least ONE language should be filled
-    const hasAnyLanguageData = Object.entries(formData.languages).some(
-      ([langCode, langData]) =>
-        langData && langData.courseName.trim() && langData.pages.length > 0
+  // Validate that at least ONE language has data
+  const hasAnyLanguageData = Object.entries(formData.languages).some(
+    ([langCode, langData]) =>
+      langData && langData.courseName.trim() && langData.pages.length > 0
+  );
+
+  if (!hasAnyLanguageData) {
+    alert("Please enter course name and pages in at least one language");
+    return;
+  }
+
+  // Validate that ALL languages that have content are complete
+  const incompleteLanguages = Object.entries(formData.languages)
+    .filter(([_, langData]) => langData && langData.courseName.trim())
+    .filter(
+      ([_, langData]) =>
+        langData.pages.some((page) => !page.title.trim() || !page.content.trim())
+    )
+    .map(([langCode]) => langCode.toUpperCase());
+
+  if (incompleteLanguages.length > 0) {
+    alert(
+      `Please fill in all page titles and content for: ${incompleteLanguages.join(", ")}`
     );
+    return;
+  }
 
-    if (!hasAnyLanguageData) {
-      alert("Please enter course name and pages in at least one language");
-      return;
-    }
+  setIsSubmitting(true);
 
-    // Validate that all filled languages have complete page data
-    const invalidLanguages = Object.entries(formData.languages)
-      .filter(([_, langData]) => langData && langData.courseName.trim())
-      .filter(
-        ([_, langData]) =>
-          langData.pages.some((page) => !page.title.trim() || !page.content.trim())
-      )
-      .map(([langCode]) => langCode.toUpperCase());
-
-    if (invalidLanguages.length > 0) {
-      alert(
-        `Please fill in all page titles and content for: ${invalidLanguages.join(", ")}`
-      );
-      return;
-    }
-
-    setIsSubmitting(true);
-    console.log("Submitting course with user context:", userData?.email);
-
-    try {
-      let result;
-
-      if (isEditing && selectedCourse) {
-        console.log("Updating existing course:", selectedCourse._id);
-        
-        // Get the first language that has data
-        const firstLangCode = Object.keys(formData.languages).find(
-          (code) => formData.languages[code]?.courseName.trim()
-        );
-        const firstLangData = formData.languages[firstLangCode];
-
-        const editPayload = {
-          courseName: firstLangData?.courseName.trim() || "",
-          pages: (firstLangData?.pages || []).map((page) => ({
+  try {
+    // ✅ Build the languages object with ALL languages that have content
+    const languagesPayload = {};
+    
+    Object.entries(formData.languages).forEach(([langCode, langData]) => {
+      if (langData && langData.courseName.trim() && langData.pages.length > 0) {
+        // Only include languages that have content
+        languagesPayload[langCode] = {
+          courseName: langData.courseName.trim(),
+          pages: langData.pages.map((page) => ({
             title: page.title.trim(),
             content: page.content.trim(),
             time: JSON.stringify({
@@ -190,74 +184,73 @@ export default function CourseManagementPage() {
               unit: page.timeUnit || "minutes",
             }),
           })),
-          language: firstLangCode,
         };
-
-        console.log("Update payload:", editPayload);
-        result = await updateCourse(selectedCourse._id, editPayload);
-      } else {
-        console.log("Creating new course");
-        
-        // Get the first language that has data
-        const firstLangCode = Object.keys(formData.languages).find(
-          (code) => formData.languages[code]?.courseName.trim()
-        );
-        const firstLangData = formData.languages[firstLangCode];
-
-        const coursePayload = {
-          courseName: firstLangData?.courseName.trim() || "",
-          pages: (firstLangData?.pages || []).map((page) => ({
-            title: page.title.trim(),
-            content: page.content.trim(),
-            time: JSON.stringify({
-              value: parseInt(page.time) || 0,
-              unit: page.timeUnit || "minutes",
-            }),
-          })),
-          language: firstLangCode,
-          uploadedBy: userData?.username || "Administrator",
-        };
-        
-        console.log("Course payload being sent:", coursePayload);
-        result = await createCourse(coursePayload);
       }
+    });
 
-      if (result.success) {
-        console.log("Course operation successful");
-        setIsSuccessModalOpen(true);
-        setTimeout(() => {
-          setIsSuccessModalOpen(false);
-          setCurrentView("main");
-          setSelectedCourse(null);
-          setIsEditing(false);
-          // Reset form
-          setCurrentLanguage("en");
-          setTimeUnit("minutes");
-          setFormData({
-            languages: {
-              en: {
-                courseName: "",
-                pages: [{ title: "", content: "", time: "", timeUnit: "minutes" }],
-              },
-            },
-          });
-        }, 2000);
-      } else {
-        console.error("Course operation failed:", result.error);
-        alert(
-          `Failed to ${isEditing ? "update" : "create"} course: ${result.error}`
-        );
-      }
-    } catch (error) {
-      console.error("Error during course submission:", error);
-      alert(
-        `Error ${isEditing ? "updating" : "creating"} course: ${error.message}`
-      );
-    } finally {
+    // Check if we have any languages to send
+    if (Object.keys(languagesPayload).length === 0) {
+      alert("Please fill in at least one language");
       setIsSubmitting(false);
+      return;
     }
-  };
 
+    let result;
+
+    if (isEditing && selectedCourse) {
+      console.log("Updating existing course:", selectedCourse._id);
+      
+      const editPayload = {
+        languages: languagesPayload, // Send ALL languages
+      };
+
+      result = await updateCourse(selectedCourse._id, editPayload);
+    } else {
+      console.log("Creating new course");
+      
+      const coursePayload = {
+        languages: languagesPayload, // Send ALL languages
+        uploadedBy: userData?.username || "Administrator",
+      };
+      
+      result = await createCourse(coursePayload);
+    }
+
+    if (result.success) {
+      console.log("Course operation successful");
+      setIsSuccessModalOpen(true);
+      setTimeout(() => {
+        setIsSuccessModalOpen(false);
+        setCurrentView("main");
+        setSelectedCourse(null);
+        setIsEditing(false);
+        // Reset form
+        setCurrentLanguage("en");
+        setTimeUnit("minutes");
+        setFormData({
+          languages: {
+            en: {
+              courseName: "",
+              pages: [{ title: "", content: "", time: "", timeUnit: "minutes" }],
+            },
+          },
+        });
+      }, 2000);
+    } else {
+      console.error("Course operation failed:", result.error);
+      alert(
+        `Failed to ${isEditing ? "update" : "create"} course: ${result.error}`
+      );
+    }
+  } catch (error) {
+    console.error("Error during course submission:", error);
+    alert(
+      `Error ${isEditing ? "updating" : "creating"} course: ${error.message}`
+    );
+  } finally {
+    setIsSubmitting(false);
+  }
+};
   const handleDeleteCourse = async (courseId) => {
     if (!isAuthenticated) {
       alert("Please log in to delete courses");
