@@ -1818,7 +1818,7 @@ const EnhancedUserManagement = () => {
       {/* Enhanced Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="min-w-0 flex-1">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Enhanced User Management</h2>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Enhanced User Management test11</h2>
           <p className="text-sm sm:text-base text-gray-600 mt-1">
             Comprehensive user management with analytics and detailed profiles • {stats.totalUsers} total users
           </p>
