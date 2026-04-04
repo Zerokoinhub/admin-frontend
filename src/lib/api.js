@@ -23,7 +23,7 @@ const getFormDataHeaders = () => {
 // ========================
 export const userAPI = {
   // Fetch paginated user list - Enhanced to handle multiple response structures
-  async getUsers(page = 1, limit = 10, filters = {}) {
+  async getUsers(page = 1, limit = 100, filters = {}) {
     const params = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
@@ -37,6 +37,7 @@ export const userAPI = {
       if (!response.ok) throw new Error("Failed to fetch users")
       const result = await response.json()
       console.log("API Response:", result)
+      
       // Handle multiple possible response structures
       let users = []
       let pagination = {
@@ -47,34 +48,40 @@ export const userAPI = {
         hasNextPage: false,
         hasPrevPage: false,
       }
+      
       if (result.success && result.data) {
         if (result.data.users) {
-          // Structure: { success: true, data: { users: [...], pagination: {...} } }
           users = result.data.users
           pagination = result.data.pagination || pagination
         } else if (Array.isArray(result.data)) {
-          // Structure: { success: true, data: [...] }
           users = result.data
           pagination.totalItems = users.length
         }
       } else if (result.users) {
-        // Structure: { users: [...], pagination: {...} }
         users = result.users
         pagination = result.pagination || pagination
       } else if (Array.isArray(result)) {
-        // Structure: [...]
         users = result
         pagination.totalItems = users.length
       }
+      
+      // ✅ Ensure users array exists
+      users = users || []
+      
       return {
         success: true,
         users: users,
-        data: users, // For backward compatibility
+        data: users,
         pagination: pagination,
       }
     } catch (error) {
       console.error("Error fetching users:", error)
-      throw error
+      return {
+        success: false,
+        users: [],
+        data: [],
+        error: error.message,
+      }
     }
   },
 
@@ -96,7 +103,6 @@ export const userAPI = {
   // Update user - Enhanced to handle new fields
   async updateUser(userId, userData) {
     try {
-      // console.log("Updating user:", userId, "with data:", userData)
       const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
         method: "PUT",
         headers: getAuthHeaders(),
@@ -107,7 +113,6 @@ export const userAPI = {
         throw new Error(errorData.message || `Failed to update user: ${response.status}`)
       }
       const result = await response.json()
-      // console.log("Update result:", result)
       return {
         success: true,
         user: result.user,
@@ -124,7 +129,6 @@ export const userAPI = {
   },
 
   // ===== SESSION MANAGEMENT =====
-  // Get user sessions
   async getUserSessions(userId) {
     try {
       const response = await fetch(`${API_BASE_URL}/users/${userId}/sessions`, {
@@ -148,7 +152,6 @@ export const userAPI = {
     }
   },
 
-  // Update user session (unlock, complete, claim, lock)
   async updateUserSession(userId, sessionNumber, action) {
     try {
       const response = await fetch(`${API_BASE_URL}/users/${userId}/sessions`, {
@@ -179,7 +182,6 @@ export const userAPI = {
   },
 
   // ===== NOTIFICATION SETTINGS =====
-  // Update notification settings
   async updateNotificationSettings(userId, settings) {
     try {
       const response = await fetch(`${API_BASE_URL}/users/${userId}/notifications`, {
@@ -207,7 +209,6 @@ export const userAPI = {
   },
 
   // ===== NOTIFICATION MANAGEMENT =====
-  // Send general notification to all users
   async sendGeneralNotification(notificationData) {
     try {
       const { title, message, imageUrl, link, priority = "old-user" } = notificationData
@@ -244,7 +245,6 @@ export const userAPI = {
     }
   },
 
-  // Send notification to top users
   async sendTopUsersNotification(notificationData) {
     try {
       const { title, message, imageUrl, link, limit = 10, priority = "top-rated-user" } = notificationData
@@ -282,7 +282,6 @@ export const userAPI = {
     }
   },
 
-  // Send notification to single user
   async sendSingleUserNotification(notificationData) {
     try {
       const { title, message, imageUrl, link, firebaseUid, priority = "old-user" } = notificationData
@@ -320,7 +319,6 @@ export const userAPI = {
     }
   },
 
-  // Send general notification with image upload
   async sendGeneralNotificationWithImage(notificationData, imageFile) {
     try {
       const { title, message, link, priority = "old-user" } = notificationData
@@ -357,7 +355,6 @@ export const userAPI = {
     }
   },
 
-  // Get paginated notifications
   async getNotifications(filters = {}) {
     try {
       const { page = 1, limit = 10, type, priority } = filters
@@ -406,7 +403,6 @@ export const userAPI = {
     }
   },
 
-  // Get single notification by ID
   async getNotificationById(notificationId) {
     try {
       const response = await fetch(`${API_BASE_URL}/notifications/${notificationId}`, {
@@ -435,7 +431,6 @@ export const userAPI = {
   },
 
   // ===== FCM TOKEN MANAGEMENT =====
-  // Add FCM token
   async addFcmToken(userId, token) {
     try {
       const response = await fetch(`${API_BASE_URL}/users/${userId}/fcm-token`, {
@@ -462,7 +457,6 @@ export const userAPI = {
     }
   },
 
-  // Remove FCM token
   async removeFcmToken(userId, token) {
     try {
       const response = await fetch(`${API_BASE_URL}/users/${userId}/fcm-token`, {
@@ -490,7 +484,6 @@ export const userAPI = {
   },
 
   // ===== SCREENSHOT MANAGEMENT =====
-  // Get user screenshots by user ID
   async getUserScreenshots(userId) {
     try {
       const response = await fetch(`${API_BASE_URL}/users/${userId}/screenshots`, {
@@ -519,7 +512,6 @@ export const userAPI = {
     }
   },
 
-  // Add screenshot
   async addScreenshot(userId, screenshotData) {
     try {
       const response = await fetch(`${API_BASE_URL}/users/${userId}/screenshots`, {
@@ -547,7 +539,6 @@ export const userAPI = {
   },
 
   // ===== ENHANCED STATISTICS =====
-  // Get comprehensive user statistics
   async getUserStats() {
     try {
       const response = await fetch(`${API_BASE_URL}/users/stats/overview`, {
@@ -574,7 +565,6 @@ export const userAPI = {
   },
 
   // ===== USER MANAGEMENT ACTIONS =====
-  // Ban a user
   async banUser(userId) {
     try {
       const response = await fetch(`${API_BASE_URL}/users/${userId}/ban`, {
@@ -589,7 +579,6 @@ export const userAPI = {
     }
   },
 
-  // Unban a user
   async unbanUser(userId) {
     try {
       const response = await fetch(`${API_BASE_URL}/users/${userId}/unban`, {
@@ -604,14 +593,11 @@ export const userAPI = {
     }
   },
 
-  // Update user status (enhanced version that works with both ban/unban and direct status update)
   async updateUserStatus(userId, isActive) {
     try {
-      // Use the updateUser function to update the isActive status
       return await this.updateUser(userId, { isActive })
     } catch (error) {
       console.error("Error updating user status:", error)
-      // Fallback to ban/unban if status update fails
       try {
         if (isActive) {
           return await this.unbanUser(userId)
@@ -625,7 +611,6 @@ export const userAPI = {
     }
   },
 
-  // Manual coin transfer - Enhanced with reason parameter
   async transferCoins(userId, amount, reason = "Manual transfer") {
     try {
       const response = await fetch(`${API_BASE_URL}/users/${userId}/transfer`, {
@@ -646,8 +631,7 @@ export const userAPI = {
         success: true,
         data: {
           transferId: result.transferId || `transfer_${Date.now()}`,
-          transactionId:
-            result.transactionId || `TXN${Date.now()}${Math.random().toString(36).substr(2, 9)}`.toUpperCase(),
+          transactionId: result.transactionId || `TXN${Date.now()}${Math.random().toString(36).substr(2, 9)}`.toUpperCase(),
           newBalance: result.transaction?.newBalance || result.user?.balance,
           amount: amount,
           reason: reason,
@@ -662,7 +646,6 @@ export const userAPI = {
     }
   },
 
-  // Edit user balance directly using the edit-balance endpoint
   async editUserBalance(email, newBalance, admin) {
     try {
       if (!email || typeof newBalance !== "number") {
@@ -699,7 +682,6 @@ export const userAPI = {
   },
 
   // ===== TRANSFER HISTORY =====
-  // Get Transfer History
   async getTransferHistory(filters = {}) {
     try {
       const params = new URLSearchParams()
@@ -719,7 +701,6 @@ export const userAPI = {
         throw new Error(errorData.message || "Failed to fetch transfer history")
       }
       const result = await response.json()
-      // Handle the exact API response structure where data is directly an array
       if (result.success && result.data) {
         return {
           success: true,
@@ -741,7 +722,6 @@ export const userAPI = {
     }
   },
 
-  // Get Transfer By ID
   async getTransferById(transferId) {
     try {
       const response = await fetch(`${API_BASE_URL}/transfers/${transferId}`, {
@@ -759,7 +739,6 @@ export const userAPI = {
     }
   },
 
-  // Update Transfer Status
   async updateTransferStatus(transferId, status) {
     try {
       const response = await fetch(`${API_BASE_URL}/transfers/${transferId}/status`, {
@@ -779,7 +758,6 @@ export const userAPI = {
   },
 
   // ===== AUTHENTICATION & PROFILE =====
-  // Change user password
   async changePassword(oldPassword, newPassword, confirmPassword) {
     try {
       const response = await fetch(`${API_BASE_URL}/users/change-password`, {
@@ -812,7 +790,6 @@ export const userAPI = {
     }
   },
 
-  // Get logged-in user's profile
   async getProfile() {
     try {
       const response = await fetch(`${API_BASE_URL}/users/profile`, {
@@ -828,7 +805,7 @@ export const userAPI = {
         return {
           success: true,
           user: result.user,
-          data: result.user, // For backward compatibility
+          data: result.user,
         }
       }
       return result
@@ -841,7 +818,6 @@ export const userAPI = {
     }
   },
 
-  // Update logged-in user's profile
   async updateProfile(data) {
     try {
       const response = await fetch(`${API_BASE_URL}/users/profile`, {
@@ -872,7 +848,6 @@ export const userAPI = {
   },
 
   // ===== LEGACY STATISTICS ENDPOINTS =====
-  // Get total referrals
   async getTotalReferrals() {
     try {
       const response = await fetch(`${API_BASE_URL}/users/stats/referrals`, {
@@ -886,7 +861,6 @@ export const userAPI = {
     }
   },
 
-  // Get total connected wallets
   async getTotalWallets() {
     try {
       const response = await fetch(`${API_BASE_URL}/users/stats/wallets`, {
@@ -900,7 +874,6 @@ export const userAPI = {
     }
   },
 
-  // Get users with calculator usage
   async getCalculatorUsers() {
     try {
       const response = await fetch(`${API_BASE_URL}/users/calculator-users`, {
@@ -914,7 +887,6 @@ export const userAPI = {
     }
   },
 
-  // Get total calculator usage
   async getTotalCalculatorUsage() {
     try {
       const response = await fetch(`${API_BASE_URL}/users/stats/calculator-usage`, {
@@ -928,7 +900,6 @@ export const userAPI = {
     }
   },
 
-  // Alternative function for admin to update any user (deprecated - use updateUser instead)
   async adminUpdateUser(userId, userData) {
     console.warn("adminUpdateUser is deprecated, use updateUser instead")
     return await this.updateUser(userId, userData)
@@ -936,10 +907,9 @@ export const userAPI = {
 }
 
 // ========================
-// HELPER FUNCTIONS - Updated for actual data structure
+// HELPER FUNCTIONS - FIXED for firebaseUid
 // ========================
 export const userHelpers = {
-  // Calculate comprehensive stats from user data - Updated for actual structure
   calculateStats(users) {
     if (!Array.isArray(users)) {
       return {
@@ -966,7 +936,7 @@ export const userHelpers = {
       }
     }
     const now = new Date()
-    const recentThreshold = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) // 7 days ago
+    const recentThreshold = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
     const stats = {
       totalUsers: users.length,
       activeUsers: users.filter((user) => user.isActive === true).length,
@@ -996,16 +966,16 @@ export const userHelpers = {
     return stats
   },
 
-  // Format user data for display - Updated for actual structure
+  // ✅ FIXED: Format user data - handles both uid and firebaseUid
   formatUserData(user) {
     if (!user) return null
     return {
-      id: user._id,
-      _id: user._id, // Keep original for compatibility
+      id: user._id || user.id,
+      _id: user._id || user.id,
       name: user.name || "N/A",
       email: user.email || "No email",
       role: user.role || "user",
-      isActive: user.isActive === true, // Explicit check since some users don't have this field
+      isActive: user.isActive === true,
       balance: user.balance || 0,
       recentAmount: user.recentAmount || 0,
       hasWallet: !!(user.walletAddresses && (user.walletAddresses.metamask || user.walletAddresses.trustWallet)),
@@ -1014,8 +984,10 @@ export const userHelpers = {
       referredBy: user.referredBy || null,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt || null,
-      lastLogin: user.lastSignInAt || null, // Use lastSignInAt from actual data
-      firebaseUid: user.firebaseUid || null,
+      lastLogin: user.lastSignInAt || null,
+      // ✅ FIX: Handle both firebaseUid and uid
+      firebaseUid: user.firebaseUid || user.uid || null,
+      uid: user.uid || user.firebaseUid || null,
       sessions: user.sessions || [],
       walletAddresses: user.walletAddresses || { metamask: null, trustWallet: null },
       walletStatus: user.walletStatus || "Not Connected",
@@ -1026,16 +998,13 @@ export const userHelpers = {
       deviceId: user.deviceId || null,
       lastSignInDevice: user.lastSignInDevice || null,
       isSignedIn: user.isSignedIn || false,
+      photoURL: user.photoURL || user.profileImage || user.avatar || user.imageUrl || null,
     }
   },
 
-  // Get user activity status - Updated for actual data structure
   getUserActivityStatus(user) {
-    // Check if user is explicitly inactive
     if (user.isActive === false) return "inactive"
-    // Check if user has never signed in
     if (!user.lastSignInAt && !user.updatedAt) return "new"
-    // Use lastSignInAt or updatedAt for activity calculation
     const lastActivity = user.lastSignInAt || user.updatedAt
     if (lastActivity) {
       const lastActivityDate = new Date(lastActivity)
@@ -1048,7 +1017,6 @@ export const userHelpers = {
     return "new"
   },
 
-  // Calculate growth metrics - Updated for actual data structure
   calculateGrowthMetrics(users) {
     const now = new Date()
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
@@ -1075,53 +1043,16 @@ export const userHelpers = {
     }
   },
 
-  // Format user list for display - Updated for actual structure
+  // ✅ FIXED: Format user list - handles firebaseUid correctly
   formatUserList(users) {
     if (!Array.isArray(users)) return []
-    return users.map((user) => ({
-      id: user._id,
-      _id: user._id, // Keep original
-      name: user.name || "Unnamed",
-      email: user.email || "No email",
-      country: user.country || "Unknown",
-      wallet: this.hasWallet(user) ? "Connected" : "Not Connected",
-      walletStatus: user.walletStatus || "Not Connected",
-      referredBy: user.referredBy || "Direct",
-      coins: user.balance || 0,
-      balance: user.balance || 0, // Keep both for compatibility
-      isActive: user.isActive === true,
-      role: user.role || "user",
-      joinedDate: user.createdAt,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-      lastLogin: user.lastSignInAt,
-      lastSignInAt: user.lastSignInAt,
-      inviteCode: user.inviteCode,
-      calculatorUsage: user.calculatorUsage || 0,
-      recentAmount: user.recentAmount || 0,
-      walletAddresses: user.walletAddresses || { metamask: null, trustWallet: null },
-      firebaseUid: user.firebaseUid,
-      sessions: user.sessions || [],
-      notificationSettings: user.notificationSettings || { sessionUnlocked: true, pushEnabled: true },
-      fcmTokens: user.fcmTokens || [],
-      screenshots: user.screenshots || [],
-      deviceId: user.deviceId,
-      lastSignInDevice: user.lastSignInDevice,
-      isSignedIn: user.isSignedIn || false,
-      hasWallet: this.hasWallet(user),
-      sessionProgress: this.getSessionProgress(user),
-      engagementScore: this.getUserEngagementScore(user),
-       // IMPORTANT: Add photoURL
-    photoURL: user.photoURL || user.profileImage || user.avatar || user.imageUrl || null,
-    }))
+    return users.map((user) => this.formatUserData(user))
   },
 
-  // Helper function to check if user has wallet - Updated for actual structure
   hasWallet(user) {
     return !!(user.walletAddresses && (user.walletAddresses.metamask || user.walletAddresses.trustWallet))
   },
 
-  // Get session progress for user
   getSessionProgress(user) {
     if (!user.sessions || !Array.isArray(user.sessions)) {
       return {
@@ -1135,381 +1066,4 @@ export const userHelpers = {
     const totalSessions = user.sessions.length
     const unlockedSessions = user.sessions.filter((s) => !s.isLocked).length
     const completedSessions = user.sessions.filter((s) => s.completedAt).length
-    const claimedSessions = user.sessions.filter((s) => s.isClaimed).length
-    return {
-      totalSessions,
-      unlockedSessions,
-      completedSessions,
-      claimedSessions,
-      progressPercentage: totalSessions > 0 ? (completedSessions / totalSessions) * 100 : 0,
-    }
-  },
-
-  // Format transfer data for display - Updated for MongoDB structure
-  formatTransferData(transfer) {
-    const dateTime = new Date(transfer.dateTime)
-    return {
-      id: transfer._id,
-      userId: transfer.userId || transfer._id,
-      userName: transfer.userName || "Unknown User",
-      userEmail: transfer.email || "No email",
-      amount: Number(transfer.amount) || 0,
-      reason: transfer.reason || "Coin transfer",
-      status: transfer.status || "completed",
-      createdAt: transfer.dateTime,
-      date: dateTime.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      }),
-      time: dateTime.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: true,
-      }),
-      transferredBy: transfer.adminName || "System",
-      transactionId: `TXN${transfer._id}`,
-      balanceBefore: transfer.balanceBefore || 0,
-      balanceAfter: transfer.balanceAfter || 0,
-      dateTime: transfer.dateTime,
-    }
-  },
-
-  // Calculate transfer statistics - Updated helper
-  calculateTransferStats(transfers) {
-    if (!Array.isArray(transfers)) {
-      return {
-        totalTransfers: 0,
-        totalAmount: 0,
-        completedTransfers: 0,
-        pendingTransfers: 0,
-        failedTransfers: 0,
-        averageAmount: 0,
-        todayTransfers: 0,
-        weekTransfers: 0,
-        monthTransfers: 0,
-      }
-    }
-    const now = new Date()
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-    const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-    const stats = {
-      totalTransfers: transfers.length,
-      totalAmount: transfers.reduce((sum, transfer) => sum + (Number(transfer.amount) || 0), 0),
-      completedTransfers: transfers.filter((t) => t.status === "completed").length,
-      pendingTransfers: transfers.filter((t) => t.status === "pending").length,
-      failedTransfers: transfers.filter((t) => t.status === "failed").length,
-      averageAmount: 0,
-      todayTransfers: transfers.filter((t) => new Date(t.createdAt || t.dateTime) >= today).length,
-      weekTransfers: transfers.filter((t) => new Date(t.createdAt || t.dateTime) >= weekAgo).length,
-      monthTransfers: transfers.filter((t) => new Date(t.createdAt || t.dateTime) >= monthAgo).length,
-    }
-    stats.averageAmount = stats.totalTransfers > 0 ? stats.totalAmount / stats.totalTransfers : 0
-    return stats
-  },
-
-  // Get user wallet info - Enhanced
-  getUserWalletInfo(user) {
-    if (!user.walletAddresses) {
-      return {
-        hasWallet: false,
-        walletTypes: [],
-        walletCount: 0,
-        primaryWallet: null,
-        walletStatus: user.walletStatus || "Not Connected",
-      }
-    }
-    const walletTypes = []
-    let primaryWallet = null
-    if (user.walletAddresses.metamask) {
-      walletTypes.push("MetaMask")
-      if (!primaryWallet) primaryWallet = { type: "MetaMask", address: user.walletAddresses.metamask }
-    }
-    if (user.walletAddresses.trustWallet) {
-      walletTypes.push("Trust Wallet")
-      if (!primaryWallet) primaryWallet = { type: "Trust Wallet", address: user.walletAddresses.trustWallet }
-    }
-    return {
-      hasWallet: walletTypes.length > 0,
-      walletTypes,
-      walletCount: walletTypes.length,
-      primaryWallet,
-      metamask: user.walletAddresses.metamask,
-      trustWallet: user.walletAddresses.trustWallet,
-      walletStatus: user.walletStatus || "Not Connected",
-    }
-  },
-
-  // Get user engagement score - Enhanced
-  getUserEngagementScore(user) {
-    let score = 0
-    // Base score for being active
-    if (user.isActive === true) score += 20
-    // Score for having wallet
-    if (this.hasWallet(user)) score += 15
-    // Score for calculator usage
-    if (user.calculatorUsage > 0) {
-      score += Math.min(user.calculatorUsage * 2, 20) // Max 20 points
-    }
-    // Score for recent activity
-    const activityStatus = this.getUserActivityStatus(user)
-    switch (activityStatus) {
-      case "active":
-        score += 25
-        break
-      case "recent":
-        score += 15
-        break
-      case "dormant":
-        score += 5
-        break
-      default:
-        score += 0
-    }
-    // Score for having referrals
-    if (user.referredBy) score += 10
-    // Score for balance
-    if (user.balance > 0) {
-      score += Math.min(Math.floor(user.balance / 100), 10) // 1 point per 100 coins, max 10
-    }
-    // Score for session progress
-    const sessionProgress = this.getSessionProgress(user)
-    if (sessionProgress.totalSessions > 0) {
-      score += Math.floor(sessionProgress.progressPercentage / 10) // 1 point per 10% progress
-    }
-    // Score for having notifications enabled
-    if (user.notificationSettings && user.notificationSettings.pushEnabled) score += 5
-    // Score for having FCM tokens (active on mobile)
-    if (user.fcmTokens && user.fcmTokens.length > 0) score += 5
-    return Math.min(score, 100) // Cap at 100
-  },
-
-  // Format user for export - Enhanced
-  formatUserForExport(user) {
-    const formatted = this.formatUserData(user)
-    const walletInfo = this.getUserWalletInfo(user)
-    const engagementScore = this.getUserEngagementScore(user)
-    const sessionProgress = this.getSessionProgress(user)
-    return {
-      ID: formatted.id,
-      Name: formatted.name,
-      Email: formatted.email,
-      Role: formatted.role,
-      Status: formatted.isActive ? "Active" : "Inactive",
-      Balance: formatted.balance,
-      "Recent Amount": formatted.recentAmount,
-      "Calculator Usage": formatted.calculatorUsage,
-      "Invite Code": formatted.inviteCode || "N/A",
-      "Referred By": formatted.referredBy || "Direct",
-      Country: formatted.country,
-      "Has Wallet": walletInfo.hasWallet ? "Yes" : "No",
-      "Wallet Status": walletInfo.walletStatus,
-      "Wallet Types": walletInfo.walletTypes.join(", ") || "None",
-      "Session Progress": `${sessionProgress.completedSessions}/${sessionProgress.totalSessions}`,
-      "Sessions Completed": sessionProgress.completedSessions,
-      "Sessions Claimed": sessionProgress.claimedSessions,
-      "Created Date": formatted.createdAt ? new Date(formatted.createdAt).toLocaleDateString() : "N/A",
-      "Last Activity": formatted.lastLogin ? new Date(formatted.lastLogin).toLocaleDateString() : "Never",
-      "Activity Status": this.getUserActivityStatus(user),
-      "Engagement Score": engagementScore,
-      "Firebase UID": formatted.firebaseUid || "N/A",
-      "Push Notifications": formatted.notificationSettings.pushEnabled ? "Enabled" : "Disabled",
-      "FCM Tokens": formatted.fcmTokens.length,
-      Screenshots: formatted.screenshots.length,
-    }
-  },
-
-  // New helper: Get notification status
-  getNotificationStatus(user) {
-    if (!user.notificationSettings) {
-      return {
-        pushEnabled: false,
-        sessionUnlocked: false,
-        hasTokens: false,
-        tokenCount: 0,
-      }
-    }
-    return {
-      pushEnabled: user.notificationSettings.pushEnabled || false,
-      sessionUnlocked: user.notificationSettings.sessionUnlocked || false,
-      hasTokens: user.fcmTokens && user.fcmTokens.length > 0,
-      tokenCount: user.fcmTokens ? user.fcmTokens.length : 0,
-    }
-  },
-
-  // New helper: Get country statistics
-  getCountryStats(users) {
-    const countryCount = {}
-    users.forEach((user) => {
-      const country = user.country || "Unknown"
-      countryCount[country] = (countryCount[country] || 0) + 1
-    })
-    return Object.entries(countryCount)
-      .map(([country, count]) => ({ country, count }))
-      .sort((a, b) => b.count - a.count)
-  },
-
-  // New helper: Format notification data for display
-  formatNotificationData(notification) {
-    if (!notification) return null
-    return {
-      id: notification._id,
-      _id: notification._id,
-      title: notification.title,
-      message: notification.message,
-      imageUrl: notification.imageUrl,
-      link: notification.link,
-      type: notification.type,
-      priority: notification.priority,
-      recipient: notification.recipient,
-      recipientName: notification.recipient?.name || "All Users",
-      recipientEmail: notification.recipient?.email || "N/A",
-      sentBy: notification.sentBy,
-      sentByName: notification.sentBy?.name || "System",
-      sentByEmail: notification.sentBy?.email || "N/A",
-      createdAt: notification.createdAt,
-      updatedAt: notification.updatedAt,
-      formattedDate: notification.createdAt ? new Date(notification.createdAt).toLocaleDateString() : "N/A",
-      formattedTime: notification.createdAt ? new Date(notification.createdAt).toLocaleTimeString() : "N/A",
-      typeLabel: this.getNotificationTypeLabel(notification.type),
-      priorityLabel: this.getNotificationPriorityLabel(notification.priority),
-    }
-  },
-
-  // New helper: Get notification type label
-  getNotificationTypeLabel(type) {
-    const typeLabels = {
-      general: "General (All Users)",
-      "top-users": "Top Users",
-      "single-user": "Single User",
-    }
-    return typeLabels[type] || type
-  },
-
-  // New helper: Get notification priority label
-  getNotificationPriorityLabel(priority) {
-    const priorityLabels = {
-      "new-user": "New User",
-      "old-user": "Old User",
-      "top-rated-user": "Top Rated User",
-    }
-    return priorityLabels[priority] || priority
-  },
-
-  // New helper: Calculate notification statistics
-  calculateNotificationStats(notifications) {
-    if (!Array.isArray(notifications)) {
-      return {
-        totalNotifications: 0,
-        generalNotifications: 0,
-        topUserNotifications: 0,
-        singleUserNotifications: 0,
-        newUserPriority: 0,
-        oldUserPriority: 0,
-        topRatedUserPriority: 0,
-        todayNotifications: 0,
-        weekNotifications: 0,
-        monthNotifications: 0,
-        notificationsWithImages: 0,
-        notificationsWithLinks: 0,
-      }
-    }
-    const now = new Date()
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-    const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-    return {
-      totalNotifications: notifications.length,
-      generalNotifications: notifications.filter((n) => n.type === "general").length,
-      topUserNotifications: notifications.filter((n) => n.type === "top-users").length,
-      singleUserNotifications: notifications.filter((n) => n.type === "single-user").length,
-      newUserPriority: notifications.filter((n) => n.priority === "new-user").length,
-      oldUserPriority: notifications.filter((n) => n.priority === "old-user").length,
-      topRatedUserPriority: notifications.filter((n) => n.priority === "top-rated-user").length,
-      todayNotifications: notifications.filter((n) => new Date(n.createdAt) >= today).length,
-      weekNotifications: notifications.filter((n) => new Date(n.createdAt) >= weekAgo).length,
-      monthNotifications: notifications.filter((n) => new Date(n.createdAt) >= monthAgo).length,
-      notificationsWithImages: notifications.filter((n) => n.imageUrl && n.imageUrl !== null).length,
-      notificationsWithLinks: notifications.filter((n) => n.link && n.link !== null).length,
-    }
-  },
-
-  // New helper: Format notification list for display
-  formatNotificationList(notifications) {
-    if (!Array.isArray(notifications)) return []
-    return notifications.map((notification) => this.formatNotificationData(notification))
-  },
-}
-
-
-
-// ========================
-// WITHDRAWAL API SERVICE
-// ========================
-export const withdrawalAPI = {
-  async getWithdrawalRequests(filters = {}) {
-    const params = new URLSearchParams({
-      page: filters.page || 1,
-      limit: filters.limit || 20,
-      status: filters.status || 'all',
-      search: filters.search || '',
-    }).toString();
-    try {
-      const response = await fetch(`${API_BASE_URL}/withdrawals?${params}`, {
-        method: "GET",
-        headers: getAuthHeaders(),
-      });
-      if (!response.ok) throw new Error("Failed to fetch withdrawal requests");
-      const result = await response.json();
-      return result;
-    } catch (error) {
-      console.error("Error fetching withdrawal requests:", error);
-      throw error;
-    }
-  },
-
-  async updateWithdrawalStatus(id, status) {
-    try {
-      const response = await fetch(`${API_BASE_URL}/withdrawals/${id}/status`, {
-        method: 'PUT',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ status }),
-      });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to update status");
-      }
-      return await response.json();
-    } catch (error) {
-      console.error("Error updating withdrawal status:", error);
-      throw error;
-    }
-  },
-};
-
-
-// ========================
-// WITHDRAWAL HELPER FUNCTIONS
-// ========================
-export const withdrawalHelpers = {
-  formatWithdrawalData(withdrawal) {
-    if (!withdrawal) return null;
-    return {
-      ...withdrawal,
-      id: withdrawal._id,
-      userName: withdrawal.user?.name || "N/A",
-      userEmail: withdrawal.user?.email || "N/A",
-      date: new Date(withdrawal.createdAt).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      }),
-      time: new Date(withdrawal.createdAt).toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    };
-  },
-};
+    const claimedSessions
