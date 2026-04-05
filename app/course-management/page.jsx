@@ -44,7 +44,7 @@ export default function CourseManagementPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState("en");
-  const [timeUnit, setTimeUnit] = useState("minutes"); // "minutes" or "seconds"
+  const [timeUnit, setTimeUnit] = useState("minutes");
   const [availableLanguages] = useState([
     { code: "hi", name: "हिंदी" },
     { code: "en", name: "English" },
@@ -61,7 +61,6 @@ export default function CourseManagementPage() {
     },
   });
 
-  // Fetch courses and users data
   const {
     courses,
     loading: coursesLoading,
@@ -80,7 +79,6 @@ export default function CourseManagementPage() {
 
   const { users, loading, error } = useUsers(1, 100);
 
-  // Check authentication status on component mount
   useEffect(() => {
     console.log("Course Management Page - Current user:", userData);
     console.log("Course Management Page - Is authenticated:", isAuthenticated);
@@ -102,50 +100,171 @@ export default function CourseManagementPage() {
   };
 
   const handleUploadCourse = () => {
-  if (!isAuthenticated) {
-    alert("Please log in to create courses");
-    return;
-  }
-  if (!hasPermission("create")) {
-    alert("You don't have permission to create courses");
-    return;
-  }
-  console.log("Starting course creation for user:", userData?.email, "Role:", userRole);
-  
-  setCurrentView("upload");
-  setCurrentLanguage("en");
-  setTimeUnit("minutes");
-  
-  // ✅ FIX: Properly initialize form data with default values
-  setFormData({
-    languages: {
-      en: {
-        courseName: "",
-        pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
+    if (!isAuthenticated) {
+      alert("Please log in to create courses");
+      return;
+    }
+    if (!hasPermission("create")) {
+      alert("You don't have permission to create courses");
+      return;
+    }
+    console.log("Starting course creation for user:", userData?.email, "Role:", userRole);
+    
+    setCurrentView("upload");
+    setCurrentLanguage("en");
+    setTimeUnit("minutes");
+    
+    setFormData({
+      languages: {
+        en: {
+          courseName: "",
+          pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
+        },
+        hi: {
+          courseName: "",
+          pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
+        },
+        ar: {
+          courseName: "",
+          pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
+        },
+        ur: {
+          courseName: "",
+          pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
+        },
+        es: {
+          courseName: "",
+          pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
+        },
       },
-      hi: {
-        courseName: "",
-        pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
-      },
-      ar: {
-        courseName: "",
-        pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
-      },
-      ur: {
-        courseName: "",
-        pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
-      },
-      es: {
-        courseName: "",
-        pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
-      },
-    },
-  });
-  
-  setIsEditing(false);
-  setSelectedCourse(null);
-  setIsMobileMenuOpen(false);
-};
+    });
+    
+    setIsEditing(false);
+    setSelectedCourse(null);
+    setIsMobileMenuOpen(false);
+  };
+
+  // ✅ FIXED: Added missing handleSubmitCourse function
+  const handleSubmitCourse = async () => {
+    console.log("🔍 Starting course submission");
+    console.log("Form Data:", JSON.stringify(formData, null, 2));
+    
+    if (!isAuthenticated) {
+      alert("Please log in to create courses");
+      return;
+    }
+
+    // Get the current language data (English by default)
+    const currentLangData = formData.languages[currentLanguage];
+    
+    if (!currentLangData) {
+      alert("Please fill in course details");
+      return;
+    }
+
+    // Validate course name
+    if (!currentLangData.courseName || currentLangData.courseName.trim() === "") {
+      alert("Please enter a course name");
+      return;
+    }
+
+    // Validate pages
+    if (!currentLangData.pages || currentLangData.pages.length === 0) {
+      alert("Please add at least one page");
+      return;
+    }
+
+    // Validate each page
+    for (let i = 0; i < currentLangData.pages.length; i++) {
+      const page = currentLangData.pages[i];
+      if (!page.title || page.title.trim() === "") {
+        alert(`Page ${i + 1} is missing a title`);
+        return;
+      }
+      if (!page.content || page.content.trim() === "") {
+        alert(`Page ${i + 1} is missing content`);
+        return;
+      }
+      if (!page.time || page.time === "") {
+        alert(`Page ${i + 1} is missing duration`);
+        return;
+      }
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Build the languages object for ALL languages that have content
+      const languagesPayload = {};
+      
+      Object.entries(formData.languages).forEach(([langCode, langData]) => {
+        if (langData && langData.courseName && langData.courseName.trim() !== "") {
+          languagesPayload[langCode] = {
+            courseName: langData.courseName.trim(),
+            pages: langData.pages.map((page) => ({
+              title: page.title.trim(),
+              content: page.content.trim(),
+              time: JSON.stringify({
+                value: parseInt(page.time) || 0,
+                unit: page.timeUnit || "minutes",
+              }),
+            })),
+          };
+        }
+      });
+
+      if (Object.keys(languagesPayload).length === 0) {
+        alert("Please fill in at least one language");
+        setIsSubmitting(false);
+        return;
+      }
+
+      let result;
+
+      if (isEditing && selectedCourse) {
+        console.log("Updating existing course:", selectedCourse._id);
+        const editPayload = { languages: languagesPayload };
+        result = await updateCourse(selectedCourse._id, editPayload);
+      } else {
+        console.log("Creating new course");
+        const coursePayload = {
+          languages: languagesPayload,
+          uploadedBy: userData?.username || "Administrator",
+        };
+        result = await createCourse(coursePayload);
+      }
+
+      if (result.success) {
+        console.log("Course operation successful");
+        setIsSuccessModalOpen(true);
+        setTimeout(() => {
+          setIsSuccessModalOpen(false);
+          setCurrentView("main");
+          setSelectedCourse(null);
+          setIsEditing(false);
+          setCurrentLanguage("en");
+          setTimeUnit("minutes");
+          setFormData({
+            languages: {
+              en: {
+                courseName: "",
+                pages: [{ title: "", content: "", time: "", timeUnit: "minutes" }],
+              },
+            },
+          });
+        }, 2000);
+      } else {
+        console.error("Course operation failed:", result.error);
+        alert(`Failed to ${isEditing ? "update" : "create"} course: ${result.error}`);
+      }
+    } catch (error) {
+      console.error("Error during course submission:", error);
+      alert(`Error ${isEditing ? "updating" : "creating"} course: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleDeleteCourse = async (courseId) => {
     if (!isAuthenticated) {
       alert("Please log in to delete courses");
@@ -170,7 +289,6 @@ export default function CourseManagementPage() {
 
     if (result.success) {
       alert("Course deleted successfully");
-      // Refresh the courses list
       await refreshCourses();
     } else {
       alert(`Error deleting course: ${result.error}`);
@@ -196,7 +314,6 @@ export default function CourseManagementPage() {
     );
     setSelectedCourse(course);
 
-    // Handle both old format (courseName) and new format (languages)
     let languagesData = {};
     const langCode = course.language || "en";
     
@@ -205,46 +322,10 @@ export default function CourseManagementPage() {
         (acc, [lCode, langData]) => {
           acc[lCode] = {
             courseName: langData.courseName || "",
-            pages:
-              langData.pages && langData.pages.length > 0
-                ? langData.pages.map((page) => {
-                    // Parse time if it's a JSON string, otherwise use as is
-                    let timeValue = page.time || "0";
-                    let timeUnit = "minutes";
-                    
-                    try {
-                      const parsed = JSON.parse(page.time);
-                      timeValue = String(parsed.value || 0);
-                      timeUnit = parsed.unit || "minutes";
-                    } catch (e) {
-                      timeValue = String(page.time || 0);
-                    }
-                    
-                    return {
-                      title: page.title || "",
-                      content: page.content || "",
-                      time: timeValue,
-                      timeUnit: timeUnit,
-                    };
-                  })
-                : [{ title: "", content: "", time: "", timeUnit: "minutes" }],
-          };
-          return acc;
-        },
-        {}
-      );
-    } else {
-      // Fallback for old format (single language)
-      languagesData = {
-        [langCode]: {
-          courseName: course.courseName || "",
-          pages:
-            course.pages && course.pages.length > 0
-              ? course.pages.map((page) => {
-                  // Parse time if it's a JSON string, otherwise use as is
+            pages: langData.pages && langData.pages.length > 0
+              ? langData.pages.map((page) => {
                   let timeValue = page.time || "0";
                   let timeUnit = "minutes";
-                  
                   try {
                     const parsed = JSON.parse(page.time);
                     timeValue = String(parsed.value || 0);
@@ -252,7 +333,6 @@ export default function CourseManagementPage() {
                   } catch (e) {
                     timeValue = String(page.time || 0);
                   }
-                  
                   return {
                     title: page.title || "",
                     content: page.content || "",
@@ -261,6 +341,34 @@ export default function CourseManagementPage() {
                   };
                 })
               : [{ title: "", content: "", time: "", timeUnit: "minutes" }],
+          };
+          return acc;
+        },
+        {}
+      );
+    } else {
+      languagesData = {
+        [langCode]: {
+          courseName: course.courseName || "",
+          pages: course.pages && course.pages.length > 0
+            ? course.pages.map((page) => {
+                let timeValue = page.time || "0";
+                let timeUnit = "minutes";
+                try {
+                  const parsed = JSON.parse(page.time);
+                  timeValue = String(parsed.value || 0);
+                  timeUnit = parsed.unit || "minutes";
+                } catch (e) {
+                  timeValue = String(page.time || 0);
+                }
+                return {
+                  title: page.title || "",
+                  content: page.content || "",
+                  time: timeValue,
+                  timeUnit: timeUnit,
+                };
+              })
+            : [{ title: "", content: "", time: "", timeUnit: "minutes" }],
         },
       };
     }
@@ -366,7 +474,6 @@ export default function CourseManagementPage() {
     }
   };
 
-  // Calculate total duration for a course (using current language data)
   const getTotalDuration = (pages) => {
     if (!Array.isArray(pages)) return 0;
     return pages.reduce((total, page) => {
@@ -374,17 +481,14 @@ export default function CourseManagementPage() {
       let timeUnit = "minutes";
       
       try {
-        // Try to parse as JSON (new format)
         const parsed = JSON.parse(page.time);
         timeValue = parsed.value || 0;
         timeUnit = parsed.unit || "minutes";
       } catch (e) {
-        // Fallback to old format
         timeValue = typeof page.time === "string" ? parseInt(page.time) : page.time;
         timeUnit = "minutes";
       }
       
-      // Convert to seconds for calculation
       let seconds = timeValue;
       if (timeUnit === "minutes") {
         seconds = timeValue * 60;
@@ -394,18 +498,15 @@ export default function CourseManagementPage() {
     }, 0);
   };
 
-  // Format duration in seconds to readable format
   const formatDuration = (input) => {
     let totalSeconds = 0;
 
-    // If input is in "mm:ss" format
     if (typeof input === "string" && input.includes(":")) {
       const [minStr, secStr] = input.split(":");
       const minutes = parseInt(minStr, 10);
       const seconds = parseInt(secStr, 10);
       totalSeconds = minutes * 60 + seconds;
     } else {
-      // If input is a number (in seconds)
       totalSeconds = Number(input);
     }
 
@@ -421,7 +522,6 @@ export default function CourseManagementPage() {
     return result.trim();
   };
 
-  // Generate analytics data from real courses and users
   const generateAnalyticsData = () => {
     if (!courses || courses.length === 0) {
       return [
@@ -481,9 +581,7 @@ export default function CourseManagementPage() {
 
   const analyticsData = generateAnalyticsData();
 
-  // Mobile Course Card Component
   const CourseCard = ({ course }) => {
-    // Handle both old format (courseName) and new format (languages)
     const displayName = course.languages?.en?.courseName || course.courseName || "";
     const displayPages = course.languages?.en?.pages || course.pages || [];
 
@@ -557,7 +655,6 @@ export default function CourseManagementPage() {
     );
   };
 
-  // Show authentication warning if not authenticated
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-50 p-3 sm:p-4 lg:p-6">
@@ -589,11 +686,9 @@ export default function CourseManagementPage() {
     );
   }
 
-  // Upload Course View
   if (currentView === "upload") {
     return (
       <div className="min-h-screen bg-gray-50">
-        {/* Mobile Header */}
         <div className="lg:hidden bg-white border-b border-gray-200 p-4 sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <Button
@@ -616,7 +711,6 @@ export default function CourseManagementPage() {
         </div>
 
         <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6">
-          {/* Desktop Header */}
           <div className="hidden lg:flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
             <div>
               <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">
@@ -659,11 +753,9 @@ export default function CourseManagementPage() {
             </Button>
           </div>
 
-          {/* Course Upload Form */}
           <div className="max-w-4xl mx-auto">
             <Card className="bg-white border border-gray-200">
               <CardContent className="p-4 sm:p-6">
-                {/* Language Tabs */}
                 <div className="mb-6 border-b border-gray-200">
                   <div className="flex flex-wrap gap-2 sm:gap-0 sm:flex-nowrap overflow-x-auto">
                     {availableLanguages.map((lang) => (
@@ -691,7 +783,6 @@ export default function CourseManagementPage() {
                 </div>
 
                 <div className="space-y-4 sm:space-y-6">
-                  {/* Course Name */}
                   <div className="space-y-2">
                     <Label className="text-sm font-medium text-gray-700">
                       Course Name ({currentLanguage.toUpperCase()}) *
@@ -705,7 +796,6 @@ export default function CourseManagementPage() {
                     />
                   </div>
 
-                  {/* Course Pages */}
                   <div className="space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
                       <Label className="text-sm font-medium text-gray-700">
@@ -832,7 +922,6 @@ export default function CourseManagementPage() {
             </Card>
           </div>
 
-          {/* Success Modal */}
           <Dialog
             open={isSuccessModalOpen}
             onOpenChange={setIsSuccessModalOpen}
@@ -866,11 +955,9 @@ export default function CourseManagementPage() {
     );
   }
 
-  // Main Course Management View
   if (currentView === "main") {
     return (
       <div className="min-h-screen bg-gray-50">
-        {/* Mobile Header with Menu */}
         <div className="lg:hidden bg-white border-b border-gray-200 p-4 sticky top-0 z-20">
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0">
@@ -905,7 +992,6 @@ export default function CourseManagementPage() {
             </Button>
           </div>
 
-          {/* Mobile Menu Dropdown */}
           {isMobileMenuOpen && (
             <div className="absolute top-full left-0 right-0 bg-white border-b border-gray-200 shadow-lg">
               <div className="p-4 space-y-2">
@@ -941,7 +1027,6 @@ export default function CourseManagementPage() {
         </div>
 
         <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6">
-          {/* Desktop Header */}
           <div className="hidden lg:flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
             <div>
               <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">
@@ -992,7 +1077,6 @@ export default function CourseManagementPage() {
             </div>
           </div>
 
-          {/* Hero Banner */}
           <div className="relative overflow-hidden rounded-lg">
             <Image
               src="/coin1.png"
@@ -1003,7 +1087,6 @@ export default function CourseManagementPage() {
             />
           </div>
 
-          {/* Courses Table */}
           <Card className="bg-white border border-gray-200">
             <CardContent className="p-3 sm:p-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
@@ -1022,7 +1105,6 @@ export default function CourseManagementPage() {
                 )}
               </div>
 
-              {/* Mobile Course Cards */}
               <div className="block md:hidden">
                 {coursesLoading ? (
                   <div className="text-center py-8">
@@ -1074,7 +1156,6 @@ export default function CourseManagementPage() {
                 )}
               </div>
 
-              {/* Desktop Table */}
               <div className="hidden md:block overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -1263,11 +1344,9 @@ export default function CourseManagementPage() {
     );
   }
 
-  // Course View (keeping the rest of the views the same but with authentication checks)
   if (currentView === "course") {
     return (
       <div className="min-h-screen bg-gray-50">
-        {/* Mobile Header */}
         <div className="lg:hidden bg-white border-b border-gray-200 p-4 sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <Button
@@ -1290,7 +1369,6 @@ export default function CourseManagementPage() {
         </div>
 
         <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6">
-          {/* Desktop Header */}
           <div className="hidden lg:flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
             <div>
               <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">
@@ -1327,9 +1405,7 @@ export default function CourseManagementPage() {
             </div>
           </div>
 
-          {/* Course Content Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-            {/* Main Course Image */}
             <div className="lg:col-span-2">
               <Card className="bg-white border border-gray-200">
                 <CardContent className="p-0">
@@ -1346,7 +1422,6 @@ export default function CourseManagementPage() {
               </Card>
             </div>
 
-            {/* All Courses List */}
             <div className="lg:col-span-1">
               <Card className="bg-white border border-gray-200 h-40 sm:h-48 md:h-60 lg:h-80">
                 <CardContent className="p-3 sm:p-6 h-full overflow-y-auto">
@@ -1421,7 +1496,6 @@ export default function CourseManagementPage() {
             </div>
           </div>
 
-          {/* Selected Course Details */}
           {selectedCourse && (
             <Card className="bg-white border border-gray-200">
               <CardContent className="p-3 sm:p-6">
@@ -1497,7 +1571,6 @@ export default function CourseManagementPage() {
                   )}
                 </div>
 
-                {/* Course Pages */}
                 <div className="space-y-4">
                   <h5 className="font-medium text-gray-900 text-sm sm:text-base">
                     Course Content (English):
@@ -1544,11 +1617,9 @@ export default function CourseManagementPage() {
     );
   }
 
-  // Analytics View
   if (currentView === "analytics") {
     return (
       <div className="min-h-screen bg-gray-50">
-        {/* Mobile Header */}
         <div className="lg:hidden bg-white border-b border-gray-200 p-4 sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <Button
@@ -1569,7 +1640,6 @@ export default function CourseManagementPage() {
         </div>
 
         <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6">
-          {/* Desktop Header */}
           <div className="hidden lg:flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
             <div>
               <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">
@@ -1599,7 +1669,6 @@ export default function CourseManagementPage() {
             </div>
           </div>
 
-          {/* Course Statistics */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-3 sm:gap-4 lg:gap-6">
             <Card className="bg-white border border-gray-200">
               <CardContent className="p-4 sm:p-6">
@@ -1639,54 +1708,8 @@ export default function CourseManagementPage() {
                 </div>
               </CardContent>
             </Card>
-
-            {/* <Card className="bg-white border border-gray-200">
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs sm:text-sm font-medium text-gray-600">
-                      Total Pages
-                    </p>
-                    <p className="text-xl sm:text-2xl font-bold text-gray-900">
-                      {courses.reduce(
-                        (total, course) => total + (course.pages?.length || 0),
-                        0
-                      )}
-                    </p>
-                  </div>
-                  <div className="w-10 sm:w-12 h-10 sm:h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <FileText className="h-5 sm:h-6 w-5 sm:w-6 text-purple-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card> */}
-
-            {/* <Card className="bg-white border border-gray-200">
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs sm:text-sm font-medium text-gray-600">
-                      Total Duration
-                    </p>
-                    <p className="text-xl sm:text-2xl font-bold text-gray-900">
-                      {formatDuration(
-                        courses.reduce(
-                          (total, course) =>
-                            total + getTotalDuration(course.pages || []),
-                          0
-                        )
-                      )}
-                    </p>
-                  </div>
-                  <div className="w-10 sm:w-12 h-10 sm:h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <Clock className="h-5 sm:h-6 w-5 sm:w-6 text-blue-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card> */}
           </div>
 
-          {/* Course Analytics Chart */}
           <div className="space-y-4 sm:space-y-6">
             <h2 className="text-base sm:text-lg lg:text-xl font-semibold text-gray-900">
               Course Distribution
@@ -1706,7 +1729,6 @@ export default function CourseManagementPage() {
                   size="sm"
                   variant="outline"
                   className="mt-2 bg-transparent"
-                  
                 >
                   Retry
                 </Button>
@@ -1714,7 +1736,6 @@ export default function CourseManagementPage() {
             ) : (
               <Card className="bg-white border border-gray-200 shadow-sm rounded-xl w-full max-w-4xl mx-auto">
                 <CardContent className="p-4 sm:p-6 lg:p-8">
-                  {/* Chart Section */}
                   <div className="relative w-full h-[200px] sm:h-[300px] md:h-[350px] lg:h-[400px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
@@ -1734,7 +1755,6 @@ export default function CourseManagementPage() {
                       </PieChart>
                     </ResponsiveContainer>
 
-                    {/* Center Text */}
                     <div className="absolute inset-0 flex items-center justify-center">
                       <div className="text-center hidden md:block">
                         <h3 className="text-xs sm:text-sm font-medium text-gray-700">
@@ -1747,7 +1767,6 @@ export default function CourseManagementPage() {
                     </div>
                   </div>
 
-                  {/* Legend Section */}
                   <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 mt-6">
                     {analyticsData.map((item, index) => (
                       <div key={index} className="flex items-center space-x-2">
