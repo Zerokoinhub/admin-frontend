@@ -148,22 +148,24 @@ export default function CourseManagementPage() {
   const handleSubmitCourse = async () => {
   console.log("🔍 Starting course submission");
   
-  // ✅ Get the current language data
+  // ✅ Get the current language data directly from formData
   const currentLangData = formData.languages[currentLanguage];
+  
+  console.log("Current Language:", currentLanguage);
+  console.log("Current Language Data:", currentLangData);
+  console.log("Full formData:", JSON.stringify(formData, null, 2));
   
   if (!currentLangData) {
     alert("Please fill in course details");
     return;
   }
 
-  // ✅ Get course name from the form
+  // ✅ Get course name and pages from the current language data
   const courseName = currentLangData.courseName;
   const pages = currentLangData.pages;
 
-  console.log("Course Name:", courseName);
-  console.log("Pages:", pages);
-  console.log("Current Language:", currentLanguage);
-  console.log("Full formData:", JSON.stringify(formData, null, 2));
+  console.log("Extracted Course Name:", courseName);
+  console.log("Extracted Pages:", pages);
 
   if (!courseName || courseName.trim() === "") {
     alert("Please enter a course name");
@@ -195,60 +197,46 @@ export default function CourseManagementPage() {
   setIsSubmitting(true);
 
   try {
-    // ✅ Build the payload correctly
-    const languagesPayload = {};
-    
-    // Add the current language content
-    languagesPayload[currentLanguage] = {
-      courseName: courseName.trim(),
-      pages: pages.map((page) => ({
-        title: page.title.trim(),
-        content: page.content.trim(),
-        time: JSON.stringify({
-          value: parseInt(page.time) || 0,
-          unit: page.timeUnit || "minutes",
-        }),
-      })),
-    };
-
-    // Also add any other languages that have content
-    Object.entries(formData.languages).forEach(([langCode, langData]) => {
-      if (langCode !== currentLanguage && langData && langData.courseName && langData.courseName.trim() !== "") {
-        languagesPayload[langCode] = {
-          courseName: langData.courseName.trim(),
-          pages: langData.pages.map((page) => ({
-            title: page.title.trim(),
-            content: page.content.trim(),
-            time: JSON.stringify({
-              value: parseInt(page.time) || 0,
-              unit: page.timeUnit || "minutes",
-            }),
-          })),
-        };
-      }
-    });
-
-    // ✅ Get the current user ID from userData (not username)
+    // ✅ Get the user ID from userData (from your logs, it's 68cc15c7e612f4b0cc2062b7)
     const uploadedById = userData?.id || userData?._id;
+    
+    console.log("Uploaded By ID:", uploadedById);
     
     if (!uploadedById) {
       throw new Error("User ID not found. Please log in again.");
     }
 
+    // ✅ Build the payload correctly
+    const payload = {
+      languages: {
+        [currentLanguage]: {
+          courseName: courseName.trim(),
+          pages: pages.map((page) => ({
+            title: page.title.trim(),
+            content: page.content.trim(),
+            time: JSON.stringify({
+              value: parseInt(page.time) || 60,
+              unit: page.timeUnit || "minutes",
+            }),
+          })),
+        },
+      },
+      uploadedBy: uploadedById,
+    };
+
+    console.log("📤 FINAL PAYLOAD BEING SENT:", JSON.stringify(payload, null, 2));
+
     let result;
 
     if (isEditing && selectedCourse) {
       console.log("Updating existing course:", selectedCourse._id);
-      result = await updateCourse(selectedCourse._id, { languages: languagesPayload });
+      result = await updateCourse(selectedCourse._id, { languages: payload.languages });
     } else {
       console.log("Creating new course");
-      const coursePayload = {
-        languages: languagesPayload,
-        uploadedBy: uploadedById,  // ✅ Use the user ID, not username
-      };
-      console.log("📤 Sending payload:", JSON.stringify(coursePayload, null, 2));
-      result = await createCourse(coursePayload);
+      result = await createCourse(payload);
     }
+
+    console.log("Result from API:", result);
 
     if (result && result.success) {
       console.log("Course operation successful");
