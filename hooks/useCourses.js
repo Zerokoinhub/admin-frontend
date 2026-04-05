@@ -59,8 +59,8 @@ export const useCourses = () => {
     }
   };
 
-  // Helper function to format time properly
-  const formatTime = (time, timeUnit = "minutes") => {
+  // Helper function to format time
+  const formatTimeForBackend = (time, timeUnit = "minutes") => {
     if (typeof time === 'string' && time.includes('{')) {
       return time; // Already formatted
     }
@@ -68,7 +68,7 @@ export const useCourses = () => {
     return JSON.stringify({ value, unit: timeUnit });
   };
 
-  // Create a new course
+  // Create a new course - FIXED VERSION
   const createCourse = async (courseData) => {
     try {
       if (!isAuthenticated()) {
@@ -80,48 +80,52 @@ export const useCourses = () => {
         throw new Error("User ID not found.");
       }
 
+      // Get uploadedBy from localStorage
       const currUsr = localStorage.getItem("user");
-      const currUsrStr = JSON.parse(currUsr);
-      const uploadedBy = currUsrStr.username
-        .toLowerCase()
-        .replace(/[^a-zA-Z0-9 ]/g, "")
-        .split(" ")
-        .map((word, index) =>
-          index === 0 ? word : word.charAt(0).toUpperCase() + word.slice(1)
-        )
-        .join("");
+      const currUsrStr = currUsr ? JSON.parse(currUsr) : null;
+      const uploadedBy = currUsrStr?.username
+        ? currUsrStr.username
+            .toLowerCase()
+            .replace(/[^a-zA-Z0-9 ]/g, "")
+            .split(" ")
+            .map((word, index) =>
+              index === 0 ? word : word.charAt(0).toUpperCase() + word.slice(1)
+            )
+            .join("")
+        : "administrator";
 
-      // ✅ FIX: Convert to the format backend expects
+      // ✅ FIX: Build the correct payload format
       let payload;
       
-      // Check if courseData already has the languages structure
       if (courseData.languages) {
-        // Already in correct format - ensure time fields are properly formatted
-        const formattedLanguages = {};
-        Object.entries(courseData.languages).forEach(([langCode, langData]) => {
-          formattedLanguages[langCode] = {
-            courseName: langData.courseName,
-            pages: langData.pages.map(page => ({
-              title: page.title,
-              content: page.content,
-              time: formatTime(page.time, page.timeUnit),
-            })),
-          };
-        });
+        // Already has languages structure
         payload = {
-          languages: formattedLanguages,
+          languages: {},
           uploadedBy: uploadedBy,
         };
+        
+        Object.entries(courseData.languages).forEach(([langCode, langData]) => {
+          if (langData && langData.courseName && langData.courseName.trim()) {
+            payload.languages[langCode] = {
+              courseName: langData.courseName.trim(),
+              pages: langData.pages.map(page => ({
+                title: page.title.trim(),
+                content: page.content.trim(),
+                time: formatTimeForBackend(page.time, page.timeUnit),
+              })),
+            };
+          }
+        });
       } else {
-        // Convert from simple format to languages format
+        // Convert from simple format
         payload = {
           languages: {
             en: {
-              courseName: courseData.courseName,
-              pages: courseData.pages.map(page => ({
-                title: page.title,
-                content: page.content,
-                time: formatTime(page.time, page.timeUnit),
+              courseName: courseData.courseName?.trim() || "",
+              pages: (courseData.pages || []).map(page => ({
+                title: page.title?.trim() || "",
+                content: page.content?.trim() || "",
+                time: formatTimeForBackend(page.time, page.timeUnit),
               })),
             },
           },
@@ -129,7 +133,7 @@ export const useCourses = () => {
         };
       }
 
-      console.log("📤 Creating course with payload:", JSON.stringify(payload, null, 2));
+      console.log("📤 FINAL CREATE PAYLOAD:", JSON.stringify(payload, null, 2));
 
       const response = await fetch(API_BASE, {
         method: "POST",
@@ -143,8 +147,10 @@ export const useCourses = () => {
       const data = await response.json();
       console.log("Create response:", data);
 
-      if (data.success && data.course) {
-        setCourses((prev) => [...prev, data.course]);
+      if (data.success) {
+        if (data.course) {
+          setCourses((prev) => [...prev, data.course]);
+        }
         return { success: true, data: data.course };
       } else {
         throw new Error(data.message || "Failed to create course");
@@ -158,47 +164,47 @@ export const useCourses = () => {
     }
   };
 
-  // Edit/update course
+  // Edit/update course - FIXED VERSION
   const updateCourse = async (courseId, courseData) => {
     try {
       if (!isAuthenticated()) {
         throw new Error("User not authenticated. Please log in again.");
       }
 
-      // ✅ FIX: Format the payload correctly for update
+      // ✅ FIX: Build the correct payload format for update
       let payload;
       
       if (courseData.languages) {
-        // Already in correct format - ensure time fields are properly formatted
-        const formattedLanguages = {};
+        payload = { languages: {} };
+        
         Object.entries(courseData.languages).forEach(([langCode, langData]) => {
-          formattedLanguages[langCode] = {
-            courseName: langData.courseName,
-            pages: langData.pages.map(page => ({
-              title: page.title,
-              content: page.content,
-              time: formatTime(page.time, page.timeUnit),
-            })),
-          };
+          if (langData && langData.courseName && langData.courseName.trim()) {
+            payload.languages[langCode] = {
+              courseName: langData.courseName.trim(),
+              pages: langData.pages.map(page => ({
+                title: page.title.trim(),
+                content: page.content.trim(),
+                time: formatTimeForBackend(page.time, page.timeUnit),
+              })),
+            };
+          }
         });
-        payload = { languages: formattedLanguages };
       } else {
-        // Convert from simple format to languages format
         payload = {
           languages: {
             en: {
-              courseName: courseData.courseName,
-              pages: courseData.pages.map(page => ({
-                title: page.title,
-                content: page.content,
-                time: formatTime(page.time, page.timeUnit),
+              courseName: courseData.courseName?.trim() || "",
+              pages: (courseData.pages || []).map(page => ({
+                title: page.title?.trim() || "",
+                content: page.content?.trim() || "",
+                time: formatTimeForBackend(page.time, page.timeUnit),
               })),
             },
           },
         };
       }
 
-      console.log("📤 Updating course with payload:", JSON.stringify(payload, null, 2));
+      console.log("📤 FINAL UPDATE PAYLOAD:", JSON.stringify(payload, null, 2));
 
       const response = await makeAuthenticatedRequest(`${API_BASE}/${courseId}`, {
         method: "PUT",
