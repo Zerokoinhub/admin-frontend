@@ -70,100 +70,38 @@ export const useCourses = () => {
 
   // Create a new course - FIXED VERSION
   const createCourse = async (courseData) => {
-    try {
-      if (!isAuthenticated()) {
-        throw new Error("User not authenticated. Please log in again.");
-      }
-
-      const currentUser = getCurrentUser();
-      if (!currentUser?.id) {
-        throw new Error("User ID not found.");
-      }
-
-      // Get uploadedBy from localStorage
-      const currUsr = localStorage.getItem("user");
-      const currUsrStr = currUsr ? JSON.parse(currUsr) : null;
-      const uploadedBy = currUsrStr?.username
-        ? currUsrStr.username
-            .toLowerCase()
-            .replace(/[^a-zA-Z0-9 ]/g, "")
-            .split(" ")
-            .map((word, index) =>
-              index === 0 ? word : word.charAt(0).toUpperCase() + word.slice(1)
-            )
-            .join("")
-        : "administrator";
-
-      // ✅ FIX: Build the correct payload format
-      let payload;
-      
-      if (courseData.languages) {
-        // Already has languages structure
-        payload = {
-          languages: {},
-          uploadedBy: uploadedBy,
-        };
-        
-        Object.entries(courseData.languages).forEach(([langCode, langData]) => {
-          if (langData && langData.courseName && langData.courseName.trim()) {
-            payload.languages[langCode] = {
-              courseName: langData.courseName.trim(),
-              pages: langData.pages.map(page => ({
-                title: page.title.trim(),
-                content: page.content.trim(),
-                time: formatTimeForBackend(page.time, page.timeUnit),
-              })),
-            };
-          }
-        });
-      } else {
-        // Convert from simple format
-        payload = {
-          languages: {
-            en: {
-              courseName: courseData.courseName?.trim() || "",
-              pages: (courseData.pages || []).map(page => ({
-                title: page.title?.trim() || "",
-                content: page.content?.trim() || "",
-                time: formatTimeForBackend(page.time, page.timeUnit),
-              })),
-            },
-          },
-          uploadedBy: uploadedBy,
-        };
-      }
-
-      console.log("📤 FINAL CREATE PAYLOAD:", JSON.stringify(payload, null, 2));
-
-      const response = await fetch(API_BASE, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
-      console.log("Create response:", data);
-
-      if (data.success) {
-        if (data.course) {
-          setCourses((prev) => [...prev, data.course]);
-        }
-        return { success: true, data: data.course };
-      } else {
-        throw new Error(data.message || "Failed to create course");
-      }
-    } catch (err) {
-      console.error("Error creating course:", err);
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to create course";
-      setError(errorMessage);
-      return { success: false, error: errorMessage };
+  try {
+    if (!isAuthenticated()) {
+      throw new Error("User not authenticated. Please log in again.");
     }
-  };
 
+    console.log("📤 createCourse received:", JSON.stringify(courseData, null, 2));
+
+    const response = await fetch(API_BASE, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+      },
+      body: JSON.stringify(courseData), // courseData already has the correct format
+    });
+
+    const data = await response.json();
+    console.log("Create response:", data);
+
+    if (data.success) {
+      if (data.course) {
+        setCourses((prev) => [...prev, data.course]);
+      }
+      return { success: true, data: data.course };
+    } else {
+      throw new Error(data.message || "Failed to create course");
+    }
+  } catch (err) {
+    console.error("Error creating course:", err);
+    return { success: false, error: err.message };
+  }
+};
   // Edit/update course - FIXED VERSION
   const updateCourse = async (courseId, courseData) => {
     try {
