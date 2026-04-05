@@ -146,125 +146,141 @@ export default function CourseManagementPage() {
 
   // ✅ FIXED: Added missing handleSubmitCourse function
   const handleSubmitCourse = async () => {
-    console.log("🔍 Starting course submission");
-    console.log("Form Data:", JSON.stringify(formData, null, 2));
+  console.log("🔍 Starting course submission");
+  
+  // ✅ Get the current language data
+  const currentLangData = formData.languages[currentLanguage];
+  
+  if (!currentLangData) {
+    alert("Please fill in course details");
+    return;
+  }
+
+  // ✅ Get course name from the form
+  const courseName = currentLangData.courseName;
+  const pages = currentLangData.pages;
+
+  console.log("Course Name:", courseName);
+  console.log("Pages:", pages);
+  console.log("Current Language:", currentLanguage);
+  console.log("Full formData:", JSON.stringify(formData, null, 2));
+
+  if (!courseName || courseName.trim() === "") {
+    alert("Please enter a course name");
+    return;
+  }
+
+  if (!pages || pages.length === 0) {
+    alert("Please add at least one page");
+    return;
+  }
+
+  // Validate each page
+  for (let i = 0; i < pages.length; i++) {
+    const page = pages[i];
+    if (!page.title || page.title.trim() === "") {
+      alert(`Page ${i + 1} is missing a title`);
+      return;
+    }
+    if (!page.content || page.content.trim() === "") {
+      alert(`Page ${i + 1} is missing content`);
+      return;
+    }
+    if (!page.time || page.time === "") {
+      alert(`Page ${i + 1} is missing duration`);
+      return;
+    }
+  }
+
+  setIsSubmitting(true);
+
+  try {
+    // ✅ Build the payload correctly
+    const languagesPayload = {};
     
-    if (!isAuthenticated) {
-      alert("Please log in to create courses");
-      return;
-    }
+    // Add the current language content
+    languagesPayload[currentLanguage] = {
+      courseName: courseName.trim(),
+      pages: pages.map((page) => ({
+        title: page.title.trim(),
+        content: page.content.trim(),
+        time: JSON.stringify({
+          value: parseInt(page.time) || 0,
+          unit: page.timeUnit || "minutes",
+        }),
+      })),
+    };
 
-    // Get the current language data (English by default)
-    const currentLangData = formData.languages[currentLanguage];
-    
-    if (!currentLangData) {
-      alert("Please fill in course details");
-      return;
-    }
-
-    // Validate course name
-    if (!currentLangData.courseName || currentLangData.courseName.trim() === "") {
-      alert("Please enter a course name");
-      return;
-    }
-
-    // Validate pages
-    if (!currentLangData.pages || currentLangData.pages.length === 0) {
-      alert("Please add at least one page");
-      return;
-    }
-
-    // Validate each page
-    for (let i = 0; i < currentLangData.pages.length; i++) {
-      const page = currentLangData.pages[i];
-      if (!page.title || page.title.trim() === "") {
-        alert(`Page ${i + 1} is missing a title`);
-        return;
-      }
-      if (!page.content || page.content.trim() === "") {
-        alert(`Page ${i + 1} is missing content`);
-        return;
-      }
-      if (!page.time || page.time === "") {
-        alert(`Page ${i + 1} is missing duration`);
-        return;
-      }
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      // Build the languages object for ALL languages that have content
-      const languagesPayload = {};
-      
-      Object.entries(formData.languages).forEach(([langCode, langData]) => {
-        if (langData && langData.courseName && langData.courseName.trim() !== "") {
-          languagesPayload[langCode] = {
-            courseName: langData.courseName.trim(),
-            pages: langData.pages.map((page) => ({
-              title: page.title.trim(),
-              content: page.content.trim(),
-              time: JSON.stringify({
-                value: parseInt(page.time) || 0,
-                unit: page.timeUnit || "minutes",
-              }),
-            })),
-          };
-        }
-      });
-
-      if (Object.keys(languagesPayload).length === 0) {
-        alert("Please fill in at least one language");
-        setIsSubmitting(false);
-        return;
-      }
-
-      let result;
-
-      if (isEditing && selectedCourse) {
-        console.log("Updating existing course:", selectedCourse._id);
-        const editPayload = { languages: languagesPayload };
-        result = await updateCourse(selectedCourse._id, editPayload);
-      } else {
-        console.log("Creating new course");
-        const coursePayload = {
-          languages: languagesPayload,
-          uploadedBy: userData?.username || "Administrator",
+    // Also add any other languages that have content
+    Object.entries(formData.languages).forEach(([langCode, langData]) => {
+      if (langCode !== currentLanguage && langData && langData.courseName && langData.courseName.trim() !== "") {
+        languagesPayload[langCode] = {
+          courseName: langData.courseName.trim(),
+          pages: langData.pages.map((page) => ({
+            title: page.title.trim(),
+            content: page.content.trim(),
+            time: JSON.stringify({
+              value: parseInt(page.time) || 0,
+              unit: page.timeUnit || "minutes",
+            }),
+          })),
         };
-        result = await createCourse(coursePayload);
       }
+    });
 
-      if (result.success) {
-        console.log("Course operation successful");
-        setIsSuccessModalOpen(true);
-        setTimeout(() => {
-          setIsSuccessModalOpen(false);
-          setCurrentView("main");
-          setSelectedCourse(null);
-          setIsEditing(false);
-          setCurrentLanguage("en");
-          setTimeUnit("minutes");
-          setFormData({
-            languages: {
-              en: {
-                courseName: "",
-                pages: [{ title: "", content: "", time: "", timeUnit: "minutes" }],
-              },
-            },
-          });
-        }, 2000);
-      } else {
-        console.error("Course operation failed:", result.error);
-        alert(`Failed to ${isEditing ? "update" : "create"} course: ${result.error}`);
-      }
-    } catch (error) {
-      console.error("Error during course submission:", error);
-      alert(`Error ${isEditing ? "updating" : "creating"} course: ${error.message}`);
-    } finally {
-      setIsSubmitting(false);
+    // ✅ Get the current user ID from userData (not username)
+    const uploadedById = userData?.id || userData?._id;
+    
+    if (!uploadedById) {
+      throw new Error("User ID not found. Please log in again.");
     }
-  };
 
+    let result;
+
+    if (isEditing && selectedCourse) {
+      console.log("Updating existing course:", selectedCourse._id);
+      result = await updateCourse(selectedCourse._id, { languages: languagesPayload });
+    } else {
+      console.log("Creating new course");
+      const coursePayload = {
+        languages: languagesPayload,
+        uploadedBy: uploadedById,  // ✅ Use the user ID, not username
+      };
+      console.log("📤 Sending payload:", JSON.stringify(coursePayload, null, 2));
+      result = await createCourse(coursePayload);
+    }
+
+    if (result && result.success) {
+      console.log("Course operation successful");
+      setIsSuccessModalOpen(true);
+      setTimeout(() => {
+        setIsSuccessModalOpen(false);
+        setCurrentView("main");
+        setSelectedCourse(null);
+        setIsEditing(false);
+        setCurrentLanguage("en");
+        setTimeUnit("minutes");
+        setFormData({
+          languages: {
+            en: {
+              courseName: "",
+              pages: [{ title: "", content: "", time: "", timeUnit: "minutes" }],
+            },
+          },
+        });
+        refreshCourses();
+      }, 2000);
+    } else {
+      console.error("Course operation failed:", result?.error);
+      alert(`Failed to ${isEditing ? "update" : "create"} course: ${result?.error || "Unknown error"}`);
+    }
+  } catch (error) {
+    console.error("Error during course submission:", error);
+    alert(`Error ${isEditing ? "updating" : "creating"} course: ${error.message}`);
+  } finally {
+    setIsSubmitting(false);
+  }
+};
   const handleDeleteCourse = async (courseId) => {
     if (!isAuthenticated) {
       alert("Please log in to delete courses");
