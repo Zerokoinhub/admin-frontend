@@ -59,6 +59,15 @@ export const useCourses = () => {
     }
   };
 
+  // Helper function to format time properly
+  const formatTime = (time, timeUnit = "minutes") => {
+    if (typeof time === 'string' && time.includes('{')) {
+      return time; // Already formatted
+    }
+    const value = parseInt(time) || 0;
+    return JSON.stringify({ value, unit: timeUnit });
+  };
+
   // Create a new course
   const createCourse = async (courseData) => {
     try {
@@ -75,18 +84,52 @@ export const useCourses = () => {
       const currUsrStr = JSON.parse(currUsr);
       const uploadedBy = currUsrStr.username
         .toLowerCase()
-        .replace(/[^a-zA-Z0-9 ]/g, "") // remove special chars
+        .replace(/[^a-zA-Z0-9 ]/g, "")
         .split(" ")
         .map((word, index) =>
           index === 0 ? word : word.charAt(0).toUpperCase() + word.slice(1)
         )
         .join("");
-      const coursePayload = {
-        courseName: courseData.courseName,
-        pages: courseData.pages,
-        uploadedBy: uploadedBy,
-      };
-      console.log("Creating course:", coursePayload);
+
+      // ✅ FIX: Convert to the format backend expects
+      let payload;
+      
+      // Check if courseData already has the languages structure
+      if (courseData.languages) {
+        // Already in correct format - ensure time fields are properly formatted
+        const formattedLanguages = {};
+        Object.entries(courseData.languages).forEach(([langCode, langData]) => {
+          formattedLanguages[langCode] = {
+            courseName: langData.courseName,
+            pages: langData.pages.map(page => ({
+              title: page.title,
+              content: page.content,
+              time: formatTime(page.time, page.timeUnit),
+            })),
+          };
+        });
+        payload = {
+          languages: formattedLanguages,
+          uploadedBy: uploadedBy,
+        };
+      } else {
+        // Convert from simple format to languages format
+        payload = {
+          languages: {
+            en: {
+              courseName: courseData.courseName,
+              pages: courseData.pages.map(page => ({
+                title: page.title,
+                content: page.content,
+                time: formatTime(page.time, page.timeUnit),
+              })),
+            },
+          },
+          uploadedBy: uploadedBy,
+        };
+      }
+
+      console.log("📤 Creating course with payload:", JSON.stringify(payload, null, 2));
 
       const response = await fetch(API_BASE, {
         method: "POST",
@@ -94,7 +137,7 @@ export const useCourses = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
         },
-        body: JSON.stringify(coursePayload),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
@@ -122,13 +165,45 @@ export const useCourses = () => {
         throw new Error("User not authenticated. Please log in again.");
       }
 
-      const response = await makeAuthenticatedRequest(
-        `${API_BASE}/${courseId}`,
-        {
-          method: "PUT",
-          body: JSON.stringify(courseData),
-        }
-      );
+      // ✅ FIX: Format the payload correctly for update
+      let payload;
+      
+      if (courseData.languages) {
+        // Already in correct format - ensure time fields are properly formatted
+        const formattedLanguages = {};
+        Object.entries(courseData.languages).forEach(([langCode, langData]) => {
+          formattedLanguages[langCode] = {
+            courseName: langData.courseName,
+            pages: langData.pages.map(page => ({
+              title: page.title,
+              content: page.content,
+              time: formatTime(page.time, page.timeUnit),
+            })),
+          };
+        });
+        payload = { languages: formattedLanguages };
+      } else {
+        // Convert from simple format to languages format
+        payload = {
+          languages: {
+            en: {
+              courseName: courseData.courseName,
+              pages: courseData.pages.map(page => ({
+                title: page.title,
+                content: page.content,
+                time: formatTime(page.time, page.timeUnit),
+              })),
+            },
+          },
+        };
+      }
+
+      console.log("📤 Updating course with payload:", JSON.stringify(payload, null, 2));
+
+      const response = await makeAuthenticatedRequest(`${API_BASE}/${courseId}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
 
       const data = await response.json();
       console.log("Update response:", data);
@@ -157,12 +232,9 @@ export const useCourses = () => {
         throw new Error("User not authenticated. Please log in again.");
       }
 
-      const response = await makeAuthenticatedRequest(
-        `${API_BASE}/${courseId}`,
-        {
-          method: "DELETE",
-        }
-      );
+      const response = await makeAuthenticatedRequest(`${API_BASE}/${courseId}`, {
+        method: "DELETE",
+      });
 
       const data = await response.json();
       console.log("Delete response:", data);
