@@ -144,7 +144,7 @@ export default function CourseManagementPage() {
     setIsMobileMenuOpen(false);
   };
 
-  // ✅ FIXED: Update course name with proper state management
+  // Update course name with proper state management
   const updateCourseName = (value) => {
     console.log("Updating course name to:", value);
     setFormData(prev => ({
@@ -159,7 +159,7 @@ export default function CourseManagementPage() {
     }));
   };
 
-  // ✅ FIXED: Update page with proper state management
+  // Update page with proper state management
   const updatePage = (index, field, value) => {
     console.log("Updating page", index, field, "to:", value);
     setFormData(prev => {
@@ -182,7 +182,7 @@ export default function CourseManagementPage() {
     });
   };
 
-  // ✅ FIXED: Add page with proper state management
+  // Add page with proper state management
   const addPage = () => {
     setFormData(prev => ({
       ...prev,
@@ -199,7 +199,7 @@ export default function CourseManagementPage() {
     }));
   };
 
-  // ✅ FIXED: Remove page with proper state management
+  // Remove page with proper state management
   const removePage = (index) => {
     setFormData(prev => {
       const currentPages = prev.languages[currentLanguage].pages;
@@ -233,6 +233,62 @@ export default function CourseManagementPage() {
         },
       }));
     }
+  };
+
+  // ✅ FIXED: Safe getTotalDuration function
+  const getTotalDuration = (pages) => {
+    if (!pages || !Array.isArray(pages)) return 0;
+    
+    return pages.reduce((total, page) => {
+      if (!page) return total;
+      let timeValue = 0;
+      let timeUnit = "minutes";
+      
+      try {
+        if (page.time) {
+          const parsed = JSON.parse(page.time);
+          timeValue = parsed.value || 0;
+          timeUnit = parsed.unit || "minutes";
+        }
+      } catch (e) {
+        timeValue = typeof page.time === "string" ? parseInt(page.time) : (page.time || 0);
+        timeUnit = "minutes";
+      }
+      
+      let seconds = timeValue;
+      if (timeUnit === "minutes") {
+        seconds = timeValue * 60;
+      }
+      
+      return total + seconds;
+    }, 0);
+  };
+
+  // ✅ FIXED: Safe formatDuration function
+  const formatDuration = (input) => {
+    if (!input && input !== 0) return "0m";
+    
+    let totalSeconds = 0;
+
+    if (typeof input === "string" && input.includes(":")) {
+      const [minStr, secStr] = input.split(":");
+      const minutes = parseInt(minStr, 10);
+      const seconds = parseInt(secStr, 10);
+      totalSeconds = (isNaN(minutes) ? 0 : minutes) * 60 + (isNaN(seconds) ? 0 : seconds);
+    } else {
+      totalSeconds = Number(input) || 0;
+    }
+
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = Math.floor(totalSeconds % 60);
+
+    let result = "";
+    if (hours > 0) result += `${hours}h `;
+    if (minutes > 0) result += `${minutes}m `;
+    if (seconds > 0) result += `${seconds}s `;
+
+    return result.trim() || "0m";
   };
 
   // ✅ FIXED: Submit course with proper payload
@@ -393,30 +449,30 @@ export default function CourseManagementPage() {
       return;
     }
 
-    console.log("Editing course:", course.courseName || course.languages?.en?.courseName, "by user:", userData?.email);
+    console.log("Editing course:", course?.courseName || course?.languages?.en?.courseName, "by user:", userData?.email);
     setSelectedCourse(course);
 
     let languagesData = {};
-    const langCode = course.language || "en";
+    const langCode = course?.language || "en";
     
-    if (course.languages && typeof course.languages === "object") {
+    if (course?.languages && typeof course.languages === "object") {
       languagesData = Object.entries(course.languages).reduce((acc, [lCode, langData]) => {
         acc[lCode] = {
-          courseName: langData.courseName || "",
-          pages: langData.pages && langData.pages.length > 0
+          courseName: langData?.courseName || "",
+          pages: langData?.pages && langData.pages.length > 0
             ? langData.pages.map((page) => {
-                let timeValue = page.time || "0";
+                let timeValue = page?.time || "0";
                 let timeUnit = "minutes";
                 try {
                   const parsed = JSON.parse(page.time);
                   timeValue = String(parsed.value || 0);
                   timeUnit = parsed.unit || "minutes";
                 } catch (e) {
-                  timeValue = String(page.time || 0);
+                  timeValue = String(page?.time || 0);
                 }
                 return {
-                  title: page.title || "",
-                  content: page.content || "",
+                  title: page?.title || "",
+                  content: page?.content || "",
                   time: timeValue,
                   timeUnit: timeUnit,
                 };
@@ -428,21 +484,21 @@ export default function CourseManagementPage() {
     } else {
       languagesData = {
         [langCode]: {
-          courseName: course.courseName || "",
-          pages: course.pages && course.pages.length > 0
+          courseName: course?.courseName || "",
+          pages: course?.pages && course.pages.length > 0
             ? course.pages.map((page) => {
-                let timeValue = page.time || "0";
+                let timeValue = page?.time || "0";
                 let timeUnit = "minutes";
                 try {
                   const parsed = JSON.parse(page.time);
                   timeValue = String(parsed.value || 0);
                   timeUnit = parsed.unit || "minutes";
                 } catch (e) {
-                  timeValue = String(page.time || 0);
+                  timeValue = String(page?.time || 0);
                 }
                 return {
-                  title: page.title || "",
-                  content: page.content || "",
+                  title: page?.title || "",
+                  content: page?.content || "",
                   time: timeValue,
                   timeUnit: timeUnit,
                 };
@@ -463,100 +519,48 @@ export default function CourseManagementPage() {
     setSelectedCourse(course);
     setCurrentView("course");
   };
-const getTotalDuration = (pages) => {
-  // ✅ FIX: Check if pages exists and is an array
-  if (!pages || !Array.isArray(pages)) return 0;
-  
-  return pages.reduce((total, page) => {
-    if (!page) return total;
-    let timeValue = 0;
-    let timeUnit = "minutes";
-    
-    try {
-      if (page.time) {
-        const parsed = JSON.parse(page.time);
-        timeValue = parsed.value || 0;
-        timeUnit = parsed.unit || "minutes";
-      }
-    } catch (e) {
-      timeValue = typeof page.time === "string" ? parseInt(page.time) : (page.time || 0);
-      timeUnit = "minutes";
-    }
-    
-    let seconds = timeValue;
-    if (timeUnit === "minutes") {
-      seconds = timeValue * 60;
-    }
-    
-    return total + seconds;
-  }, 0);
-};
- const formatDuration = (input) => {
-  // ✅ FIX: Handle null, undefined, and invalid input
-  if (!input && input !== 0) return "0m";
-  
-  let totalSeconds = 0;
 
-  if (typeof input === "string" && input.includes(":")) {
-    const [minStr, secStr] = input.split(":");
-    const minutes = parseInt(minStr, 10);
-    const seconds = parseInt(secStr, 10);
-    totalSeconds = (isNaN(minutes) ? 0 : minutes) * 60 + (isNaN(seconds) ? 0 : seconds);
-  } else {
-    totalSeconds = Number(input) || 0;
-  }
-
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = Math.floor(totalSeconds % 60);
-
-  let result = "";
-  if (hours > 0) result += `${hours}h `;
-  if (minutes > 0) result += `${minutes}m `;
-  if (seconds > 0) result += `${seconds}s `;
-
-  return result.trim() || "0m";
-};
+  // ✅ FIXED: Safe generateAnalyticsData function
   const generateAnalyticsData = () => {
-  if (!courses || courses.length === 0) {
+    if (!courses || courses.length === 0) {
+      return [
+        { name: "Active Courses", value: 25, color: "#0d9488" },
+        { name: "Inactive Courses", value: 25, color: "#ef4444" },
+        { name: "Total Pages", value: 25, color: "#22c55e" },
+        { name: "Total Duration", value: 25, color: "#a855f7" },
+      ];
+    }
+
+    const activeCourses = courses.filter((course) => course?.isActive !== false).length;
+    const inactiveCourses = courses.length - activeCourses;
+    
+    const totalPages = courses.reduce((total, course) => {
+      const pages = course?.languages?.en?.pages || course?.pages || [];
+      return total + (Array.isArray(pages) ? pages.length : 0);
+    }, 0);
+    
+    const totalDuration = courses.reduce((total, course) => {
+      const pages = course?.languages?.en?.pages || course?.pages || [];
+      return total + getTotalDuration(pages);
+    }, 0);
+
+    const total = activeCourses + inactiveCourses + totalPages + Math.floor(totalDuration / 60);
+
+    if (total === 0) {
+      return [{ name: "No Data", value: 100, color: "#9ca3af" }];
+    }
+
     return [
-      { name: "Active Courses", value: 25, color: "#0d9488" },
-      { name: "Inactive Courses", value: 25, color: "#ef4444" },
-      { name: "Total Pages", value: 25, color: "#22c55e" },
-      { name: "Total Duration", value: 25, color: "#a855f7" },
+      { name: "Active Courses", value: Math.round((activeCourses / total) * 100) || 1, color: "#0d9488" },
+      { name: "Inactive Courses", value: Math.round((inactiveCourses / total) * 100) || 1, color: "#ef4444" },
+      { name: "Total Pages", value: Math.round((totalPages / total) * 100) || 1, color: "#22c55e" },
+      { name: "Duration (hrs)", value: Math.round((Math.floor(totalDuration / 60) / total) * 100) || 1, color: "#a855f7" },
     ];
-  }
+  };
 
-  const activeCourses = courses.filter((course) => course?.isActive !== false).length;
-  const inactiveCourses = courses.length - activeCourses;
-  
-  // ✅ FIX: Safely calculate total pages
-  const totalPages = courses.reduce((total, course) => {
-    const pages = course?.languages?.en?.pages || course?.pages || [];
-    return total + (Array.isArray(pages) ? pages.length : 0);
-  }, 0);
-  
-  // ✅ FIX: Safely calculate total duration
-  const totalDuration = courses.reduce((total, course) => {
-    const pages = course?.languages?.en?.pages || course?.pages || [];
-    return total + getTotalDuration(pages);
-  }, 0);
-
-  const total = activeCourses + inactiveCourses + totalPages + Math.floor(totalDuration / 60);
-
-  if (total === 0) {
-    return [{ name: "No Data", value: 100, color: "#9ca3af" }];
-  }
-
-  return [
-    { name: "Active Courses", value: Math.round((activeCourses / total) * 100) || 1, color: "#0d9488" },
-    { name: "Inactive Courses", value: Math.round((inactiveCourses / total) * 100) || 1, color: "#ef4444" },
-    { name: "Total Pages", value: Math.round((totalPages / total) * 100) || 1, color: "#22c55e" },
-    { name: "Duration (hrs)", value: Math.round((Math.floor(totalDuration / 60) / total) * 100) || 1, color: "#a855f7" },
-  ];
-};
   const analyticsData = generateAnalyticsData();
 
+  // ✅ FIXED: Safe CourseCard component
   const CourseCard = ({ course }) => {
     const displayName = course?.languages?.en?.courseName || course?.courseName || "Untitled";
     const displayPages = course?.languages?.en?.pages || course?.pages || [];
@@ -573,7 +577,7 @@ const getTotalDuration = (pages) => {
         <div className="grid grid-cols-2 gap-3 mb-3 text-xs text-gray-600">
           <div className="flex items-center gap-1">
             <FileText className="h-3 w-3" />
-            <span>{displayPages.length} pages</span>
+            <span>{Array.isArray(displayPages) ? displayPages.length : 0} pages</span>
           </div>
           <div className="flex items-center gap-1">
             <Clock className="h-3 w-3" />
@@ -652,7 +656,6 @@ const getTotalDuration = (pages) => {
           <div className="max-w-4xl mx-auto">
             <Card className="bg-white border border-gray-200">
               <CardContent className="p-6">
-                {/* Language Tabs */}
                 <div className="mb-6 border-b border-gray-200">
                   <div className="flex flex-wrap gap-2 overflow-x-auto">
                     {availableLanguages.map((lang) => (
@@ -676,7 +679,6 @@ const getTotalDuration = (pages) => {
                 </div>
 
                 <div className="space-y-6">
-                  {/* Course Name */}
                   <div className="space-y-2">
                     <Label className="text-sm font-medium text-gray-700">Course Name ({currentLanguage.toUpperCase()}) *</Label>
                     <Input
@@ -688,7 +690,6 @@ const getTotalDuration = (pages) => {
                     />
                   </div>
 
-                  {/* Course Pages */}
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
                       <Label className="text-sm font-medium text-gray-700">Course Pages ({currentLanguage.toUpperCase()})</Label>
@@ -856,18 +857,35 @@ const getTotalDuration = (pages) => {
                       courses.map((course) => {
                         const displayName = course?.languages?.en?.courseName || course?.courseName || "";
                         const displayPages = course?.languages?.en?.pages || course?.pages || [];
+                        const languageCount = course?.languages ? Object.keys(course.languages).length : 1;
+
                         return (
                           <TableRow key={course._id}>
-                            <TableCell className="font-medium">{displayName}</TableCell>
-                            <TableCell>{displayPages.length}</TableCell>
+                            <TableCell className="font-medium">
+                              <div>{displayName}</div>
+                              {languageCount > 1 && <div className="text-xs text-gray-500 mt-1">{languageCount} languages</div>}
+                            </TableCell>
+                            <TableCell>{Array.isArray(displayPages) ? displayPages.length : 0}</TableCell>
                             <TableCell>{formatDuration(getTotalDuration(displayPages))}</TableCell>
-                            <TableCell><Badge className={course.isActive !== false ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>{course.isActive !== false ? "Active" : "Inactive"}</Badge></TableCell>
-                            <TableCell>{course.createdAt ? new Date(course.createdAt).toLocaleDateString() : "N/A"}</TableCell>
-                            <TableCell>{course.uploadedBy?.username || course.uploadedBy || "Admin"}</TableCell>
+                            <TableCell>
+                              <Badge className={course?.isActive !== false ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                                {course?.isActive !== false ? "Active" : "Inactive"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{course?.createdAt ? new Date(course.createdAt).toLocaleDateString() : "N/A"}</TableCell>
+                            <TableCell>{course?.uploadedBy?.username || course?.uploadedBy || "Admin"}</TableCell>
                             <TableCell>
                               <div className="flex gap-2">
-                                {hasPermission("edit") && <Button variant="ghost" size="sm" onClick={() => handleEditCourse(course)} className="text-blue-600"><Edit className="h-4 w-4" /></Button>}
-                                {hasPermission("delete") && <Button variant="ghost" size="sm" onClick={() => handleDeleteCourse(course._id)} className="text-red-600"><Trash2 className="h-4 w-4" /></Button>}
+                                {hasPermission("edit") && (
+                                  <Button variant="ghost" size="sm" onClick={() => handleEditCourse(course)} className="text-blue-600">
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {hasPermission("delete") && (
+                                  <Button variant="ghost" size="sm" onClick={() => handleDeleteCourse(course._id)} className="text-red-600">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
                               </div>
                             </TableCell>
                           </TableRow>
@@ -928,7 +946,7 @@ const getTotalDuration = (pages) => {
                             <h4 className="font-medium text-gray-900 text-sm truncate">{displayName}</h4>
                             <p className="text-xs text-gray-500">{course?.languages?.en?.pages?.length || course?.pages?.length || 0} pages</p>
                           </div>
-                          <Badge className={course.isActive !== false ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>{course.isActive !== false ? "Active" : "Inactive"}</Badge>
+                          <Badge className={course?.isActive !== false ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>{course?.isActive !== false ? "Active" : "Inactive"}</Badge>
                         </div>
                       );
                     })}
@@ -945,11 +963,11 @@ const getTotalDuration = (pages) => {
                   <div className="flex gap-4">
                     <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center"><User className="h-6 w-6 text-gray-600" /></div>
                     <div>
-                      <h4 className="font-semibold text-gray-900 text-lg">{selectedCourse.languages?.en?.courseName || selectedCourse.courseName}</h4>
+                      <h4 className="font-semibold text-gray-900 text-lg">{selectedCourse?.languages?.en?.courseName || selectedCourse?.courseName}</h4>
                       <div className="flex gap-4 mt-2 text-sm text-gray-600">
-                        <span>📄 {(selectedCourse.languages?.en?.pages || selectedCourse.pages || []).length} pages</span>
-                        <span>⏱️ {formatDuration(getTotalDuration(selectedCourse.languages?.en?.pages || selectedCourse.pages || []))}</span>
-                        <Badge className={selectedCourse.isActive !== false ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>{selectedCourse.isActive !== false ? "Active" : "Inactive"}</Badge>
+                        <span>📄 {(selectedCourse?.languages?.en?.pages || selectedCourse?.pages || []).length} pages</span>
+                        <span>⏱️ {formatDuration(getTotalDuration(selectedCourse?.languages?.en?.pages || selectedCourse?.pages || []))}</span>
+                        <Badge className={selectedCourse?.isActive !== false ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>{selectedCourse?.isActive !== false ? "Active" : "Inactive"}</Badge>
                       </div>
                     </div>
                   </div>
@@ -958,13 +976,13 @@ const getTotalDuration = (pages) => {
 
                 <div className="space-y-4 mt-6">
                   <h5 className="font-medium text-gray-900">Course Content:</h5>
-                  {(selectedCourse.languages?.en?.pages || selectedCourse.pages || []).map((page, index) => (
+                  {(selectedCourse?.languages?.en?.pages || selectedCourse?.pages || []).map((page, index) => (
                     <div key={index} className="border rounded-lg p-4">
                       <div className="flex justify-between items-center mb-2">
-                        <h6 className="font-medium text-gray-900">Page {index + 1}: {page.title}</h6>
-                        <span className="text-sm text-gray-500">⏱️ {page.time || 0} minutes</span>
+                        <h6 className="font-medium text-gray-900">Page {index + 1}: {page?.title}</h6>
+                        <span className="text-sm text-gray-500">⏱️ {page?.time || 0} minutes</span>
                       </div>
-                      <p className="text-gray-700 text-sm">{page.content}</p>
+                      <p className="text-gray-700 text-sm">{page?.content}</p>
                     </div>
                   ))}
                 </div>
@@ -1004,7 +1022,7 @@ const getTotalDuration = (pages) => {
             <Card className="bg-white">
               <CardContent className="p-6">
                 <div className="flex justify-between items-center">
-                  <div><p className="text-sm font-medium text-gray-600">Active Courses</p><p className="text-2xl font-bold text-gray-900">{courses.filter(c => c.isActive !== false).length}</p></div>
+                  <div><p className="text-sm font-medium text-gray-600">Active Courses</p><p className="text-2xl font-bold text-gray-900">{courses.filter(c => c?.isActive !== false).length}</p></div>
                   <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center"><Badge className="bg-green-600 text-white">✓</Badge></div>
                 </div>
               </CardContent>
