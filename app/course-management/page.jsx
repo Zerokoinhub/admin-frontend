@@ -463,89 +463,98 @@ export default function CourseManagementPage() {
     setSelectedCourse(course);
     setCurrentView("course");
   };
-
-  const getTotalDuration = (pages) => {
-    if (!pages || !Array.isArray(pages)) return 0;
-    return pages.reduce((total, page) => {
-      if (!page) return total;
-      let timeValue = 0;
-      let timeUnit = "minutes";
-      
-      try {
-        if (page.time) {
-          const parsed = JSON.parse(page.time);
-          timeValue = parsed.value || 0;
-          timeUnit = parsed.unit || "minutes";
-        }
-      } catch (e) {
-        timeValue = typeof page.time === "string" ? parseInt(page.time) : (page.time || 0);
-        timeUnit = "minutes";
-      }
-      
-      let seconds = timeValue;
-      if (timeUnit === "minutes") {
-        seconds = timeValue * 60;
-      }
-      
-      return total + seconds;
-    }, 0);
-  };
-
-  const formatDuration = (input) => {
-    if (!input && input !== 0) return "0m";
+const getTotalDuration = (pages) => {
+  // ✅ FIX: Check if pages exists and is an array
+  if (!pages || !Array.isArray(pages)) return 0;
+  
+  return pages.reduce((total, page) => {
+    if (!page) return total;
+    let timeValue = 0;
+    let timeUnit = "minutes";
     
-    let totalSeconds = 0;
-
-    if (typeof input === "string" && input.includes(":")) {
-      const [minStr, secStr] = input.split(":");
-      const minutes = parseInt(minStr, 10);
-      const seconds = parseInt(secStr, 10);
-      totalSeconds = minutes * 60 + seconds;
-    } else {
-      totalSeconds = Number(input) || 0;
+    try {
+      if (page.time) {
+        const parsed = JSON.parse(page.time);
+        timeValue = parsed.value || 0;
+        timeUnit = parsed.unit || "minutes";
+      }
+    } catch (e) {
+      timeValue = typeof page.time === "string" ? parseInt(page.time) : (page.time || 0);
+      timeUnit = "minutes";
     }
+    
+    let seconds = timeValue;
+    if (timeUnit === "minutes") {
+      seconds = timeValue * 60;
+    }
+    
+    return total + seconds;
+  }, 0);
+};
+ const formatDuration = (input) => {
+  // ✅ FIX: Handle null, undefined, and invalid input
+  if (!input && input !== 0) return "0m";
+  
+  let totalSeconds = 0;
 
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = Math.floor(totalSeconds % 60);
+  if (typeof input === "string" && input.includes(":")) {
+    const [minStr, secStr] = input.split(":");
+    const minutes = parseInt(minStr, 10);
+    const seconds = parseInt(secStr, 10);
+    totalSeconds = (isNaN(minutes) ? 0 : minutes) * 60 + (isNaN(seconds) ? 0 : seconds);
+  } else {
+    totalSeconds = Number(input) || 0;
+  }
 
-    let result = "";
-    if (hours > 0) result += `${hours}h `;
-    if (minutes > 0) result += `${minutes}m `;
-    if (seconds > 0) result += `${seconds}s`;
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = Math.floor(totalSeconds % 60);
 
-    return result.trim() || "0m";
-  };
+  let result = "";
+  if (hours > 0) result += `${hours}h `;
+  if (minutes > 0) result += `${minutes}m `;
+  if (seconds > 0) result += `${seconds}s `;
 
+  return result.trim() || "0m";
+};
   const generateAnalyticsData = () => {
-    if (!courses || courses.length === 0) {
-      return [
-        { name: "Active Courses", value: 25, color: "#0d9488" },
-        { name: "Inactive Courses", value: 25, color: "#ef4444" },
-        { name: "Total Pages", value: 25, color: "#22c55e" },
-        { name: "Total Duration", value: 25, color: "#a855f7" },
-      ];
-    }
-
-    const activeCourses = courses.filter((course) => course.isActive !== false).length;
-    const inactiveCourses = courses.length - activeCourses;
-    const totalPages = courses.reduce((total, course) => total + (course.pages?.length || 0), 0);
-    const totalDuration = courses.reduce((total, course) => total + getTotalDuration(course.pages), 0);
-
-    const total = activeCourses + inactiveCourses + totalPages + Math.floor(totalDuration / 60);
-
-    if (total === 0) {
-      return [{ name: "No Data", value: 100, color: "#9ca3af" }];
-    }
-
+  if (!courses || courses.length === 0) {
     return [
-      { name: "Active Courses", value: Math.round((activeCourses / total) * 100) || 1, color: "#0d9488" },
-      { name: "Inactive Courses", value: Math.round((inactiveCourses / total) * 100) || 1, color: "#ef4444" },
-      { name: "Total Pages", value: Math.round((totalPages / total) * 100) || 1, color: "#22c55e" },
-      { name: "Duration (hrs)", value: Math.round((Math.floor(totalDuration / 60) / total) * 100) || 1, color: "#a855f7" },
+      { name: "Active Courses", value: 25, color: "#0d9488" },
+      { name: "Inactive Courses", value: 25, color: "#ef4444" },
+      { name: "Total Pages", value: 25, color: "#22c55e" },
+      { name: "Total Duration", value: 25, color: "#a855f7" },
     ];
-  };
+  }
 
+  const activeCourses = courses.filter((course) => course?.isActive !== false).length;
+  const inactiveCourses = courses.length - activeCourses;
+  
+  // ✅ FIX: Safely calculate total pages
+  const totalPages = courses.reduce((total, course) => {
+    const pages = course?.languages?.en?.pages || course?.pages || [];
+    return total + (Array.isArray(pages) ? pages.length : 0);
+  }, 0);
+  
+  // ✅ FIX: Safely calculate total duration
+  const totalDuration = courses.reduce((total, course) => {
+    const pages = course?.languages?.en?.pages || course?.pages || [];
+    return total + getTotalDuration(pages);
+  }, 0);
+
+  const total = activeCourses + inactiveCourses + totalPages + Math.floor(totalDuration / 60);
+
+  if (total === 0) {
+    return [{ name: "No Data", value: 100, color: "#9ca3af" }];
+  }
+
+  return [
+    { name: "Active Courses", value: Math.round((activeCourses / total) * 100) || 1, color: "#0d9488" },
+    { name: "Inactive Courses", value: Math.round((inactiveCourses / total) * 100) || 1, color: "#ef4444" },
+    { name: "Total Pages", value: Math.round((totalPages / total) * 100) || 1, color: "#22c55e" },
+    { name: "Duration (hrs)", value: Math.round((Math.floor(totalDuration / 60) / total) * 100) || 1, color: "#a855f7" },
+  ];
+};
   const analyticsData = generateAnalyticsData();
 
   const CourseCard = ({ course }) => {
