@@ -23,6 +23,9 @@ import {
   Edit3,
   Trash2,
   ExternalLink,
+  Save,
+  XCircle,
+  Pencil,
 } from "lucide-react"
 import Image from "next/image"
 import { userAPI, userHelpers } from "../../src/lib/api"
@@ -46,12 +49,21 @@ export default function SettingPage() {
   const [message, setMessage] = useState({ type: "", text: "" })
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
-  const [activeTab, setActiveTab] = useState("history") // Default to history for all users
+  const [activeTab, setActiveTab] = useState("history")
   const [historyFilters, setHistoryFilters] = useState({
     search: "",
     status: "all",
     dateRange: "all",
   })
+
+  // Reward settings state
+  const [rewardSettings, setRewardSettings] = useState({
+    referralReward: 50,
+    learningReward: 2,
+    adBaseReward: 30,
+  })
+  const [editingReward, setEditingReward] = useState(null)
+  const [tempRewardValue, setTempRewardValue] = useState("")
 
   // Settings specific state
   const [currentView, setCurrentView] = useState("main")
@@ -71,12 +83,11 @@ export default function SettingPage() {
 
   const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL
 
-  // Updated notification data state to include link field
   const [notificationData, setNotificationData] = useState({
     title: "Upcoming Zero Koin",
     description:
       "Zero Koin mining is the process of validating transactions and securing the Zero Koin blockchain by solving complex mathematical problems, typically using computing power, to earn rewards in Zero Koin.",
-    link: "", // Added link field
+    link: "",
   })
 
   const [isUploading, setIsUploading] = useState(false)
@@ -91,6 +102,47 @@ export default function SettingPage() {
   const [sentNotifications, setSentNotifications] = useState([])
   const [editingNotification, setEditingNotification] = useState(null)
 
+  // Load reward settings from localStorage on mount
+  useEffect(() => {
+    const savedRewards = localStorage.getItem("rewardSettings")
+    if (savedRewards) {
+      setRewardSettings(JSON.parse(savedRewards))
+    }
+  }, [])
+
+  // Save reward settings to localStorage when changed
+  const saveRewardSettings = (newSettings) => {
+    setRewardSettings(newSettings)
+    localStorage.setItem("rewardSettings", JSON.stringify(newSettings))
+    // Here you would also save to backend API
+    console.log("Reward settings saved:", newSettings)
+  }
+
+  // Handle edit reward
+  const handleEditReward = (rewardKey, currentValue) => {
+    setEditingReward(rewardKey)
+    setTempRewardValue(currentValue.toString())
+  }
+
+  // Handle save reward
+  const handleSaveReward = (rewardKey) => {
+    const newValue = parseInt(tempRewardValue)
+    if (isNaN(newValue) || newValue < 0) {
+      alert("Please enter a valid positive number")
+      return
+    }
+    const updatedSettings = { ...rewardSettings, [rewardKey]: newValue }
+    saveRewardSettings(updatedSettings)
+    setEditingReward(null)
+    setTempRewardValue("")
+  }
+
+  // Handle cancel edit
+  const handleCancelEdit = () => {
+    setEditingReward(null)
+    setTempRewardValue("")
+  }
+
   // Get user role from localStorage
   useEffect(() => {
     try {
@@ -98,12 +150,10 @@ export default function SettingPage() {
       if (user) {
         const userData = JSON.parse(user)
         setUserRole(userData.role || "")
-        //console.log("her i am", userData.role)
-        // Set default tab based on role
         if (userData.role === "superadmin") {
-          setActiveTab("transfer") // Super admin starts with transfer tab
+          setActiveTab("transfer")
         } else {
-          setActiveTab("history") // Others start with history tab
+          setActiveTab("history")
         }
       }
     } catch (error) {
@@ -113,7 +163,7 @@ export default function SettingPage() {
 
   // Check permissions
   const hasTransferAccess = userRole === "superadmin"
-  const hasHistoryAccess = true // All users can access history
+  const hasHistoryAccess = true
 
   // Fetch users on component mount (only for super admin)
   useEffect(() => {
@@ -138,7 +188,7 @@ export default function SettingPage() {
               title: notification.title,
               description: notification.message,
               image: notification.imageUrl,
-              link: notification.link || "", // Added link field
+              link: notification.link || "",
               timestamp: notification.createdAt,
               sentTo:
                 notification.priority === "new-user"
@@ -289,7 +339,6 @@ export default function SettingPage() {
         )
         setTransferAmount("")
         setTransferReason("")
-        // Refresh transfer history
         fetchTransferHistory()
       } else {
         setMessage({
@@ -410,7 +459,6 @@ export default function SettingPage() {
       setUploadedImageFile(file)
       const imageUrl = URL.createObjectURL(file)
       setUploadedImage(imageUrl)
-      //console.log("Image uploaded successfully")
     } catch (error) {
       console.error("Failed to upload image:", error)
       alert("Failed to upload image. Please try again.")
@@ -419,7 +467,7 @@ export default function SettingPage() {
     }
   }
 
-  // Updated handle notification sending to include link field
+  // Handle notification sending
   const handleSendNotification = async () => {
     if (userRole === "viewer") {
       alert("You don't have permission to send notifications.")
@@ -442,8 +490,7 @@ export default function SettingPage() {
       let requestBody = null
       const headers = {}
 
-      // Map selectedSendTo to priority and determine endpoint
-      let priority = "old-user" // default
+      let priority = "old-user"
       switch (selectedSendTo) {
         case "New User":
           priority = "new-user"
@@ -461,34 +508,29 @@ export default function SettingPage() {
           throw new Error("Invalid recipient selection")
       }
 
-      // Prepare request based on endpoint
       if (selectedSendTo === "Top rated user") {
         headers["Content-Type"] = "application/json"
         requestBody = JSON.stringify({
           title: notificationData.title,
           message: notificationData.description,
           imageUrl: uploadedImage || null,
-          link: notificationData.link || null, // Include link field
+          link: notificationData.link || null,
           priority: priority,
           limit: 10,
         })
       } else {
-        // Use FormData for general notifications with image
         const formData = new FormData()
         formData.append("title", notificationData.title)
         formData.append("message", notificationData.description)
         formData.append("priority", priority)
         if (notificationData.link) {
-          formData.append("link", notificationData.link) // Include link field
+          formData.append("link", notificationData.link)
         }
         if (uploadedImageFile) {
           formData.append("image", uploadedImageFile)
         }
         requestBody = formData
       }
-
-     // console.log("Sending notification to:", endpoint)
-      //console.log("Priority:", priority)
 
       const response = await fetch(endpoint, {
         method: "POST",
@@ -504,16 +546,14 @@ export default function SettingPage() {
       }
 
       const result = await response.json()
-     // console.log("Response:", result)
 
       if (response.ok && result.success) {
-        // Add the sent notification to the list
         const newNotification = {
           id: Date.now(),
           title: notificationData.title,
           description: notificationData.description,
           image: uploadedImage,
-          link: notificationData.link, // Include link field
+          link: notificationData.link,
           timestamp: new Date().toISOString(),
           sentTo: selectedSendTo,
           priority: priority,
@@ -521,7 +561,6 @@ export default function SettingPage() {
 
         setSentNotifications((prev) => [newNotification, ...prev])
 
-        // Dispatch custom event to notify header component
         const event = new CustomEvent("newNotificationSent", {
           detail: {
             notification: newNotification,
@@ -540,7 +579,7 @@ export default function SettingPage() {
             title: "Upcoming Zero Koin",
             description:
               "Zero Koin mining is the process of validating transactions and securing the Zero Koin blockchain by solving complex mathematical problems, typically using computing power, to earn rewards in Zero Koin.",
-            link: "", // Reset link field
+            link: "",
           })
         }, 3000)
       } else {
@@ -681,7 +720,6 @@ export default function SettingPage() {
     }
   }
 
-  // Updated notification handlers to include link field
   const handleEditNotification = (notification) => {
     if (userRole === "viewer") {
       alert("You don't have permission to edit notifications.")
@@ -691,7 +729,7 @@ export default function SettingPage() {
     setNotificationData({
       title: notification.title,
       description: notification.description,
-      link: notification.link || "", // Include link field
+      link: notification.link || "",
     })
     setUploadedImage(notification.image)
     setSelectedSendTo(
@@ -751,7 +789,7 @@ export default function SettingPage() {
       ...editingNotification,
       title: notificationData.title,
       description: notificationData.description,
-      link: notificationData.link, // Include link field
+      link: notificationData.link,
       image: uploadedImage,
       priority: priority,
       sentTo: selectedSendTo,
@@ -774,7 +812,7 @@ export default function SettingPage() {
           title: "Upcoming Zero Koin",
           description:
             "Zero Koin mining is the process of validating transactions and securing the Zero Koin blockchain by solving complex mathematical problems, typically using computing power, to earn rewards in Zero Koin.",
-          link: "", // Reset link field
+          link: "",
         })
         setUploadedImage(null)
         setUploadedImageFile(null)
@@ -787,6 +825,67 @@ export default function SettingPage() {
       console.error("Update failed:", error)
       alert("Failed to update notification. Please try again.")
     }
+  }
+
+  // Reward Card Component
+  const RewardCard = ({ title, value, rewardKey, icon: Icon, color }) => {
+    const isEditing = editingReward === rewardKey
+
+    return (
+      <Card className="bg-white border border-gray-200">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3 sm:space-x-4">
+              <div className={`w-10 sm:w-12 h-10 sm:h-12 ${color} rounded-full flex items-center justify-center flex-shrink-0`}>
+                <Icon className="h-5 sm:h-6 w-5 sm:w-6 text-white" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">{title}</p>
+                {isEditing ? (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      value={tempRewardValue}
+                      onChange={(e) => setTempRewardValue(e.target.value)}
+                      className="w-24 h-8 text-lg font-bold"
+                      min="0"
+                      autoFocus
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => handleSaveReward(rewardKey)}
+                      className="h-8 w-8 p-0 bg-green-600 hover:bg-green-700"
+                    >
+                      <Save className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleCancelEdit}
+                      variant="outline"
+                      className="h-8 w-8 p-0"
+                    >
+                      <XCircle className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <p className="text-2xl sm:text-3xl font-bold text-gray-900">{value}</p>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleEditReward(rewardKey, value)}
+                      className="h-8 w-8 p-0 text-gray-500 hover:text-teal-600"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
   }
 
   if (loading || usersLoading) {
@@ -813,7 +912,6 @@ export default function SettingPage() {
       )
     }
 
-    // Empty Notification State
     if (notificationView === "empty") {
       return (
         <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen relative">
@@ -843,7 +941,6 @@ export default function SettingPage() {
       )
     }
 
-    // Enhanced Notification List View
     if (notificationView === "list") {
       return (
         <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen relative">
@@ -881,7 +978,6 @@ export default function SettingPage() {
                   className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden"
                 >
                   <CardContent className="p-0">
-                    {/* Image Section with Error Handling */}
                     {notification.image ? (
                       <div className="relative w-full h-48 bg-gray-100">
                         <Image
@@ -909,15 +1005,11 @@ export default function SettingPage() {
                         </div>
                       </div>
                     )}
-                    {/* Content Section */}
                     <div className="p-4 space-y-3">
-                      {/* Title */}
                       <h3 className="text-lg font-semibold text-gray-900 line-clamp-2 leading-tight">
                         {notification.title}
                       </h3>
-                      {/* Description */}
                       <p className="text-sm text-gray-600 line-clamp-3 leading-relaxed">{notification.description}</p>
-                      {/* Link Display */}
                       {notification.link && (
                         <div className="flex items-center gap-2 text-xs text-blue-600 bg-blue-50 p-2 rounded-md">
                           <ExternalLink className="h-3 w-3 flex-shrink-0" />
@@ -926,7 +1018,6 @@ export default function SettingPage() {
                           </span>
                         </div>
                       )}
-                      {/* Type Badge */}
                       <div className="flex items-center gap-2">
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -948,7 +1039,6 @@ export default function SettingPage() {
                                 : "General User"}
                         </span>
                       </div>
-                      {/* Created Date */}
                       <p className="text-xs text-gray-500 flex items-center gap-1">
                         <span className="w-1.5 h-1.5 bg-gray-400 rounded-full"></span>
                         Created:{" "}
@@ -960,7 +1050,6 @@ export default function SettingPage() {
                           minute: "2-digit",
                         })}
                       </p>
-                      {/* Action Buttons */}
                       {(userRole === "superadmin" || userRole === "editor") && (
                         <div className="flex gap-2 pt-2 border-t border-gray-100">
                           <Button
@@ -993,7 +1082,6 @@ export default function SettingPage() {
       )
     }
 
-    // Create Notification View with Link Field
     if (notificationView === "create") {
       return (
         <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
@@ -1008,7 +1096,6 @@ export default function SettingPage() {
             </Button>
           </div>
           <div className="max-w-2xl mx-auto space-y-6">
-            {/* Enhanced Upload Image Area */}
             <div
               onClick={handleUploadClick}
               className={`border-2 border-dashed border-gray-300 rounded-lg p-8 sm:p-12 text-center transition-colors ${
@@ -1078,7 +1165,6 @@ export default function SettingPage() {
                 )}
               </div>
             </div>
-            {/* Editable Content */}
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="notification-title" className="text-sm font-medium text-gray-700">
@@ -1105,7 +1191,6 @@ export default function SettingPage() {
                   disabled={userRole === "viewer"}
                 />
               </div>
-              {/* Link Field */}
               <div className="space-y-2">
                 <Label htmlFor="notification-link" className="text-sm font-medium text-gray-700">
                   Link (Optional)
@@ -1121,7 +1206,6 @@ export default function SettingPage() {
                 />
                 <p className="text-xs text-gray-500">Add a URL that users can visit when they tap the notification</p>
               </div>
-              {/* Send To Selection */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium text-gray-700">Send To * (Required)</Label>
                 <div className="relative">
@@ -1182,7 +1266,6 @@ export default function SettingPage() {
       )
     }
 
-    // Edit Notification View with Link Field
     if (notificationView === "edit") {
       return (
         <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
@@ -1195,7 +1278,7 @@ export default function SettingPage() {
                   title: "Upcoming Zero Koin",
                   description:
                     "Zero Koin mining is the process of validating transactions and securing the Zero Koin blockchain by solving complex mathematical problems, typically using computing power, to earn rewards in Zero Koin.",
-                  link: "", // Reset link field
+                  link: "",
                 })
                 setUploadedImage(null)
                 setUploadedImageFile(null)
@@ -1209,7 +1292,6 @@ export default function SettingPage() {
             </Button>
           </div>
           <div className="max-w-2xl mx-auto space-y-6">
-            {/* Enhanced Upload Image Area */}
             <div
               onClick={handleUploadClick}
               className={`border-2 border-dashed border-gray-300 rounded-lg p-8 sm:p-12 text-center transition-colors ${
@@ -1279,7 +1361,6 @@ export default function SettingPage() {
                 )}
               </div>
             </div>
-            {/* Editable Content */}
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="notification-title" className="text-sm font-medium text-gray-700">
@@ -1306,7 +1387,6 @@ export default function SettingPage() {
                   disabled={userRole === "viewer"}
                 />
               </div>
-              {/* Link Field */}
               <div className="space-y-2">
                 <Label htmlFor="notification-link" className="text-sm font-medium text-gray-700">
                   Link (Optional)
@@ -1322,7 +1402,6 @@ export default function SettingPage() {
                 />
                 <p className="text-xs text-gray-500">Add a URL that users can visit when they tap the notification</p>
               </div>
-              {/* Send To Selection */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium text-gray-700">Send To * (Required)</Label>
                 <div className="relative">
@@ -1383,7 +1462,6 @@ export default function SettingPage() {
       )
     }
 
-    // Filter & Send Notification View with Link Preview
     if (notificationView === "send") {
       return (
         <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
@@ -1421,7 +1499,6 @@ export default function SettingPage() {
             </div>
           </div>
           <div className="max-w-2xl mx-auto space-y-6">
-            {/* Notification Preview */}
             <div className="relative rounded-lg overflow-hidden">
               {uploadedImage ? (
                 <Image
@@ -1453,11 +1530,9 @@ export default function SettingPage() {
                 </div>
               )}
             </div>
-            {/* Content Preview */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-gray-900">{notificationData.title}</h3>
               <p className="text-gray-700 text-sm leading-relaxed">{notificationData.description}</p>
-              {/* Link Preview */}
               {notificationData.link && (
                 <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 p-3 rounded-md">
                   <ExternalLink className="h-4 w-4 flex-shrink-0" />
@@ -1479,7 +1554,6 @@ export default function SettingPage() {
               )}
             </div>
           </div>
-          {/* Success Modal */}
           <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
             <DialogContent className="sm:max-w-md bg-white text-center border-0 shadow-2xl mx-4">
               <div className="py-8 px-6">
@@ -1511,59 +1585,42 @@ export default function SettingPage() {
     }
   }
 
-  // Main Settings View
+  // Main Settings View with Reward Cards
   if (currentView === "main") {
     return (
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Setting</h1>
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Settings</h1>
         </div>
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          <Card className="bg-white border border-gray-200">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center space-x-3 sm:space-x-4">
-                <div className="w-10 sm:w-12 h-10 sm:h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <GraduationCap className="h-5 sm:h-6 w-5 sm:w-6 text-blue-600" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Learning Rewards</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
-                    {userRole === "superadmin" ? stats.learningRewards : "***"}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-white border border-gray-200">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center space-x-3 sm:space-x-4">
-                <div className="w-10 sm:w-12 h-10 sm:h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Edit className="h-5 sm:h-6 w-5 sm:w-6 text-blue-600" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Referrals Rewards</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.referralsRewards}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-white border border-gray-200 sm:col-span-2 lg:col-span-1">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center space-x-3 sm:space-x-4">
-                <div className="w-10 sm:w-12 h-10 sm:h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Target className="h-5 sm:h-6 w-5 sm:w-6 text-blue-600" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Ad Base Rewards</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
-                    {userRole === "superadmin" ? stats.adBaseRewards : "***"}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+
+        {/* Reward Settings Section */}
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Reward Settings</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            <RewardCard
+              title="Referral Rewards"
+              value={rewardSettings.referralReward}
+              rewardKey="referralReward"
+              icon={Edit}
+              color="bg-purple-500"
+            />
+            <RewardCard
+              title="Learning Rewards"
+              value={rewardSettings.learningReward}
+              rewardKey="learningReward"
+              icon={GraduationCap}
+              color="bg-blue-500"
+            />
+            <RewardCard
+              title="Ad Base Rewards"
+              value={rewardSettings.adBaseReward}
+              rewardKey="adBaseReward"
+              icon={Target}
+              color="bg-orange-500"
+            />
+          </div>
         </div>
+
         {/* Expiry Dropdown */}
         {(userRole === "superadmin" || userRole === "editor") && (
           <div className="flex justify-center sm:justify-end">
@@ -1596,6 +1653,7 @@ export default function SettingPage() {
             </div>
           </div>
         )}
+
         {/* Navigation Buttons */}
         <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 pt-4 sm:pt-8">
           <Button
@@ -1617,11 +1675,10 @@ export default function SettingPage() {
     )
   }
 
-  // Admin Control View with Back to Settings button
+  // Admin Control View
   if (currentView === "control") {
     return (
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
-        {/* Header with Back to Settings */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <div className="flex items-center gap-3">
             <Button
@@ -1644,6 +1701,7 @@ export default function SettingPage() {
             </Button>
           )}
         </div>
+
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           <Card className="bg-white border border-gray-200">
@@ -1690,6 +1748,7 @@ export default function SettingPage() {
             </CardContent>
           </Card>
         </div>
+
         {/* Admin Access Table */}
         <Card className="bg-white border border-gray-200">
           <CardContent className="p-3 sm:p-6">
@@ -1781,6 +1840,7 @@ export default function SettingPage() {
             </div>
           </CardContent>
         </Card>
+
         {/* Add Admin Modal */}
         <Dialog open={showAddAdminModal} onOpenChange={setShowAddAdminModal}>
           <DialogContent className="sm:max-w-md bg-white">
@@ -1860,6 +1920,7 @@ export default function SettingPage() {
             </div>
           </DialogContent>
         </Dialog>
+
         {/* Edit Admin Modal */}
         <Dialog open={showEditAdminModal} onOpenChange={setShowEditAdminModal}>
           <DialogContent className="sm:max-w-md bg-white">
