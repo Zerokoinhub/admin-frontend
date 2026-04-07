@@ -114,7 +114,6 @@ export default function SettingPage() {
   const saveRewardSettings = (newSettings) => {
     setRewardSettings(newSettings)
     localStorage.setItem("rewardSettings", JSON.stringify(newSettings))
-    // Here you would also save to backend API
     console.log("Reward settings saved:", newSettings)
   }
 
@@ -827,57 +826,54 @@ export default function SettingPage() {
     }
   }
 
-  // Reward Card Component
+  // Reward Card Component - Fully fixed with visible pencil icon
   const RewardCard = ({ title, value, rewardKey, icon: Icon, color }) => {
     const isEditing = editingReward === rewardKey
 
     return (
-      <Card className="bg-white border border-gray-200">
+      <Card className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
         <CardContent className="p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3 sm:space-x-4">
               <div className={`w-10 sm:w-12 h-10 sm:h-12 ${color} rounded-full flex items-center justify-center flex-shrink-0`}>
                 <Icon className="h-5 sm:h-6 w-5 sm:w-6 text-white" />
               </div>
-              <div className="min-w-0">
+              <div className="flex-1">
                 <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">{title}</p>
                 {isEditing ? (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Input
                       type="number"
                       value={tempRewardValue}
                       onChange={(e) => setTempRewardValue(e.target.value)}
                       className="w-24 h-8 text-lg font-bold"
                       min="0"
-                      autoFocus
                     />
-                    <Button
-                      size="sm"
+                    <button
                       onClick={() => handleSaveReward(rewardKey)}
-                      className="h-8 w-8 p-0 bg-green-600 hover:bg-green-700"
+                      className="w-8 h-8 rounded-md bg-green-600 hover:bg-green-700 text-white flex items-center justify-center"
+                      title="Save"
                     >
                       <Save className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="sm"
+                    </button>
+                    <button
                       onClick={handleCancelEdit}
-                      variant="outline"
-                      className="h-8 w-8 p-0"
+                      className="w-8 h-8 rounded-md bg-gray-300 hover:bg-gray-400 text-gray-800 flex items-center justify-center"
+                      title="Cancel"
                     >
                       <XCircle className="h-4 w-4" />
-                    </Button>
+                    </button>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2">
-                    <p className="text-2xl sm:text-3xl font-bold text-gray-900">{value}</p>
-                    <Button
-                      size="sm"
-                      variant="ghost"
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-2xl sm:text-3xl font-bold text-gray-900">{value}</span>
+                    <button
                       onClick={() => handleEditReward(rewardKey, value)}
-                      className="h-8 w-8 p-0 text-gray-500 hover:text-teal-600"
+                      className="w-8 h-8 rounded-md hover:bg-gray-100 text-gray-500 hover:text-teal-600 flex items-center justify-center transition-colors"
+                      title="Edit Reward"
                     >
                       <Pencil className="h-4 w-4" />
-                    </Button>
+                    </button>
                   </div>
                 )}
               </div>
