@@ -84,7 +84,7 @@ export default function SettingPage() {
   const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL
 
   const [notificationData, setNotificationData] = useState({
-    title: "Upcoming Zero Koin",
+    title: "Upcoming Zero Koin1",
     description:
       "Zero Koin mining is the process of validating transactions and securing the Zero Koin blockchain by solving complex mathematical problems, typically using computing power, to earn rewards in Zero Koin.",
     link: "",
