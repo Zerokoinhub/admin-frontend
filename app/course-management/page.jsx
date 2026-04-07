@@ -79,6 +79,9 @@ export default function CourseManagementPage() {
 
   const { users, loading, error } = useUsers(1, 100);
 
+  // Ensure courses is always an array
+  const safeCourses = courses || [];
+
   useEffect(() => {
     console.log("Course Management Page - Current user:", userData);
     console.log("Course Management Page - Is authenticated:", isAuthenticated);
@@ -510,7 +513,7 @@ export default function CourseManagementPage() {
 
   // ✅ FIXED: Safe generateAnalyticsData function
   const generateAnalyticsData = () => {
-    if (!courses || courses.length === 0) {
+    if (!safeCourses || safeCourses.length === 0) {
       return [
         { name: "Active Courses", value: 25, color: "#0d9488" },
         { name: "Inactive Courses", value: 25, color: "#ef4444" },
@@ -523,8 +526,8 @@ export default function CourseManagementPage() {
     let totalPages = 0;
     let totalDuration = 0;
     
-    for (let i = 0; i < courses.length; i++) {
-      const course = courses[i];
+    for (let i = 0; i < safeCourses.length; i++) {
+      const course = safeCourses[i];
       if (!course) continue;
       
       if (course.isActive !== false) {
@@ -538,7 +541,7 @@ export default function CourseManagementPage() {
       }
     }
     
-    const inactiveCourses = courses.length - activeCourses;
+    const inactiveCourses = safeCourses.length - activeCourses;
     const total = activeCourses + inactiveCourses + totalPages + Math.floor(totalDuration / 60);
 
     if (total === 0) {
@@ -837,7 +840,7 @@ export default function CourseManagementPage() {
 
               {coursesLoading ? (
                 <div className="text-center py-8">Loading courses...</div>
-              ) : courses.length === 0 ? (
+              ) : safeCourses.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">No courses found</div>
               ) : (
                 <div className="overflow-x-auto">
@@ -854,7 +857,7 @@ export default function CourseManagementPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {courses.map((course) => {
+                      {safeCourses.map((course) => {
                         const displayName = course?.languages?.en?.courseName || course?.courseName || "";
                         const displayPages = course?.languages?.en?.pages || course?.pages || [];
                         const pagesArray = Array.isArray(displayPages) ? displayPages : [];
@@ -935,10 +938,10 @@ export default function CourseManagementPage() {
                 <CardContent className="p-6 h-full overflow-y-auto">
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-semibold text-gray-900">All Courses</h3>
-                    <Badge variant="outline">{courses.length} total</Badge>
+                    <Badge variant="outline">{safeCourses.length} total</Badge>
                   </div>
                   <div className="space-y-3">
-                    {courses.map((course) => {
+                    {safeCourses.map((course) => {
                       const displayName = course?.languages?.en?.courseName || course?.courseName || "";
                       return (
                         <div key={course._id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100" onClick={() => handleCourseClick(course)}>
@@ -1015,7 +1018,7 @@ export default function CourseManagementPage() {
             <Card className="bg-white">
               <CardContent className="p-6">
                 <div className="flex justify-between items-center">
-                  <div><p className="text-sm font-medium text-gray-600">Total Courses</p><p className="text-2xl font-bold text-gray-900">{courses.length}</p></div>
+                  <div><p className="text-sm font-medium text-gray-600">Total Courses</p><p className="text-2xl font-bold text-gray-900">{safeCourses.length}</p></div>
                   <div className="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center"><FileText className="h-6 w-6 text-teal-600" /></div>
                 </div>
               </CardContent>
@@ -1023,7 +1026,7 @@ export default function CourseManagementPage() {
             <Card className="bg-white">
               <CardContent className="p-6">
                 <div className="flex justify-between items-center">
-                  <div><p className="text-sm font-medium text-gray-600">Active Courses</p><p className="text-2xl font-bold text-gray-900">{courses.filter(c => c?.isActive !== false).length}</p></div>
+                  <div><p className="text-sm font-medium text-gray-600">Active Courses</p><p className="text-2xl font-bold text-gray-900">{safeCourses.filter(c => c?.isActive !== false).length}</p></div>
                   <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center"><Badge className="bg-green-600 text-white">✓</Badge></div>
                 </div>
               </CardContent>
