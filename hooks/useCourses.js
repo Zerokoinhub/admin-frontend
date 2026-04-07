@@ -15,7 +15,7 @@ import {
 const API_BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL}/courses`;
 
 export const useCourses = () => {
-  const [courses, setCourses] = useState([]);
+  const [courses, setCourses] = useState([]); // ✅ Already initialized as array
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -23,37 +23,45 @@ export const useCourses = () => {
   const fetchCourses = async () => {
     try {
       setLoading(true);
+      setError(null); // Clear previous error
 
       if (!isAuthenticated()) {
-        throw new Error("User not authenticated. Please log in again.");
+        console.warn("User not authenticated, setting empty courses");
+        setCourses([]);
+        setError("User not authenticated");
+        return;
       }
 
       const currentUser = getCurrentUser();
-      console.log(
-        "Fetching courses for:",
-        currentUser?.email,
-        currentUser?.role
-      );
+      console.log("Fetching courses for:", currentUser?.email, currentUser?.role);
 
       const response = await makeAuthenticatedRequest(API_BASE, {
         method: "GET",
       });
 
+      if (!response) {
+        throw new Error("No response from server");
+      }
+
       const data = await response.json();
       console.log("Courses data received:", data);
 
-      if (data.success && data.courses) {
+      // ✅ SAFE: Ensure courses is always an array
+      if (data && data.success && Array.isArray(data.courses)) {
         setCourses(data.courses);
-      } else {
+        console.log(`✅ Loaded ${data.courses.length} courses`);
+      } else if (data && data.success && !Array.isArray(data.courses)) {
+        console.error("Courses is not an array:", data.courses);
         setCourses([]);
-        console.warn("No courses returned from server.");
+        setError("Invalid courses data format from server");
+      } else {
+        console.warn("No courses returned or invalid response format");
+        setCourses([]);
       }
-
-      setError(null);
     } catch (err) {
       console.error("Error fetching courses:", err);
       setError(err instanceof Error ? err.message : "An error occurred");
-      setCourses([]);
+      setCourses([]); // ✅ Always set to empty array on error
     } finally {
       setLoading(false);
     }
@@ -68,48 +76,48 @@ export const useCourses = () => {
     return JSON.stringify({ value, unit: timeUnit });
   };
 
-  // Create a new course - FIXED VERSION
+  // Create a new course
   const createCourse = async (courseData) => {
-  try {
-    if (!isAuthenticated()) {
-      throw new Error("User not authenticated. Please log in again.");
-    }
-
-    console.log("📤 createCourse received:", JSON.stringify(courseData, null, 2));
-
-    const response = await fetch(API_BASE, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
-      },
-      body: JSON.stringify(courseData), // courseData already has the correct format
-    });
-
-    const data = await response.json();
-    console.log("Create response:", data);
-
-    if (data.success) {
-      if (data.course) {
-        setCourses((prev) => [...prev, data.course]);
+    try {
+      if (!isAuthenticated()) {
+        throw new Error("User not authenticated. Please log in again.");
       }
-      return { success: true, data: data.course };
-    } else {
-      throw new Error(data.message || "Failed to create course");
+
+      console.log("📤 createCourse received:", JSON.stringify(courseData, null, 2));
+
+      const response = await fetch(API_BASE, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+        },
+        body: JSON.stringify(courseData),
+      });
+
+      const data = await response.json();
+      console.log("Create response:", data);
+
+      if (data.success) {
+        if (data.course) {
+          setCourses((prev) => [...prev, data.course]);
+        }
+        return { success: true, data: data.course };
+      } else {
+        throw new Error(data.message || "Failed to create course");
+      }
+    } catch (err) {
+      console.error("Error creating course:", err);
+      return { success: false, error: err.message };
     }
-  } catch (err) {
-    console.error("Error creating course:", err);
-    return { success: false, error: err.message };
-  }
-};
-  // Edit/update course - FIXED VERSION
+  };
+
+  // Edit/update course
   const updateCourse = async (courseId, courseData) => {
     try {
       if (!isAuthenticated()) {
         throw new Error("User not authenticated. Please log in again.");
       }
 
-      // ✅ FIX: Build the correct payload format for update
       let payload;
       
       if (courseData.languages) {
@@ -162,8 +170,7 @@ export const useCourses = () => {
       }
     } catch (err) {
       console.error("Error updating course:", err);
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to update course";
+      const errorMessage = err instanceof Error ? err.message : "Failed to update course";
       setError(errorMessage);
       return { success: false, error: errorMessage };
     }
@@ -191,8 +198,7 @@ export const useCourses = () => {
       }
     } catch (err) {
       console.error("Error deleting course:", err);
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to delete course";
+      const errorMessage = err instanceof Error ? err.message : "Failed to delete course";
       setError(errorMessage);
       return { success: false, error: errorMessage };
     }
@@ -207,8 +213,11 @@ export const useCourses = () => {
 
   const currentUser = getCurrentUser();
 
+  // ✅ Ensure courses is always an array when returned
+  const safeCourses = Array.isArray(courses) ? courses : [];
+
   return {
-    courses,
+    courses: safeCourses, // Return safe array
     loading,
     error,
     createCourse,
