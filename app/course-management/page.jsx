@@ -79,8 +79,22 @@ export default function CourseManagementPage() {
 
   const { users, loading, error } = useUsers(1, 100);
 
+  // Add debugging for courses
+  useEffect(() => {
+    console.log("🔍 DEBUG - Courses state:", courses);
+    console.log("🔍 DEBUG - Courses type:", typeof courses);
+    console.log("🔍 DEBUG - Is courses an array?", Array.isArray(courses));
+    console.log("🔍 DEBUG - Courses loading:", coursesLoading);
+    console.log("🔍 DEBUG - Courses error:", coursesError);
+  }, [courses, coursesLoading, coursesError]);
+
   // Ensure courses is always an array
-  const safeCourses = courses || [];
+  const safeCourses = Array.isArray(courses) ? courses : [];
+  
+  useEffect(() => {
+    console.log("🔍 DEBUG - SafeCourses:", safeCourses);
+    console.log("🔍 DEBUG - SafeCourses length:", safeCourses.length);
+  }, [safeCourses]);
 
   useEffect(() => {
     console.log("Course Management Page - Current user:", userData);
@@ -511,9 +525,15 @@ export default function CourseManagementPage() {
     setCurrentView("course");
   };
 
-  // ✅ FIXED: Safe generateAnalyticsData function
+  // ✅ COMPLETELY REWRITTEN: Safe generateAnalyticsData function with debugging
   const generateAnalyticsData = () => {
+    console.log("📊 Generating analytics data...");
+    console.log("📊 safeCourses:", safeCourses);
+    console.log("📊 safeCourses length:", safeCourses.length);
+    
+    // If no courses or empty array, return default data
     if (!safeCourses || safeCourses.length === 0) {
+      console.log("📊 No courses found, returning default data");
       return [
         { name: "Active Courses", value: 25, color: "#0d9488" },
         { name: "Inactive Courses", value: 25, color: "#ef4444" },
@@ -526,34 +546,61 @@ export default function CourseManagementPage() {
     let totalPages = 0;
     let totalDuration = 0;
     
+    // Safely iterate through courses
     for (let i = 0; i < safeCourses.length; i++) {
       const course = safeCourses[i];
-      if (!course) continue;
+      if (!course) {
+        console.log(`📊 Course at index ${i} is null/undefined, skipping`);
+        continue;
+      }
+      
+      console.log(`📊 Processing course ${i}:`, course._id);
       
       if (course.isActive !== false) {
         activeCourses++;
       }
       
-      const pages = course?.languages?.en?.pages || course?.pages || [];
-      if (Array.isArray(pages)) {
+      // Safely get pages
+      let pages = [];
+      try {
+        pages = course?.languages?.en?.pages || course?.pages || [];
+        if (!Array.isArray(pages)) {
+          console.log(`📊 Pages for course ${i} is not an array, converting`);
+          pages = [];
+        }
+      } catch (err) {
+        console.error(`📊 Error getting pages for course ${i}:`, err);
+        pages = [];
+      }
+      
+      if (pages.length > 0) {
         totalPages += pages.length;
-        totalDuration += getTotalDuration(pages);
+        const duration = getTotalDuration(pages);
+        totalDuration += duration;
+        console.log(`📊 Course ${i} - Pages: ${pages.length}, Duration: ${duration}`);
       }
     }
     
     const inactiveCourses = safeCourses.length - activeCourses;
     const total = activeCourses + inactiveCourses + totalPages + Math.floor(totalDuration / 60);
+    
+    console.log("📊 Totals - Active:", activeCourses, "Inactive:", inactiveCourses, "Pages:", totalPages, "Duration(min):", Math.floor(totalDuration / 60));
+    console.log("📊 Total for percentages:", total);
 
     if (total === 0) {
+      console.log("📊 Total is 0, returning no data message");
       return [{ name: "No Data", value: 100, color: "#9ca3af" }];
     }
 
-    return [
+    const analyticsDataResult = [
       { name: "Active Courses", value: Math.round((activeCourses / total) * 100) || 1, color: "#0d9488" },
       { name: "Inactive Courses", value: Math.round((inactiveCourses / total) * 100) || 1, color: "#ef4444" },
       { name: "Total Pages", value: Math.round((totalPages / total) * 100) || 1, color: "#22c55e" },
       { name: "Duration (hrs)", value: Math.round((Math.floor(totalDuration / 60) / total) * 100) || 1, color: "#a855f7" },
     ];
+    
+    console.log("📊 Final analytics data:", analyticsDataResult);
+    return analyticsDataResult;
   };
 
   const analyticsData = generateAnalyticsData();
@@ -611,6 +658,7 @@ export default function CourseManagementPage() {
     );
   };
 
+  // Show loading state while checking authentication
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-50 p-4">
