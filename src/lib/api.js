@@ -907,7 +907,7 @@ export const userAPI = {
 }
 
 // ========================
-// HELPER FUNCTIONS - FIXED for firebaseUid
+// HELPER FUNCTIONS - FULLY FIXED
 // ========================
 export const userHelpers = {
   calculateStats(users) {
@@ -966,7 +966,6 @@ export const userHelpers = {
     return stats
   },
 
-  // ✅ FIXED: Format user data - handles both uid and firebaseUid
   formatUserData(user) {
     if (!user) return null
     return {
@@ -985,7 +984,6 @@ export const userHelpers = {
       createdAt: user.createdAt,
       updatedAt: user.updatedAt || null,
       lastLogin: user.lastSignInAt || null,
-      // ✅ FIX: Handle both firebaseUid and uid
       firebaseUid: user.firebaseUid || user.uid || null,
       uid: user.uid || user.firebaseUid || null,
       sessions: user.sessions || [],
@@ -1043,7 +1041,6 @@ export const userHelpers = {
     }
   },
 
-  // ✅ FIXED: Format user list - handles firebaseUid correctly
   formatUserList(users) {
     if (!Array.isArray(users)) return []
     return users.map((user) => this.formatUserData(user))
@@ -1066,7 +1063,7 @@ export const userHelpers = {
     const totalSessions = user.sessions.length
     const unlockedSessions = user.sessions.filter((s) => !s.isLocked).length
     const completedSessions = user.sessions.filter((s) => s.completedAt).length
-    const claimedSessions = user.sessions.filter((s) => s.claimedAt || s.isClaimed).length  // ✅ FIXED: Added missing assignment
+    const claimedSessions = user.sessions.filter((s) => s.claimedAt || s.isClaimed).length
     
     return {
       totalSessions,
@@ -1074,6 +1071,49 @@ export const userHelpers = {
       completedSessions,
       claimedSessions,
       progressPercentage: totalSessions > 0 ? (completedSessions / totalSessions) * 100 : 0,
+    }
+  },
+
+  // ✅ NEW: Calculate transfer statistics
+  calculateTransferStats(transfers) {
+    if (!Array.isArray(transfers) || transfers.length === 0) {
+      return {
+        totalTransfers: 0,
+        totalAmount: 0,
+        completedTransfers: 0,
+        pendingTransfers: 0,
+        failedTransfers: 0,
+        averageAmount: 0,
+        successRate: 0,
+        transfersByStatus: {
+          completed: 0,
+          pending: 0,
+          failed: 0,
+        },
+        recentTransfers: [],
+      }
+    }
+
+    const totalAmount = transfers.reduce((sum, t) => sum + (t.amount || 0), 0)
+    const completedTransfers = transfers.filter(t => t.status === 'completed' || t.status === 'success').length
+    const pendingTransfers = transfers.filter(t => t.status === 'pending').length
+    const failedTransfers = transfers.filter(t => t.status === 'failed' || t.status === 'error').length
+    const successRate = transfers.length > 0 ? (completedTransfers / transfers.length) * 100 : 0
+
+    return {
+      totalTransfers: transfers.length,
+      totalAmount: totalAmount,
+      completedTransfers: completedTransfers,
+      pendingTransfers: pendingTransfers,
+      failedTransfers: failedTransfers,
+      averageAmount: transfers.length > 0 ? totalAmount / transfers.length : 0,
+      successRate: successRate,
+      transfersByStatus: {
+        completed: completedTransfers,
+        pending: pendingTransfers,
+        failed: failedTransfers,
+      },
+      recentTransfers: transfers.slice(0, 10),
     }
   },
 }
