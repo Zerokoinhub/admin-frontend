@@ -26,11 +26,68 @@ import {
   Save,
   XCircle,
   Pencil,
+  Loader2,
 } from "lucide-react"
 import Image from "next/image"
 import { userAPI, userHelpers } from "../../src/lib/api"
 import { useUsers } from "../../hooks/useUsers"
 import { useAdmins } from "../../hooks/useAdmins"
+
+// API Service for Settings
+const settingsAPI = {
+  // Get settings from backend
+  async getSettings() {
+    try {
+      const token = localStorage.getItem("token")
+      const baseURL = process.env.NEXT_PUBLIC_API_BASE_URL
+      
+      const response = await fetch(`${baseURL}/settings`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+      
+      const result = await response.json()
+      return result
+    } catch (error) {
+      console.error("Error fetching settings:", error)
+      return { success: false, error: error.message }
+    }
+  },
+
+  // Update settings to backend
+  async updateSettings(settingsData) {
+    try {
+      const token = localStorage.getItem("token")
+      const baseURL = process.env.NEXT_PUBLIC_API_BASE_URL
+      
+      const response = await fetch(`${baseURL}/settings`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(settingsData),
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+      
+      const result = await response.json()
+      return result
+    } catch (error) {
+      console.error("Error updating settings:", error)
+      return { success: false, error: error.message }
+    }
+  },
+}
 
 export default function SettingPage() {
   // User role state
@@ -56,7 +113,7 @@ export default function SettingPage() {
     dateRange: "all",
   })
 
-  // Reward settings state
+  // Reward settings state - initialized from API
   const [rewardSettings, setRewardSettings] = useState({
     referralReward: 50,
     learningReward: 2,
@@ -64,6 +121,8 @@ export default function SettingPage() {
   })
   const [editingReward, setEditingReward] = useState(null)
   const [tempRewardValue, setTempRewardValue] = useState("")
+  const [settingsLoading, setSettingsLoading] = useState(true)
+  const [savingSettings, setSavingSettings] = useState(false)
 
   // Settings specific state
   const [currentView, setCurrentView] = useState("main")
@@ -102,19 +161,56 @@ export default function SettingPage() {
   const [sentNotifications, setSentNotifications] = useState([])
   const [editingNotification, setEditingNotification] = useState(null)
 
-  // Load reward settings from localStorage on mount
+  // Load reward settings from API on mount
   useEffect(() => {
-    const savedRewards = localStorage.getItem("rewardSettings")
-    if (savedRewards) {
-      setRewardSettings(JSON.parse(savedRewards))
-    }
+    loadSettingsFromAPI()
   }, [])
 
-  // Save reward settings to localStorage when changed
-  const saveRewardSettings = (newSettings) => {
-    setRewardSettings(newSettings)
-    localStorage.setItem("rewardSettings", JSON.stringify(newSettings))
-    console.log("Reward settings saved:", newSettings)
+  // Load settings from backend API
+  const loadSettingsFromAPI = async () => {
+    setSettingsLoading(true)
+    try {
+      const result = await settingsAPI.getSettings()
+      
+      if (result.success && result.data && result.data.rewards) {
+        setRewardSettings(result.data.rewards)
+        console.log("Settings loaded from API:", result.data.rewards)
+      } else {
+        console.log("No settings from API, using defaults")
+        // Keep default values
+      }
+    } catch (error) {
+      console.error("Failed to load settings from API:", error)
+      // Keep default values
+    } finally {
+      setSettingsLoading(false)
+    }
+  }
+
+  // Save reward settings to API
+  const saveRewardSettingsToAPI = async (newSettings) => {
+    setSavingSettings(true)
+    try {
+      const result = await settingsAPI.updateSettings({ rewards: newSettings })
+      
+      if (result.success) {
+        setMessage({ type: "success", text: "Reward settings saved successfully! App will use new values." })
+        console.log("Settings saved to API:", newSettings)
+        
+        // Clear message after 3 seconds
+        setTimeout(() => setMessage({ type: "", text: "" }), 3000)
+        return true
+      } else {
+        throw new Error(result.error || "Failed to save settings")
+      }
+    } catch (error) {
+      console.error("Failed to save settings to API:", error)
+      setMessage({ type: "error", text: `Failed to save: ${error.message}` })
+      setTimeout(() => setMessage({ type: "", text: "" }), 3000)
+      return false
+    } finally {
+      setSavingSettings(false)
+    }
   }
 
   // Handle edit reward
@@ -124,16 +220,27 @@ export default function SettingPage() {
   }
 
   // Handle save reward
-  const handleSaveReward = (rewardKey) => {
+  const handleSaveReward = async (rewardKey) => {
     const newValue = parseInt(tempRewardValue)
     if (isNaN(newValue) || newValue < 0) {
-      alert("Please enter a valid positive number")
+      setMessage({ type: "error", text: "Please enter a valid positive number" })
+      setTimeout(() => setMessage({ type: "", text: "" }), 3000)
       return
     }
+    
     const updatedSettings = { ...rewardSettings, [rewardKey]: newValue }
-    saveRewardSettings(updatedSettings)
-    setEditingReward(null)
-    setTempRewardValue("")
+    setRewardSettings(updatedSettings)
+    
+    // Save to API
+    const saved = await saveRewardSettingsToAPI(updatedSettings)
+    
+    if (saved) {
+      setEditingReward(null)
+      setTempRewardValue("")
+    } else {
+      // Revert on failure
+      setRewardSettings(rewardSettings)
+    }
   }
 
   // Handle cancel edit
@@ -826,7 +933,7 @@ export default function SettingPage() {
     }
   }
 
-  // Reward Card Component - Fully fixed with visible pencil icon
+  // Reward Card Component - Fully fixed with API integration
   const RewardCard = ({ title, value, rewardKey, icon: Icon, color }) => {
     const isEditing = editingReward === rewardKey
 
@@ -848,13 +955,15 @@ export default function SettingPage() {
                       onChange={(e) => setTempRewardValue(e.target.value)}
                       className="w-24 h-8 text-lg font-bold"
                       min="0"
+                      disabled={savingSettings}
                     />
                     <button
                       onClick={() => handleSaveReward(rewardKey)}
                       className="w-8 h-8 rounded-md bg-green-600 hover:bg-green-700 text-white flex items-center justify-center"
                       title="Save"
+                      disabled={savingSettings}
                     >
-                      <Save className="h-4 w-4" />
+                      {savingSettings ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                     </button>
                     <button
                       onClick={handleCancelEdit}
@@ -884,11 +993,14 @@ export default function SettingPage() {
     )
   }
 
-  if (loading || usersLoading) {
+  if (loading || usersLoading || settingsLoading) {
     return (
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
         <div className="flex justify-center items-center h-64">
-          <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+          <div className="text-center">
+            <Loader2 className="w-8 h-8 animate-spin text-teal-600 mx-auto mb-2" />
+            <p className="text-gray-500">Loading settings...</p>
+          </div>
         </div>
       </div>
     )
@@ -1149,7 +1261,7 @@ export default function SettingPage() {
                   <>
                     <div className="w-12 h-12 mx-auto bg-gray-100 rounded-lg flex items-center justify-center">
                       {isUploading ? (
-                        <div className="w-6 h-6 border-2 border-gray-300 border-t-teal-600 rounded-full animate-spin"></div>
+                        <Loader2 className="h-6 w-6 text-gray-600 animate-spin" />
                       ) : (
                         <Upload className="h-6 w-6 text-gray-600" />
                       )}
@@ -1345,7 +1457,7 @@ export default function SettingPage() {
                   <>
                     <div className="w-12 h-12 mx-auto bg-gray-100 rounded-lg flex items-center justify-center">
                       {isUploading ? (
-                        <div className="w-6 h-6 border-2 border-gray-300 border-t-teal-600 rounded-full animate-spin"></div>
+                        <Loader2 className="h-6 w-6 text-gray-600 animate-spin" />
                       ) : (
                         <Upload className="h-6 w-6 text-gray-600" />
                       )}
@@ -1545,6 +1657,7 @@ export default function SettingPage() {
                   className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-md text-sm font-medium"
                   disabled={isSending || selectedSendTo === "Send to"}
                 >
+                  {isSending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                   {isSending ? "Sending..." : "Send Notification"}
                 </Button>
               )}
@@ -1572,7 +1685,7 @@ export default function SettingPage() {
                 <h3 className="text-xl font-semibold text-teal-600 mb-6">has Successfully Send!</h3>
                 <p className="text-sm text-gray-600 mb-2">Please wait</p>
                 <p className="text-sm text-gray-600 mb-8">You will be directed to the homepage soon</p>
-                <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
+                <Loader2 className="w-8 h-8 text-blue-600 animate-spin mx-auto" />
               </div>
             </DialogContent>
           </Dialog>
@@ -1585,13 +1698,28 @@ export default function SettingPage() {
   if (currentView === "main") {
     return (
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
+        {/* Success/Error Message */}
+        {message.text && (
+          <div className={`p-3 rounded-lg ${
+            message.type === "success" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+          }`}>
+            {message.text}
+          </div>
+        )}
+
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Settings</h1>
+          <div className="text-sm text-gray-500">
+            {settingsLoading ? "Loading..." : "Settings synced with backend"}
+          </div>
         </div>
 
         {/* Reward Settings Section */}
         <div>
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Reward Settings</h2>
+          <p className="text-sm text-gray-500 mb-4">
+            These values will be used by the mobile app. Changes are saved to the backend immediately.
+          </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             <RewardCard
               title="Referral Rewards"
@@ -1765,7 +1893,7 @@ export default function SettingPage() {
                     <TableRow>
                       <TableCell colSpan={userRole === "superadmin" ? 3 : 2} className="text-center py-8">
                         <div className="flex justify-center">
-                          <div className="w-6 h-6 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                          <Loader2 className="w-6 h-6 animate-spin text-teal-600" />
                         </div>
                       </TableCell>
                     </TableRow>
