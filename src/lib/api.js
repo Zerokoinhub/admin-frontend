@@ -1066,4 +1066,14 @@ export const userHelpers = {
     const totalSessions = user.sessions.length
     const unlockedSessions = user.sessions.filter((s) => !s.isLocked).length
     const completedSessions = user.sessions.filter((s) => s.completedAt).length
-    const claimedSessions
+    const claimedSessions = user.sessions.filter((s) => s.claimedAt || s.isClaimed).length  // ✅ FIXED: Added missing assignment
+    
+    return {
+      totalSessions,
+      unlockedSessions,
+      completedSessions,
+      claimedSessions,
+      progressPercentage: totalSessions > 0 ? (completedSessions / totalSessions) * 100 : 0,
+    }
+  },
+}
