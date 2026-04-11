@@ -681,6 +681,76 @@ export const userAPI = {
     }
   },
 
+  // ===== WITHDRAWAL REQUESTS =====
+  async getWithdrawalRequests(filters = {}) {
+    try {
+      const params = new URLSearchParams()
+      if (filters.page) params.append("page", filters.page)
+      if (filters.limit) params.append("limit", filters.limit)
+      if (filters.status) params.append("status", filters.status)
+      if (filters.userId) params.append("userId", filters.userId)
+      
+      const url = `${API_BASE_URL}/withdrawals?${params.toString()}`
+      const response = await fetch(url, {
+        method: "GET",
+        headers: getAuthHeaders(),
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || "Failed to fetch withdrawal requests")
+      }
+      
+      const result = await response.json()
+      return {
+        success: true,
+        data: result.data || result.withdrawals || [],
+        withdrawals: result.data || result.withdrawals || [],
+        pagination: result.pagination || {
+          currentPage: parseInt(filters.page) || 1,
+          totalPages: 1,
+          totalItems: 0,
+        },
+      }
+    } catch (error) {
+      console.error("Error fetching withdrawal requests:", error)
+      return {
+        success: false,
+        message: error.message || "Failed to fetch withdrawal requests",
+        data: [],
+        withdrawals: [],
+      }
+    }
+  },
+
+  async updateWithdrawalStatus(withdrawalId, status, remarks = "") {
+    try {
+      const response = await fetch(`${API_BASE_URL}/withdrawals/${withdrawalId}/status`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ status, remarks }),
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || "Failed to update withdrawal status")
+      }
+      
+      const result = await response.json()
+      return {
+        success: true,
+        data: result.data,
+        message: result.message || `Withdrawal ${status} successfully`,
+      }
+    } catch (error) {
+      console.error("Error updating withdrawal status:", error)
+      return {
+        success: false,
+        message: error.message || "Failed to update withdrawal status",
+      }
+    }
+  },
+
   // ===== TRANSFER HISTORY =====
   async getTransferHistory(filters = {}) {
     try {
@@ -1074,7 +1144,6 @@ export const userHelpers = {
     }
   },
 
-  // ✅ NEW: Calculate transfer statistics
   calculateTransferStats(transfers) {
     if (!Array.isArray(transfers) || transfers.length === 0) {
       return {
@@ -1115,5 +1184,45 @@ export const userHelpers = {
       },
       recentTransfers: transfers.slice(0, 10),
     }
+  },
+
+  // ✅ NEW: Get user engagement score
+  getUserEngagementScore(user) {
+    if (!user) return 0;
+    
+    let score = 0;
+    
+    // Base score from sessions
+    if (user.sessions && Array.isArray(user.sessions)) {
+      const completedSessions = user.sessions.filter(s => s.completedAt).length;
+      score += completedSessions * 10;
+      score += user.sessions.length * 5;
+    }
+    
+    // Balance score
+    if (user.balance) {
+      score += Math.min(user.balance / 100, 50);
+    }
+    
+    // Referral score
+    if (user.referredBy) {
+      score += 20;
+    }
+    
+    // Activity score
+    if (user.lastSignInAt) {
+      const lastLogin = new Date(user.lastSignInAt);
+      const daysSinceLogin = (Date.now() - lastLogin.getTime()) / (1000 * 60 * 60 * 24);
+      if (daysSinceLogin < 1) score += 30;
+      else if (daysSinceLogin < 7) score += 20;
+      else if (daysSinceLogin < 30) score += 10;
+    }
+    
+    // Wallet connected score
+    if (user.walletAddresses && (user.walletAddresses.metamask || user.walletAddresses.trustWallet)) {
+      score += 25;
+    }
+    
+    return Math.min(score, 100);
   },
 }
