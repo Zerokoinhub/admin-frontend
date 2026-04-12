@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
@@ -25,10 +24,9 @@ import {
   Check,
 } from "lucide-react"
 
-import { withdrawalAPI, withdrawalHelpers } from "../../src/lib/api"
+// ✅ FIXED: Import from userAPI instead of withdrawalAPI
+import { userAPI, userHelpers } from "../../src/lib/api"
 import UserAvatar from "@/components/ui/UserAvatar"
-
-
 
 export default function WithdrawalsClientPage() {
   const [requests, setRequests] = useState([])
@@ -43,13 +41,34 @@ export default function WithdrawalsClientPage() {
   const [updatingId, setUpdatingId] = useState(null)
   const [copiedId, setCopiedId] = useState(null)
 
+  // ✅ Helper function to format withdrawal data
+  const formatWithdrawalData = (withdrawal) => {
+    if (!withdrawal) return null;
+    
+    return {
+      id: withdrawal._id || withdrawal.id,
+      userId: withdrawal.userId,
+      userName: withdrawal.userName || withdrawal.user?.name || 'Unknown User',
+      userEmail: withdrawal.userEmail || withdrawal.user?.email || 'No Email',
+      amount: withdrawal.amount || 0,
+      walletAddress: withdrawal.walletAddress || withdrawal.address || 'N/A',
+      status: withdrawal.status || 'pending',
+      date: withdrawal.createdAt ? new Date(withdrawal.createdAt).toLocaleDateString() : new Date().toLocaleDateString(),
+      time: withdrawal.createdAt ? new Date(withdrawal.createdAt).toLocaleTimeString() : new Date().toLocaleTimeString(),
+      createdAt: withdrawal.createdAt,
+      updatedAt: withdrawal.updatedAt,
+      remarks: withdrawal.remarks || '',
+    };
+  };
+
   const fetchWithdrawalRequests = useCallback(async () => {
     setLoading(true)
     setError("")
     try {
-      const response = await withdrawalAPI.getWithdrawalRequests(filters)
+      // ✅ FIXED: Use userAPI.getWithdrawalRequests
+      const response = await userAPI.getWithdrawalRequests(filters)
       if (response.success) {
-        const formattedRequests = response.data.map(withdrawalHelpers.formatWithdrawalData)
+        const formattedRequests = (response.data || response.withdrawals || []).map(formatWithdrawalData)
         setRequests(formattedRequests)
       } else {
         setError(response.message || "Failed to fetch withdrawal requests")
@@ -85,16 +104,17 @@ export default function WithdrawalsClientPage() {
     setUpdatingId(withdrawalId);
     setError("");
     try {
-        const response = await withdrawalAPI.updateWithdrawalStatus(withdrawalId, newStatus);
-        if (response.success) {
-            fetchWithdrawalRequests();
-        } else {
-            setError(response.message || "Failed to update status.");
-        }
+      // ✅ FIXED: Use userAPI.updateWithdrawalStatus
+      const response = await userAPI.updateWithdrawalStatus(withdrawalId, newStatus);
+      if (response.success) {
+        fetchWithdrawalRequests();
+      } else {
+        setError(response.message || "Failed to update status.");
+      }
     } catch (err) {
-        setError("Client error updating status: " + err.message);
+      setError("Client error updating status: " + err.message);
     } finally {
-        setUpdatingId(null);
+      setUpdatingId(null);
     }
   };
 
@@ -127,7 +147,6 @@ export default function WithdrawalsClientPage() {
     });
     return stats;
   }, [requests]);
-
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -241,10 +260,7 @@ export default function WithdrawalsClientPage() {
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
                         
                         <div className="flex items-center gap-3 md:col-span-1">
-                          {/* <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
-                            <User className="h-5 w-5 text-blue-600" />
-                          </div> */}
-                            <UserAvatar user={{ name: req.userName, email: req.userEmail }} size="sm" className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center shrink-0" />
+                          <UserAvatar user={{ name: req.userName, email: req.userEmail }} size="sm" className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center shrink-0" />
                           <div>
                             <p className="font-medium text-gray-800">{req.userName}</p>
                             <p className="text-sm text-gray-500">{req.userEmail}</p>
