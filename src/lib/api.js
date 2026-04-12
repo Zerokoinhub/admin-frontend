@@ -1093,4 +1093,154 @@ export const userHelpers = {
     const newUsersLast30Days = users.filter(
       (user) => user.createdAt && new Date(user.createdAt) >= thirtyDaysAgo,
     ).length
-   
+    const newUsersLast7Days = users.filter((user) => user.createdAt && new Date(user.createdAt) >= sevenDaysAgo).length
+    const newUsersToday = users.filter((user) => user.createdAt && new Date(user.createdAt) >= oneDayAgo).length
+    const activeUsersLast7Days = users.filter((user) => {
+      const lastActivity = user.lastSignInAt || user.updatedAt
+      return lastActivity && new Date(lastActivity) >= sevenDaysAgo
+    }).length
+    return {
+      newUsersLast30Days,
+      newUsersLast7Days,
+      newUsersToday,
+      activeUsersLast7Days,
+      growthRate30Days: users.length > 0 ? (newUsersLast30Days / users.length) * 100 : 0,
+      growthRate7Days: users.length > 0 ? (newUsersLast7Days / users.length) * 100 : 0,
+      dailyGrowthRate: users.length > 0 ? (newUsersToday / users.length) * 100 : 0,
+      weeklyActivityRate: users.length > 0 ? (activeUsersLast7Days / users.length) * 100 : 0,
+    }
+  },
+
+  formatUserList(users) {
+    if (!Array.isArray(users)) return []
+    return users.map((user) => this.formatUserData(user))
+  },
+
+  hasWallet(user) {
+    return !!(user.walletAddresses && (user.walletAddresses.metamask || user.walletAddresses.trustWallet))
+  },
+
+  getSessionProgress(user) {
+    if (!user.sessions || !Array.isArray(user.sessions)) {
+      return {
+        totalSessions: 0,
+        unlockedSessions: 0,
+        completedSessions: 0,
+        claimedSessions: 0,
+        progressPercentage: 0,
+      }
+    }
+    const totalSessions = user.sessions.length
+    const unlockedSessions = user.sessions.filter((s) => !s.isLocked).length
+    const completedSessions = user.sessions.filter((s) => s.completedAt).length
+    const claimedSessions = user.sessions.filter((s) => s.claimedAt || s.isClaimed).length
+    
+    return {
+      totalSessions,
+      unlockedSessions,
+      completedSessions,
+      claimedSessions,
+      progressPercentage: totalSessions > 0 ? (completedSessions / totalSessions) * 100 : 0,
+    }
+  },
+
+  calculateTransferStats(transfers) {
+    if (!Array.isArray(transfers) || transfers.length === 0) {
+      return {
+        totalTransfers: 0,
+        totalAmount: 0,
+        completedTransfers: 0,
+        pendingTransfers: 0,
+        failedTransfers: 0,
+        averageAmount: 0,
+        successRate: 0,
+        transfersByStatus: {
+          completed: 0,
+          pending: 0,
+          failed: 0,
+        },
+        recentTransfers: [],
+      }
+    }
+
+    const totalAmount = transfers.reduce((sum, t) => sum + (t.amount || 0), 0)
+    const completedTransfers = transfers.filter(t => t.status === 'completed' || t.status === 'success').length
+    const pendingTransfers = transfers.filter(t => t.status === 'pending').length
+    const failedTransfers = transfers.filter(t => t.status === 'failed' || t.status === 'error').length
+    const successRate = transfers.length > 0 ? (completedTransfers / transfers.length) * 100 : 0
+
+    return {
+      totalTransfers: transfers.length,
+      totalAmount: totalAmount,
+      completedTransfers: completedTransfers,
+      pendingTransfers: pendingTransfers,
+      failedTransfers: failedTransfers,
+      averageAmount: transfers.length > 0 ? totalAmount / transfers.length : 0,
+      successRate: successRate,
+      transfersByStatus: {
+        completed: completedTransfers,
+        pending: pendingTransfers,
+        failed: failedTransfers,
+      },
+      recentTransfers: transfers.slice(0, 10),
+    }
+  },
+
+  // ✅ ADDED: Format transfer data for display
+  formatTransferData(transfer) {
+    if (!transfer) return null;
+    
+    return {
+      transactionId: transfer.transactionId || transfer._id || `TXN${Date.now()}`,
+      userName: transfer.userName || transfer.user?.name || transfer.user?.username || 'Unknown',
+      userEmail: transfer.userEmail || transfer.user?.email || 'Unknown',
+      amount: transfer.amount || 0,
+      status: transfer.status || 'pending',
+      date: transfer.createdAt ? new Date(transfer.createdAt).toLocaleDateString() : new Date().toLocaleDateString(),
+      time: transfer.createdAt ? new Date(transfer.createdAt).toLocaleTimeString() : new Date().toLocaleTimeString(),
+      transferredBy: transfer.transferredBy || transfer.admin || transfer.adminName || 'System',
+      dateTime: transfer.createdAt || new Date().toISOString(),
+      createdAt: transfer.createdAt
+    };
+  },
+
+  // ✅ NEW: Get user engagement score
+  getUserEngagementScore(user) {
+    if (!user) return 0;
+    
+    let score = 0;
+    
+    // Base score from sessions
+    if (user.sessions && Array.isArray(user.sessions)) {
+      const completedSessions = user.sessions.filter(s => s.completedAt).length;
+      score += completedSessions * 10;
+      score += user.sessions.length * 5;
+    }
+    
+    // Balance score
+    if (user.balance) {
+      score += Math.min(user.balance / 100, 50);
+    }
+    
+    // Referral score
+    if (user.referredBy) {
+      score += 20;
+    }
+    
+    // Activity score
+    if (user.lastSignInAt) {
+      const lastLogin = new Date(user.lastSignInAt);
+      const daysSinceLogin = (Date.now() - lastLogin.getTime()) / (1000 * 60 * 60 * 24);
+      if (daysSinceLogin < 1) score += 30;
+      else if (daysSinceLogin < 7) score += 20;
+      else if (daysSinceLogin < 30) score += 10;
+    }
+    
+    // Wallet connected score
+    if (user.walletAddresses && (user.walletAddresses.metamask || user.walletAddresses.trustWallet)) {
+      score += 25;
+    }
+    
+    return Math.min(score, 100);
+  },
+}
