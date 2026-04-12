@@ -40,7 +40,7 @@ const settingsAPI = {
     try {
       const token = localStorage.getItem("token")
       // Use App Backend URL - change this to your actual App Backend URL
-      const APP_BACKEND_URL = process.env.NEXT_PUBLIC_APP_BACKEND_URL || "https://your-app-backend.com/api"
+      const APP_BACKEND_URL = process.env.NEXT_PUBLIC_APP_BACKEND_URL || "https://zerokoinapp-production.up.railway.app/api"
       
       const response = await fetch(`${APP_BACKEND_URL}/settings`, {
         method: "GET",
