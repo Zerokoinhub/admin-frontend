@@ -22,7 +22,7 @@ const getFormDataHeaders = () => {
 // API SERVICE
 // ========================
 export const userAPI = {
-  // Fetch paginated user list - Enhanced to handle multiple response structures
+  // Fetch paginated user list
   async getUsers(page = 1, limit = 100, filters = {}) {
     const params = new URLSearchParams({
       page: page.toString(),
@@ -36,9 +36,7 @@ export const userAPI = {
       })
       if (!response.ok) throw new Error("Failed to fetch users")
       const result = await response.json()
-      console.log("API Response:", result)
       
-      // Handle multiple possible response structures
       let users = []
       let pagination = {
         currentPage: page,
@@ -65,7 +63,6 @@ export const userAPI = {
         pagination.totalItems = users.length
       }
       
-      // ✅ Ensure users array exists
       users = users || []
       
       return {
@@ -100,7 +97,7 @@ export const userAPI = {
     }
   },
 
-  // Update user - Enhanced to handle new fields
+  // Update user
   async updateUser(userId, userData) {
     try {
       const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
@@ -977,7 +974,7 @@ export const userAPI = {
 }
 
 // ========================
-// HELPER FUNCTIONS - FULLY FIXED
+// HELPER FUNCTIONS
 // ========================
 export const userHelpers = {
   calculateStats(users) {
@@ -1007,7 +1004,7 @@ export const userHelpers = {
     }
     const now = new Date()
     const recentThreshold = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-    const stats = {
+    return {
       totalUsers: users.length,
       activeUsers: users.filter((user) => user.isActive === true).length,
       inactiveUsers: users.filter((user) => user.isActive === false).length,
@@ -1033,7 +1030,6 @@ export const userHelpers = {
       pendingWallets: users.filter((user) => user.walletStatus === "Pending").length,
       totalRecentAmount: users.reduce((sum, user) => sum + (user.recentAmount || 0), 0),
     }
-    return stats
   },
 
   formatUserData(user) {
@@ -1186,7 +1182,6 @@ export const userHelpers = {
     }
   },
 
-  // ✅ ADDED: Format transfer data for display
   formatTransferData(transfer) {
     if (!transfer) return null;
     
@@ -1204,30 +1199,25 @@ export const userHelpers = {
     };
   },
 
-  // ✅ NEW: Get user engagement score
   getUserEngagementScore(user) {
     if (!user) return 0;
     
     let score = 0;
     
-    // Base score from sessions
     if (user.sessions && Array.isArray(user.sessions)) {
       const completedSessions = user.sessions.filter(s => s.completedAt).length;
       score += completedSessions * 10;
       score += user.sessions.length * 5;
     }
     
-    // Balance score
     if (user.balance) {
       score += Math.min(user.balance / 100, 50);
     }
     
-    // Referral score
     if (user.referredBy) {
       score += 20;
     }
     
-    // Activity score
     if (user.lastSignInAt) {
       const lastLogin = new Date(user.lastSignInAt);
       const daysSinceLogin = (Date.now() - lastLogin.getTime()) / (1000 * 60 * 60 * 24);
@@ -1236,7 +1226,6 @@ export const userHelpers = {
       else if (daysSinceLogin < 30) score += 10;
     }
     
-    // Wallet connected score
     if (user.walletAddresses && (user.walletAddresses.metamask || user.walletAddresses.trustWallet)) {
       score += 25;
     }
