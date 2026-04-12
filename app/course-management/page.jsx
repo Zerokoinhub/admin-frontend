@@ -79,6 +79,41 @@ export default function CourseManagementPage() {
     isAuthenticated,
   } = useCourses();
 
+  // All 5 languages
+  const availableLanguages = [
+    { code: "en", name: "English" },
+    { code: "hi", name: "हिंदी" },
+    { code: "ar", name: "العربية" },
+    { code: "ur", name: "اردو" },
+    { code: "es", name: "Español" },
+  ];
+
+  // Multi-language form data
+  const [formData, setFormData] = useState({
+    languages: {
+      en: {
+        courseName: "",
+        pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
+      },
+      hi: {
+        courseName: "",
+        pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
+      },
+      ar: {
+        courseName: "",
+        pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
+      },
+      ur: {
+        courseName: "",
+        pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
+      },
+      es: {
+        courseName: "",
+        pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
+      },
+    },
+  });
+
   // Debug logging
   useEffect(() => {
     console.log("=== DEBUG ===");
@@ -93,15 +128,95 @@ export default function CourseManagementPage() {
   // Safe courses array
   const safeCourses = Array.isArray(courses) ? courses : [];
 
-  const [formData, setFormData] = useState({
-    courseName: "",
-    pages: [{ title: "", content: "", time: "120" }],
-  });
+  // Ensure language exists in formData
+  const ensureLanguageExists = (langCode) => {
+    if (!formData.languages[langCode]) {
+      setFormData(prev => ({
+        ...prev,
+        languages: {
+          ...prev.languages,
+          [langCode]: {
+            courseName: "",
+            pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
+          },
+        },
+      }));
+    }
+  };
 
-  const availableLanguages = [
-    { code: "en", name: "English" },
-    { code: "hi", name: "हिंदी" },
-  ];
+  // Update course name for current language
+  const updateCourseName = (value) => {
+    setFormData(prev => ({
+      ...prev,
+      languages: {
+        ...prev.languages,
+        [currentLanguage]: {
+          ...prev.languages[currentLanguage],
+          courseName: value,
+        },
+      },
+    }));
+  };
+
+  // Update page for current language
+  const updatePage = (index, field, value) => {
+    setFormData(prev => {
+      const updatedPages = [...prev.languages[currentLanguage].pages];
+      updatedPages[index] = {
+        ...updatedPages[index],
+        [field]: value,
+      };
+      
+      return {
+        ...prev,
+        languages: {
+          ...prev.languages,
+          [currentLanguage]: {
+            ...prev.languages[currentLanguage],
+            pages: updatedPages,
+          },
+        },
+      };
+    });
+  };
+
+  // Add page for current language
+  const addPage = () => {
+    setFormData(prev => ({
+      ...prev,
+      languages: {
+        ...prev.languages,
+        [currentLanguage]: {
+          ...prev.languages[currentLanguage],
+          pages: [
+            ...prev.languages[currentLanguage].pages,
+            { title: "", content: "", time: "120", timeUnit: "minutes" },
+          ],
+        },
+      },
+    }));
+  };
+
+  // Remove page for current language
+  const removePage = (index) => {
+    setFormData(prev => {
+      const currentPages = prev.languages[currentLanguage].pages;
+      if (currentPages.length <= 1) return prev;
+      
+      const updatedPages = currentPages.filter((_, i) => i !== index);
+      
+      return {
+        ...prev,
+        languages: {
+          ...prev.languages,
+          [currentLanguage]: {
+            ...prev.languages[currentLanguage],
+            pages: updatedPages,
+          },
+        },
+      };
+    });
+  };
 
   // Handle render errors gracefully
   if (hasRenderError) {
@@ -160,49 +275,68 @@ export default function CourseManagementPage() {
           ← Back
         </Button>
         
-        <Card className="max-w-2xl mx-auto">
+        <Card className="max-w-4xl mx-auto">
           <CardContent className="p-6">
             <h1 className="text-2xl font-semibold mb-4">
               {isEditing ? "Edit Course" : "Create Course"}
             </h1>
             
+            {/* Language Tabs */}
+            <div className="mb-6 border-b border-gray-200">
+              <div className="flex flex-wrap gap-2">
+                {availableLanguages.map((lang) => (
+                  <button
+                    key={lang.code}
+                    onClick={() => {
+                      ensureLanguageExists(lang.code);
+                      setCurrentLanguage(lang.code);
+                    }}
+                    className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                      currentLanguage === lang.code
+                        ? "bg-teal-600 text-white"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    {lang.name}
+                    {formData.languages[lang.code]?.courseName && (
+                      <span className="ml-2 text-xs bg-green-500 text-white px-1 py-0.5 rounded">✓</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
             <div className="space-y-4">
               <div>
-                <Label>Course Name *</Label>
+                <Label>Course Name ({currentLanguage.toUpperCase()}) *</Label>
                 <Input
-                  value={formData.courseName}
-                  onChange={(e) => setFormData({ ...formData, courseName: e.target.value })}
-                  placeholder="Enter course name"
+                  value={formData.languages[currentLanguage]?.courseName || ""}
+                  onChange={(e) => updateCourseName(e.target.value)}
+                  placeholder={`Enter course name in ${currentLanguage.toUpperCase()}...`}
                 />
               </div>
               
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <Label>Pages</Label>
+                  <Label>Pages ({currentLanguage.toUpperCase()})</Label>
                   <Button 
                     size="sm" 
-                    onClick={() => setFormData({
-                      ...formData,
-                      pages: [...formData.pages, { title: "", content: "", time: "120" }]
-                    })}
+                    onClick={addPage}
                   >
                     <Plus className="h-4 w-4 mr-1" /> Add Page
                   </Button>
                 </div>
                 
-                {formData.pages.map((page, index) => (
+                {(formData.languages[currentLanguage]?.pages || []).map((page, index) => (
                   <Card key={index} className="mb-3">
                     <CardContent className="p-3">
                       <div className="flex justify-between items-center mb-2">
                         <h4 className="font-medium">Page {index + 1}</h4>
-                        {formData.pages.length > 1 && (
+                        {(formData.languages[currentLanguage]?.pages?.length || 0) > 1 && (
                           <Button 
                             variant="ghost" 
                             size="sm" 
-                            onClick={() => {
-                              const newPages = formData.pages.filter((_, i) => i !== index);
-                              setFormData({ ...formData, pages: newPages });
-                            }}
+                            onClick={() => removePage(index)}
                           >
                             <X className="h-4 w-4" />
                           </Button>
@@ -213,32 +347,31 @@ export default function CourseManagementPage() {
                         <Input
                           placeholder="Title"
                           value={page.title}
-                          onChange={(e) => {
-                            const newPages = [...formData.pages];
-                            newPages[index].title = e.target.value;
-                            setFormData({ ...formData, pages: newPages });
-                          }}
+                          onChange={(e) => updatePage(index, "title", e.target.value)}
                         />
                         <Textarea
                           placeholder="Content"
                           value={page.content}
-                          onChange={(e) => {
-                            const newPages = [...formData.pages];
-                            newPages[index].content = e.target.value;
-                            setFormData({ ...formData, pages: newPages });
-                          }}
+                          onChange={(e) => updatePage(index, "content", e.target.value)}
                           rows={3}
                         />
-                        <Input
-                          type="number"
-                          placeholder="Duration (minutes)"
-                          value={page.time}
-                          onChange={(e) => {
-                            const newPages = [...formData.pages];
-                            newPages[index].time = e.target.value;
-                            setFormData({ ...formData, pages: newPages });
-                          }}
-                        />
+                        <div className="flex gap-2">
+                          <Input
+                            type="number"
+                            placeholder="Duration"
+                            value={page.time}
+                            onChange={(e) => updatePage(index, "time", e.target.value)}
+                            className="flex-1"
+                          />
+                          <select
+                            value={page.timeUnit || "minutes"}
+                            onChange={(e) => updatePage(index, "timeUnit", e.target.value)}
+                            className="border border-gray-200 rounded-md px-3 py-2 text-sm bg-white"
+                          >
+                            <option value="seconds">Seconds</option>
+                            <option value="minutes">Minutes</option>
+                          </select>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -249,33 +382,69 @@ export default function CourseManagementPage() {
                 className="w-full" 
                 disabled={isSubmitting}
                 onClick={async () => {
-                  if (!formData.courseName) {
-                    alert("Please enter a course name");
+                  const currentLangData = formData.languages[currentLanguage];
+                  
+                  if (!currentLangData?.courseName) {
+                    alert(`Please enter a course name in ${currentLanguage.toUpperCase()}`);
                     return;
+                  }
+                  
+                  // Validate all pages for current language
+                  for (let i = 0; i < currentLangData.pages.length; i++) {
+                    const page = currentLangData.pages[i];
+                    if (!page.title) {
+                      alert(`Page ${i + 1} is missing a title in ${currentLanguage.toUpperCase()}`);
+                      return;
+                    }
+                    if (!page.content) {
+                      alert(`Page ${i + 1} is missing content in ${currentLanguage.toUpperCase()}`);
+                      return;
+                    }
+                    if (!page.time) {
+                      alert(`Page ${i + 1} is missing duration in ${currentLanguage.toUpperCase()}`);
+                      return;
+                    }
                   }
                   
                   setIsSubmitting(true);
                   try {
-                    const result = await createCourse({
-                      languages: {
-                        en: {
-                          courseName: formData.courseName,
-                          pages: formData.pages.map(p => ({
-                            title: p.title,
-                            content: p.content,
-                            time: JSON.stringify({ value: parseInt(p.time) || 60, unit: "minutes" })
-                          }))
-                        }
-                      },
+                    // Build languages object with all non-empty languages
+                    const languages = {};
+                    for (const lang of availableLanguages) {
+                      const langData = formData.languages[lang.code];
+                      if (langData && langData.courseName && langData.courseName.trim()) {
+                        languages[lang.code] = {
+                          courseName: langData.courseName.trim(),
+                          pages: langData.pages.map(p => ({
+                            title: p.title.trim(),
+                            content: p.content.trim(),
+                            time: JSON.stringify({ 
+                              value: parseInt(p.time) || 60, 
+                              unit: p.timeUnit || "minutes" 
+                            }),
+                          })),
+                        };
+                      }
+                    }
+                    
+                    const payload = {
+                      languages: languages,
                       uploadedBy: userData?.id || userData?._id
-                    });
+                    };
+                    
+                    let result;
+                    if (isEditing && selectedCourse) {
+                      result = await updateCourse(selectedCourse._id, payload);
+                    } else {
+                      result = await createCourse(payload);
+                    }
                     
                     if (result?.success) {
-                      alert("Course created successfully!");
+                      alert(`Course ${isEditing ? "updated" : "created"} successfully!`);
                       setCurrentView("main");
                       refreshCourses();
                     } else {
-                      alert("Failed to create course: " + (result?.error || "Unknown error"));
+                      alert("Failed to save course: " + (result?.error || "Unknown error"));
                     }
                   } catch (err) {
                     alert("Error: " + err.message);
@@ -284,7 +453,7 @@ export default function CourseManagementPage() {
                   }
                 }}
               >
-                {isSubmitting ? "Saving..." : (isEditing ? "Update" : "Create")}
+                {isSubmitting ? "Saving..." : (isEditing ? "Update Course" : "Create Course")}
               </Button>
             </div>
           </CardContent>
@@ -310,14 +479,24 @@ export default function CourseManagementPage() {
           <Button 
             onClick={() => setCurrentView("analytics")} 
             variant="outline"
-            disabled={true} // Disabled temporarily to avoid recharts error
+            disabled={true}
           >
             <BarChart3 className="h-4 w-4 mr-2" /> Analytics (Disabled)
           </Button>
           {hasPermission?.("create") && (
             <Button onClick={() => {
-              setFormData({ courseName: "", pages: [{ title: "", content: "", time: "120" }] });
+              // Reset form data
+              setFormData({
+                languages: {
+                  en: { courseName: "", pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }] },
+                  hi: { courseName: "", pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }] },
+                  ar: { courseName: "", pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }] },
+                  ur: { courseName: "", pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }] },
+                  es: { courseName: "", pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }] },
+                },
+              });
               setIsEditing(false);
+              setCurrentLanguage("en");
               setCurrentView("upload");
             }}>
               <Plus className="h-4 w-4 mr-2" /> Create Course
@@ -340,6 +519,7 @@ export default function CourseManagementPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Course Name</TableHead>
+                    <TableHead>Languages</TableHead>
                     <TableHead>Pages</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Created By</TableHead>
@@ -348,13 +528,22 @@ export default function CourseManagementPage() {
                 </TableHeader>
                 <TableBody>
                   {safeCourses.map((course) => {
-                    // Safely extract data
                     const courseName = course?.languages?.en?.courseName || course?.courseName || "Untitled";
                     const pageCount = course?.languages?.en?.pages?.length || course?.pages?.length || 0;
+                    const languages = course?.languages ? Object.keys(course.languages) : [];
                     
                     return (
                       <TableRow key={course?._id || Math.random()}>
                         <TableCell className="font-medium">{courseName}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-1 flex-wrap">
+                            {languages.map(lang => (
+                              <Badge key={lang} variant="outline" className="text-xs">
+                                {lang.toUpperCase()}
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
                         <TableCell>{pageCount}</TableCell>
                         <TableCell>
                           <Badge className={course?.isActive !== false ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
@@ -368,11 +557,39 @@ export default function CourseManagementPage() {
                               variant="ghost" 
                               size="sm"
                               onClick={() => {
-                                // Simplified edit - just show alert for now
-                                alert("Edit feature - Course ID: " + course._id);
+                                // Load course data for editing
+                                if (course?.languages) {
+                                  const newFormData = { languages: {} };
+                                  for (const lang of availableLanguages) {
+                                    const langData = course.languages[lang.code];
+                                    if (langData) {
+                                      newFormData.languages[lang.code] = {
+                                        courseName: langData.courseName || "",
+                                        pages: (langData.pages || []).map(page => ({
+                                          title: page.title || "",
+                                          content: page.content || "",
+                                          time: page.time ? (JSON.parse(page.time)?.value?.toString() || "120") : "120",
+                                          timeUnit: page.time ? (JSON.parse(page.time)?.unit || "minutes") : "minutes",
+                                        })),
+                                      };
+                                    } else {
+                                      newFormData.languages[lang.code] = {
+                                        courseName: "",
+                                        pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
+                                      };
+                                    }
+                                  }
+                                  setFormData(newFormData);
+                                  setIsEditing(true);
+                                  setSelectedCourse(course);
+                                  setCurrentLanguage("en");
+                                  setCurrentView("upload");
+                                } else {
+                                  alert("Edit feature - Course ID: " + course._id);
+                                }
                               }}
                             >
-                              <Eye className="h-4 w-4" />
+                              <Edit className="h-4 w-4" />
                             </Button>
                             {hasPermission?.("delete") && (
                               <Button 
@@ -404,7 +621,7 @@ export default function CourseManagementPage() {
         </CardContent>
       </Card>
 
-      {/* Simple Course Viewer (without analytics) */}
+      {/* Simple Course Viewer */}
       {currentView === "course" && selectedCourse && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <Card className="max-w-2xl w-full max-h-[80vh] overflow-y-auto">
