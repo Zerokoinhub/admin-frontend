@@ -33,7 +33,8 @@ import {
   Video,
   Calendar,
   Trophy,
-} from "lucide-react"
+  Clock,  // ✅ Added - Required for Session Rewards card
+} from "lucide-react" from "lucide-react"
 import Image from "next/image"
 import { userAPI, userHelpers } from "../../src/lib/api"
 import { useUsers } from "../../hooks/useUsers"
