@@ -33,8 +33,7 @@ import {
   Video,
   Calendar,
   Trophy,
-  Clock,  // ✅ Added - Required for Session Rewards card
-} from "lucide-react" 
+} from "lucide-react"
 import Image from "next/image"
 import { userAPI, userHelpers } from "../../src/lib/api"
 import { useUsers } from "../../hooks/useUsers"
@@ -118,14 +117,11 @@ export default function SettingPage() {
     dateRange: "all",
   })
 
-  // Reward settings state - initialized from App Backend API
+  // Reward settings state - Only 3 rewards now
   const [rewardSettings, setRewardSettings] = useState({
     referralReward: 50,
     learningReward: 2,
     adBaseReward: 30,
-    sessionReward: 10,
-    dailyBonus: 5,
-    streakBonus: 100,
   })
   const [editingReward, setEditingReward] = useState(null)
   const [tempRewardValue, setTempRewardValue] = useState("")
@@ -185,9 +181,6 @@ export default function SettingPage() {
           referralReward: result.data.rewards.referralReward || 50,
           learningReward: result.data.rewards.learningReward || 2,
           adBaseReward: result.data.rewards.adBaseReward || 30,
-          sessionReward: result.data.rewards.sessionReward || 10,
-          dailyBonus: result.data.rewards.dailyBonus || 5,
-          streakBonus: result.data.rewards.streakBonus || 100,
         })
         console.log("Settings loaded from App Backend:", result.data.rewards)
         setMessage({ type: "success", text: "Settings loaded from server" })
@@ -1086,30 +1079,6 @@ export default function SettingPage() {
               color="bg-orange-500"
               description="Reward for watching video ads"
             />
-            <RewardCard
-              title="Session Rewards"
-              value={rewardSettings.sessionReward}
-              rewardKey="sessionReward"
-              icon={Clock}
-              color="bg-teal-500"
-              description="Reward for completing a session"
-            />
-            <RewardCard
-              title="Daily Bonus"
-              value={rewardSettings.dailyBonus}
-              rewardKey="dailyBonus"
-              icon={Calendar}
-              color="bg-green-500"
-              description="Daily login reward"
-            />
-            <RewardCard
-              title="Streak Bonus"
-              value={rewardSettings.streakBonus}
-              rewardKey="streakBonus"
-              icon={Trophy}
-              color="bg-yellow-500"
-              description="Bonus for maintaining streak"
-            />
           </div>
         </div>
 
@@ -1445,7 +1414,7 @@ export default function SettingPage() {
     )
   }
 
-  // Notification views (keep your existing code)
+  // Notification views
   if (currentView === "notifications") {
     return (
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
