@@ -1107,49 +1107,6 @@ export default function SettingPage() {
           </div>
         </div>
 
-        {/* Debug Section - Helps verify API is working */}
-        <div className="mt-6 p-4 bg-gray-100 rounded-lg border border-gray-200">
-          <h3 className="text-sm font-semibold mb-2 text-gray-700">🔧 Debug Tools</h3>
-          <div className="flex gap-2 flex-wrap">
-            <Button 
-              onClick={async () => {
-                console.log("Testing API connection...")
-                const result = await settingsAPI.getSettings()
-                console.log("API Test Result:", result)
-                alert(`Current adBaseReward from API: ${result.data?.rewards?.adBaseReward}`)
-              }}
-              className="bg-gray-600 hover:bg-gray-700 text-white text-xs"
-            >
-              Test API Connection
-            </Button>
-            <Button 
-              onClick={async () => {
-                const testValue = 50
-                console.log(`Testing save with value: ${testValue}`)
-                const result = await settingsAPI.updateSettings({ rewards: { adBaseReward: testValue } })
-                if (result.success) {
-                  alert(`✅ Success! adBaseReward set to ${testValue}`)
-                  await loadSettingsFromAPI()
-                } else {
-                  alert(`❌ Failed: ${result.error}`)
-                }
-              }}
-              className="bg-teal-600 hover:bg-teal-700 text-white text-xs"
-            >
-              Test Set Ad Reward to 50
-            </Button>
-            <Button 
-              onClick={async () => {
-                await loadSettingsFromAPI()
-                alert("Settings reloaded from server!")
-              }}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-xs"
-            >
-              Refresh Settings
-            </Button>
-          </div>
-        </div>
-
         {/* Expiry Dropdown */}
         {(userRole === "superadmin" || userRole === "editor") && (
           <div className="flex justify-center sm:justify-end">
