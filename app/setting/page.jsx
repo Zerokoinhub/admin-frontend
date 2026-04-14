@@ -1064,9 +1064,7 @@ export default function SettingPage() {
             <h1 className="text-2xl font-semibold text-gray-900">Settings</h1>
             <p className="text-sm text-gray-500 mt-1">Manage your app rewards and configurations</p>
           </div>
-          <div className="text-sm text-gray-500 bg-white px-3 py-1.5 rounded-lg shadow-sm">
-            {settingsLoading ? "Loading..." : "✅ Connected to App Backend"}
-          </div>
+         
         </div>
 
         {/* Reward Settings Section */}
@@ -1075,10 +1073,7 @@ export default function SettingPage() {
             <DollarSign className="h-5 w-5 text-teal-600" />
             <h2 className="text-lg font-semibold text-gray-900">Reward Settings</h2>
           </div>
-          <p className="text-sm text-gray-500 mb-4 ml-7">
-            These values are stored in the App Backend and will be used by the mobile app. 
-            Changes are saved to the server immediately.
-          </p>
+         
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             <RewardCard
               title="Referral Rewards"
