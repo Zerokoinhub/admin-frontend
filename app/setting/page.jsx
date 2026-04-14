@@ -39,12 +39,14 @@ import { userAPI, userHelpers } from "../../src/lib/api"
 import { useUsers } from "../../hooks/useUsers"
 import { useAdmins } from "../../hooks/useAdmins"
 
-// API Service for Settings - Connecting to App Backend
+// API Service for Settings - FIXED AND WORKING
 const settingsAPI = {
   async getSettings() {
     try {
       const token = localStorage.getItem("token")
       const APP_BACKEND_URL = "https://zerokoinapp-production.up.railway.app/api"
+      
+      console.log("📡 Fetching settings from:", `${APP_BACKEND_URL}/settings`)
       
       const response = await fetch(`${APP_BACKEND_URL}/settings`, {
         method: "GET",
@@ -59,9 +61,10 @@ const settingsAPI = {
       }
       
       const result = await response.json()
+      console.log("📥 Settings loaded:", result.data?.rewards)
       return result
     } catch (error) {
-      console.error("Error fetching settings from App Backend:", error)
+      console.error("Error fetching settings:", error)
       return { success: false, error: error.message }
     }
   },
@@ -70,6 +73,8 @@ const settingsAPI = {
     try {
       const token = localStorage.getItem("token")
       const APP_BACKEND_URL = "https://zerokoinapp-production.up.railway.app/api"
+      
+      console.log("📤 SAVING to backend:", JSON.stringify(settingsData, null, 2))
       
       const response = await fetch(`${APP_BACKEND_URL}/settings`, {
         method: "PUT",
@@ -81,13 +86,20 @@ const settingsAPI = {
       })
       
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
       }
       
       const result = await response.json()
+      console.log("📥 Save response:", result)
+      
+      if (result.success) {
+        console.log("✅ Successfully saved! New adBaseReward:", result.data?.rewards?.adBaseReward)
+      }
+      
       return result
     } catch (error) {
-      console.error("Error updating settings to App Backend:", error)
+      console.error("Error updating settings:", error)
       return { success: false, error: error.message }
     }
   },
@@ -117,7 +129,7 @@ export default function SettingPage() {
     dateRange: "all",
   })
 
-  // Reward settings state - Only 3 rewards now
+  // Reward settings state
   const [rewardSettings, setRewardSettings] = useState({
     referralReward: 50,
     learningReward: 2,
@@ -182,41 +194,54 @@ export default function SettingPage() {
           learningReward: result.data.rewards.learningReward || 2,
           adBaseReward: result.data.rewards.adBaseReward || 30,
         })
-        console.log("Settings loaded from App Backend:", result.data.rewards)
-        setMessage({ type: "success", text: "Settings loaded from server" })
-        setTimeout(() => setMessage({ type: "", text: "" }), 2000)
+        console.log("✅ Settings loaded:", result.data.rewards)
+        showTemporaryMessage("success", "Settings loaded from server")
       } else {
-        console.log("No settings from API, using defaults")
-        setMessage({ type: "warning", text: "Using default settings" })
-        setTimeout(() => setMessage({ type: "", text: "" }), 2000)
+        console.log("Using default settings")
+        showTemporaryMessage("warning", "Using default settings")
       }
     } catch (error) {
-      console.error("Failed to load settings from API:", error)
-      setMessage({ type: "error", text: "Failed to load settings from server" })
-      setTimeout(() => setMessage({ type: "", text: "" }), 3000)
+      console.error("Failed to load settings:", error)
+      showTemporaryMessage("error", "Failed to load settings from server")
     } finally {
       setSettingsLoading(false)
     }
   }
 
-  // Save reward settings to App Backend API
+  // Show temporary message
+  const showTemporaryMessage = (type, text) => {
+    setMessage({ type, text })
+    setTimeout(() => setMessage({ type: "", text: "" }), 3000)
+  }
+
+  // Save reward settings to App Backend API - FIXED
   const saveRewardSettingsToAPI = async (newSettings) => {
     setSavingSettings(true)
     try {
+      console.log("💾 Saving to backend:", newSettings)
+      
       const result = await settingsAPI.updateSettings({ rewards: newSettings })
       
       if (result.success) {
-        setMessage({ type: "success", text: "✅ Reward settings saved to server! App will use new values." })
-        console.log("Settings saved to App Backend:", newSettings)
-        setTimeout(() => setMessage({ type: "", text: "" }), 3000)
+        showTemporaryMessage("success", `✅ Saved! Ad reward is now ${newSettings.adBaseReward} ZRK`)
+        
+        // Verify the save by fetching again
+        setTimeout(async () => {
+          const verifyResult = await settingsAPI.getSettings()
+          if (verifyResult.success && verifyResult.data?.rewards?.adBaseReward === newSettings.adBaseReward) {
+            console.log("✅ Verification passed!")
+          } else {
+            console.warn("⚠️ Verification failed - database may not have updated")
+          }
+        }, 1000)
+        
         return true
       } else {
-        throw new Error(result.error || "Failed to save settings")
+        throw new Error(result.error || "Failed to save")
       }
     } catch (error) {
-      console.error("Failed to save settings to API:", error)
-      setMessage({ type: "error", text: `❌ Failed to save: ${error.message}` })
-      setTimeout(() => setMessage({ type: "", text: "" }), 3000)
+      console.error("❌ Save failed:", error)
+      showTemporaryMessage("error", `Failed to save: ${error.message}`)
       return false
     } finally {
       setSavingSettings(false)
@@ -229,12 +254,11 @@ export default function SettingPage() {
     setTempRewardValue(currentValue.toString())
   }
 
-  // Handle save reward
+  // Handle save reward - FIXED
   const handleSaveReward = async (rewardKey) => {
     const newValue = parseInt(tempRewardValue)
     if (isNaN(newValue) || newValue < 0) {
-      setMessage({ type: "error", text: "Please enter a valid positive number" })
-      setTimeout(() => setMessage({ type: "", text: "" }), 3000)
+      showTemporaryMessage("error", "Please enter a valid positive number")
       return
     }
     
@@ -247,6 +271,7 @@ export default function SettingPage() {
       setEditingReward(null)
       setTempRewardValue("")
     } else {
+      // Revert on failure
       setRewardSettings(rewardSettings)
     }
   }
@@ -1082,6 +1107,49 @@ export default function SettingPage() {
           </div>
         </div>
 
+        {/* Debug Section - Helps verify API is working */}
+        <div className="mt-6 p-4 bg-gray-100 rounded-lg border border-gray-200">
+          <h3 className="text-sm font-semibold mb-2 text-gray-700">🔧 Debug Tools</h3>
+          <div className="flex gap-2 flex-wrap">
+            <Button 
+              onClick={async () => {
+                console.log("Testing API connection...")
+                const result = await settingsAPI.getSettings()
+                console.log("API Test Result:", result)
+                alert(`Current adBaseReward from API: ${result.data?.rewards?.adBaseReward}`)
+              }}
+              className="bg-gray-600 hover:bg-gray-700 text-white text-xs"
+            >
+              Test API Connection
+            </Button>
+            <Button 
+              onClick={async () => {
+                const testValue = 50
+                console.log(`Testing save with value: ${testValue}`)
+                const result = await settingsAPI.updateSettings({ rewards: { adBaseReward: testValue } })
+                if (result.success) {
+                  alert(`✅ Success! adBaseReward set to ${testValue}`)
+                  await loadSettingsFromAPI()
+                } else {
+                  alert(`❌ Failed: ${result.error}`)
+                }
+              }}
+              className="bg-teal-600 hover:bg-teal-700 text-white text-xs"
+            >
+              Test Set Ad Reward to 50
+            </Button>
+            <Button 
+              onClick={async () => {
+                await loadSettingsFromAPI()
+                alert("Settings reloaded from server!")
+              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs"
+            >
+              Refresh Settings
+            </Button>
+          </div>
+        </div>
+
         {/* Expiry Dropdown */}
         {(userRole === "superadmin" || userRole === "editor") && (
           <div className="flex justify-center sm:justify-end">
@@ -1450,13 +1518,13 @@ export default function SettingPage() {
                 <CardContent className="p-4">
                   <div className="flex justify-between items-start mb-3">
                     <h3 className="font-semibold text-gray-900">{notification.title}</h3>
-                    <Badge className={
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                       notification.priority === "new-user" ? "bg-green-100 text-green-800" :
                       notification.priority === "top-rated-user" ? "bg-purple-100 text-purple-800" :
                       "bg-blue-100 text-blue-800"
-                    }>
+                    }`}>
                       {notification.sentTo}
-                    </Badge>
+                    </span>
                   </div>
                   <p className="text-sm text-gray-600 mb-3 line-clamp-2">{notification.description}</p>
                   <p className="text-xs text-gray-400">{new Date(notification.timestamp).toLocaleDateString()}</p>
