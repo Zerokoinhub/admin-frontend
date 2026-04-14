@@ -195,7 +195,7 @@ export default function SettingPage() {
           adBaseReward: result.data.rewards.adBaseReward || 30,
         })
         console.log("✅ Settings loaded:", result.data.rewards)
-        showTemporaryMessage("success", "Settings loaded from server")
+        
       } else {
         console.log("Using default settings")
         showTemporaryMessage("warning", "Using default settings")
