@@ -1006,17 +1006,17 @@ export default function SettingPage() {
                 {description && (
                   <p className="text-xs text-gray-400 mb-2">{description}</p>
                 )}
-              {isEditing ? (
+             {isEditing ? (
   <div className="flex items-center gap-2 flex-wrap">
-    <div className="relative flex items-center">
-      <span className="absolute left-3 text-gray-500 text-sm z-10">ZK</span>
+    <div className="flex items-center border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-teal-500">
+      <span className="px-2 text-gray-500 text-sm border-r border-gray-200">ZK</span>
       <input
         ref={inputRef}
         type="number"
         value={localValue}
         onChange={(e) => setLocalValue(e.target.value)}
         onKeyDown={handleKeyDown}
-        className="pl-12 pr-3 py-2 w-36 border border-gray-300 rounded-md text-lg font-bold focus:outline-none focus:ring-2 focus:ring-teal-500"
+        className="w-32 px-2 py-2 text-lg font-bold focus:outline-none rounded-r-md"
         min="0"
         disabled={savingSettings}
       />
@@ -1053,20 +1053,6 @@ export default function SettingPage() {
     </button>
   </div>
 )}
-
-  if (loading || usersLoading || settingsLoading) {
-    return (
-      <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
-        <div className="flex justify-center items-center h-64">
-          <div className="text-center">
-            <Loader2 className="w-8 h-8 animate-spin text-teal-600 mx-auto mb-2" />
-            <p className="text-gray-500">Loading settings from server...</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   // Main Settings View with Reward Cards
   if (currentView === "main") {
     return (
