@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -136,7 +136,6 @@ export default function SettingPage() {
     adBaseReward: 30,
   })
   const [editingReward, setEditingReward] = useState(null)
-  const [tempRewardValue, setTempRewardValue] = useState("")
   const [settingsLoading, setSettingsLoading] = useState(true)
   const [savingSettings, setSavingSettings] = useState(false)
 
@@ -248,18 +247,11 @@ export default function SettingPage() {
     }
   }
 
-  // Handle edit reward
-  const handleEditReward = (rewardKey, currentValue) => {
-    setEditingReward(rewardKey)
-    setTempRewardValue(currentValue.toString())
-  }
-
   // Handle save reward - FIXED
-  const handleSaveReward = async (rewardKey) => {
-    const newValue = parseInt(tempRewardValue)
+  const handleSaveReward = async (rewardKey, newValue) => {
     if (isNaN(newValue) || newValue < 0) {
       showTemporaryMessage("error", "Please enter a valid positive number")
-      return
+      return false
     }
     
     const updatedSettings = { ...rewardSettings, [rewardKey]: newValue }
@@ -269,17 +261,12 @@ export default function SettingPage() {
     
     if (saved) {
       setEditingReward(null)
-      setTempRewardValue("")
+      return true
     } else {
       // Revert on failure
       setRewardSettings(rewardSettings)
+      return false
     }
-  }
-
-  // Handle cancel edit
-  const handleCancelEdit = () => {
-    setEditingReward(null)
-    setTempRewardValue("")
   }
 
   // Get user role from localStorage
@@ -964,9 +951,47 @@ export default function SettingPage() {
     }
   }
 
-  // Reward Card Component
+  // Reward Card Component - FIXED VERSION (No focus loss)
   const RewardCard = ({ title, value, rewardKey, icon: Icon, color, description }) => {
     const isEditing = editingReward === rewardKey
+    const [localValue, setLocalValue] = useState(value.toString())
+    const inputRef = useRef(null)
+
+    // Focus input when editing starts
+    useEffect(() => {
+      if (isEditing && inputRef.current) {
+        setTimeout(() => {
+          inputRef.current?.focus()
+          inputRef.current?.select()
+        }, 50)
+      }
+    }, [isEditing])
+
+    const handleSave = async () => {
+      const newValue = parseInt(localValue)
+      if (isNaN(newValue) || newValue < 0) {
+        showTemporaryMessage("error", "Please enter a valid positive number")
+        return
+      }
+      const saved = await handleSaveReward(rewardKey, newValue)
+      if (!saved) {
+        setLocalValue(value.toString())
+      }
+    }
+
+    const handleCancel = () => {
+      setEditingReward(null)
+      setLocalValue(value.toString())
+    }
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Enter') {
+        handleSave()
+      }
+      if (e.key === 'Escape') {
+        handleCancel()
+      }
+    }
 
     return (
       <Card className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
@@ -984,26 +1009,28 @@ export default function SettingPage() {
                 {isEditing ? (
                   <div className="flex items-center gap-2 flex-wrap">
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">ZK</span>
-                      <Input
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">ZRK</span>
+                      <input
+                        ref={inputRef}
                         type="number"
-                        value={tempRewardValue}
-                        onChange={(e) => setTempRewardValue(e.target.value)}
-                        className="w-32 pl-8 h-9 text-lg font-bold"
+                        value={localValue}
+                        onChange={(e) => setLocalValue(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        className="w-32 pl-8 pr-2 py-2 border border-gray-300 rounded-md text-lg font-bold focus:outline-none focus:ring-2 focus:ring-teal-500"
                         min="0"
                         disabled={savingSettings}
                       />
                     </div>
                     <button
-                      onClick={() => handleSaveReward(rewardKey)}
+                      onClick={handleSave}
+                      disabled={savingSettings}
                       className="w-8 h-8 rounded-md bg-green-600 hover:bg-green-700 text-white flex items-center justify-center transition-colors"
                       title="Save"
-                      disabled={savingSettings}
                     >
                       {savingSettings ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                     </button>
                     <button
-                      onClick={handleCancelEdit}
+                      onClick={handleCancel}
                       className="w-8 h-8 rounded-md bg-gray-300 hover:bg-gray-400 text-gray-800 flex items-center justify-center transition-colors"
                       title="Cancel"
                     >
@@ -1013,9 +1040,12 @@ export default function SettingPage() {
                 ) : (
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-2xl sm:text-3xl font-bold text-gray-900">{value}</span>
-                    <span className="text-sm text-gray-400">ZK</span>
+                    <span className="text-sm text-gray-400">ZRK</span>
                     <button
-                      onClick={() => handleEditReward(rewardKey, value)}
+                      onClick={() => {
+                        setEditingReward(rewardKey)
+                        setLocalValue(value.toString())
+                      }}
                       className="w-7 h-7 rounded-md hover:bg-gray-100 text-gray-400 hover:text-teal-600 flex items-center justify-center transition-colors"
                       title="Edit Reward"
                     >
@@ -1064,7 +1094,6 @@ export default function SettingPage() {
             <h1 className="text-2xl font-semibold text-gray-900">Settings</h1>
             <p className="text-sm text-gray-500 mt-1">Manage your app rewards and configurations</p>
           </div>
-         
         </div>
 
         {/* Reward Settings Section */}
