@@ -1006,60 +1006,53 @@ export default function SettingPage() {
                 {description && (
                   <p className="text-xs text-gray-400 mb-2">{description}</p>
                 )}
-                {isEditing ? (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">ZRK</span>
-                      <input
-                        ref={inputRef}
-                        type="number"
-                        value={localValue}
-                        onChange={(e) => setLocalValue(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        className="w-32 pl-8 pr-2 py-2 border border-gray-300 rounded-md text-lg font-bold focus:outline-none focus:ring-2 focus:ring-teal-500"
-                        min="0"
-                        disabled={savingSettings}
-                      />
-                    </div>
-                    <button
-                      onClick={handleSave}
-                      disabled={savingSettings}
-                      className="w-8 h-8 rounded-md bg-green-600 hover:bg-green-700 text-white flex items-center justify-center transition-colors"
-                      title="Save"
-                    >
-                      {savingSettings ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    </button>
-                    <button
-                      onClick={handleCancel}
-                      className="w-8 h-8 rounded-md bg-gray-300 hover:bg-gray-400 text-gray-800 flex items-center justify-center transition-colors"
-                      title="Cancel"
-                    >
-                      <XCircle className="h-4 w-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-2xl sm:text-3xl font-bold text-gray-900">{value}</span>
-                    <span className="text-sm text-gray-400">ZRK</span>
-                    <button
-                      onClick={() => {
-                        setEditingReward(rewardKey)
-                        setLocalValue(value.toString())
-                      }}
-                      className="w-7 h-7 rounded-md hover:bg-gray-100 text-gray-400 hover:text-teal-600 flex items-center justify-center transition-colors"
-                      title="Edit Reward"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
+              {isEditing ? (
+  <div className="flex items-center gap-2 flex-wrap">
+    <div className="relative flex items-center">
+      <span className="absolute left-3 text-gray-500 text-sm z-10">ZK</span>
+      <input
+        ref={inputRef}
+        type="number"
+        value={localValue}
+        onChange={(e) => setLocalValue(e.target.value)}
+        onKeyDown={handleKeyDown}
+        className="pl-12 pr-3 py-2 w-36 border border-gray-300 rounded-md text-lg font-bold focus:outline-none focus:ring-2 focus:ring-teal-500"
+        min="0"
+        disabled={savingSettings}
+      />
+    </div>
+    <button
+      onClick={handleSave}
+      disabled={savingSettings}
+      className="w-8 h-8 rounded-md bg-green-600 hover:bg-green-700 text-white flex items-center justify-center transition-colors"
+      title="Save"
+    >
+      {savingSettings ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+    </button>
+    <button
+      onClick={handleCancel}
+      className="w-8 h-8 rounded-md bg-gray-300 hover:bg-gray-400 text-gray-800 flex items-center justify-center transition-colors"
+      title="Cancel"
+    >
+      <XCircle className="h-4 w-4" />
+    </button>
+  </div>
+) : (
+  <div className="flex items-center gap-2 flex-wrap">
+    <span className="text-2xl sm:text-3xl font-bold text-gray-900">{value}</span>
+    <span className="text-sm text-gray-400">ZK</span>
+    <button
+      onClick={() => {
+        setEditingReward(rewardKey)
+        setLocalValue(value.toString())
+      }}
+      className="w-7 h-7 rounded-md hover:bg-gray-100 text-gray-400 hover:text-teal-600 flex items-center justify-center transition-colors"
+      title="Edit Reward"
+    >
+      <Pencil className="h-3.5 w-3.5" />
+    </button>
+  </div>
+)}
 
   if (loading || usersLoading || settingsLoading) {
     return (
