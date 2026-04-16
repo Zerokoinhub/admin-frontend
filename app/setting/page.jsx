@@ -13,7 +13,7 @@ import {
   Shield,
   Eye,
   Edit,
-  GraduationCap
+  GraduationCap,
   Target,
   Bell,
   ChevronDown,
@@ -951,7 +951,7 @@ export default function SettingPage() {
     }
   }
 
-  // Reward Card Component - FIXED VERSION
+  // Reward Card Component - FIXED VERSION with ZRK
   const RewardCard = ({ title, value, rewardKey, icon: Icon, color, description }) => {
     const isEditing = editingReward === rewardKey
     const [localValue, setLocalValue] = useState(value.toString())
