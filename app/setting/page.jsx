@@ -13,7 +13,7 @@ import {
   Shield,
   Eye,
   Edit,
-  GraduationCap,
+  GraduationCap
   Target,
   Bell,
   ChevronDown,
@@ -1008,7 +1008,7 @@ export default function SettingPage() {
                 {isEditing ? (
                   <div className="flex items-center gap-2 flex-wrap">
                     <div className="flex items-center border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-teal-500">
-                      <span className="px-2 text-gray-500 text-sm border-r border-gray-200">ZK</span>
+                      <span className="px-2 text-gray-500 text-sm border-r border-gray-200">ZRK</span>
                       <input
                         ref={inputRef}
                         type="text"
@@ -1042,7 +1042,7 @@ export default function SettingPage() {
                 ) : (
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-2xl sm:text-3xl font-bold text-gray-900">{value}</span>
-                    <span className="text-sm text-gray-400">ZK</span>
+                    <span className="text-sm text-gray-400">ZRK</span>
                     <button
                       onClick={() => {
                         setEditingReward(rewardKey)
