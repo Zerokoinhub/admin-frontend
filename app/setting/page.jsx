@@ -1006,23 +1006,19 @@ export default function SettingPage() {
                 {description && (
                   <p className="text-xs text-gray-400 mb-2">{description}</p>
                 )}
-            {isEditing ? (
+
+                {isEditing ? (
   <div className="flex items-center gap-2 flex-wrap">
-    <div className="flex items-center border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-teal-500">
-      <span className="px-2 text-gray-500 text-sm border-r border-gray-200">ZK</span>
+    <div className="relative">
+      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm z-10">ZK</div>
       <input
         ref={inputRef}
-        type="text"
-        inputMode="numeric"
-        pattern="[0-9]*"
+        type="number"
         value={localValue}
-        onChange={(e) => {
-          // Only allow numbers
-          const value = e.target.value.replace(/[^0-9]/g, '');
-          setLocalValue(value);
-        }}
+        onChange={(e) => setLocalValue(e.target.value)}
         onKeyDown={handleKeyDown}
-        className="w-28 px-2 py-2 text-lg font-bold focus:outline-none rounded-r-md"
+        className="pl-12 pr-3 py-2 w-40 border border-gray-300 rounded-md text-lg font-bold focus:outline-none focus:ring-2 focus:ring-teal-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+        min="0"
         disabled={savingSettings}
       />
     </div>
