@@ -129,16 +129,6 @@ export default function SettingPage() {
     dateRange: "all",
   })
 
-  // Reward settings state
-  const [rewardSettings, setRewardSettings] = useState({
-    referralReward: 50,
-    learningReward: 2,
-    adBaseReward: 30,
-  })
-  const [editingReward, setEditingReward] = useState(null)
-  const [settingsLoading, setSettingsLoading] = useState(true)
-  const [savingSettings, setSavingSettings] = useState(false)
-
   // Settings specific state
   const [currentView, setCurrentView] = useState("main")
   const [showExpiryDropdown, setShowExpiryDropdown] = useState(false)
@@ -175,99 +165,6 @@ export default function SettingPage() {
 
   const [sentNotifications, setSentNotifications] = useState([])
   const [editingNotification, setEditingNotification] = useState(null)
-
-  // Load reward settings from App Backend API on mount
-  useEffect(() => {
-    loadSettingsFromAPI()
-  }, [])
-
-  // Load settings from App Backend API
-  const loadSettingsFromAPI = async () => {
-    setSettingsLoading(true)
-    try {
-      const result = await settingsAPI.getSettings()
-      
-      if (result.success && result.data && result.data.rewards) {
-        setRewardSettings({
-          referralReward: result.data.rewards.referralReward || 50,
-          learningReward: result.data.rewards.learningReward || 2,
-          adBaseReward: result.data.rewards.adBaseReward || 30,
-        })
-        console.log("✅ Settings loaded:", result.data.rewards)
-        
-      } else {
-        console.log("Using default settings")
-        showTemporaryMessage("warning", "Using default settings")
-      }
-    } catch (error) {
-      console.error("Failed to load settings:", error)
-      showTemporaryMessage("error", "Failed to load settings from server")
-    } finally {
-      setSettingsLoading(false)
-    }
-  }
-
-  // Show temporary message
-  const showTemporaryMessage = (type, text) => {
-    setMessage({ type, text })
-    setTimeout(() => setMessage({ type: "", text: "" }), 3000)
-  }
-
-  // Save reward settings to App Backend API - FIXED
-  const saveRewardSettingsToAPI = async (newSettings) => {
-    setSavingSettings(true)
-    try {
-      console.log("💾 Saving to backend:", newSettings)
-      
-      const result = await settingsAPI.updateSettings({ rewards: newSettings })
-      
-      if (result.success) {
-        showTemporaryMessage("success", `✅ Saved! Ad reward is now ${newSettings.adBaseReward} ZRK`)
-        
-        // Verify the save by fetching again
-        setTimeout(async () => {
-          const verifyResult = await settingsAPI.getSettings()
-          if (verifyResult.success && verifyResult.data?.rewards?.adBaseReward === newSettings.adBaseReward) {
-            console.log("✅ Verification passed!")
-          } else {
-            console.warn("⚠️ Verification failed - database may not have updated")
-          }
-        }, 1000)
-        
-        return true
-      } else {
-        throw new Error(result.error || "Failed to save")
-      }
-    } catch (error) {
-      console.error("❌ Save failed:", error)
-      showTemporaryMessage("error", `Failed to save: ${error.message}`)
-      return false
-    } finally {
-      setSavingSettings(false)
-    }
-  }
-
-  // Handle save reward - FIXED
-  const handleSaveReward = async (rewardKey, newValue) => {
-    if (isNaN(newValue) || newValue < 0) {
-      showTemporaryMessage("error", "Please enter a valid positive number")
-      return false
-    }
-    
-    const updatedSettings = { ...rewardSettings, [rewardKey]: newValue }
-    setRewardSettings(updatedSettings)
-    
-    const saved = await saveRewardSettingsToAPI(updatedSettings)
-    
-    if (saved) {
-      setEditingReward(null)
-      return true
-    } else {
-      // Revert on failure
-      setRewardSettings(rewardSettings)
-      return false
-    }
-  }
 
   // Get user role from localStorage
   useEffect(() => {
@@ -951,132 +848,20 @@ export default function SettingPage() {
     }
   }
 
-  // Reward Card Component - FIXED VERSION with ZRK
-  const RewardCard = ({ title, value, rewardKey, icon: Icon, color, description }) => {
-    const isEditing = editingReward === rewardKey
-    const [localValue, setLocalValue] = useState(value.toString())
-    const inputRef = useRef(null)
-
-    useEffect(() => {
-      if (isEditing && inputRef.current) {
-        setTimeout(() => {
-          inputRef.current?.focus()
-          inputRef.current?.select()
-        }, 50)
-      }
-    }, [isEditing])
-
-    const handleSave = async () => {
-      const newValue = parseInt(localValue)
-      if (isNaN(newValue) || newValue < 0) {
-        showTemporaryMessage("error", "Please enter a valid positive number")
-        return
-      }
-      const saved = await handleSaveReward(rewardKey, newValue)
-      if (!saved) {
-        setLocalValue(value.toString())
-      }
-    }
-
-    const handleCancel = () => {
-      setEditingReward(null)
-      setLocalValue(value.toString())
-    }
-
-    const handleKeyDown = (e) => {
-      if (e.key === 'Enter') {
-        handleSave()
-      }
-      if (e.key === 'Escape') {
-        handleCancel()
-      }
-    }
-
-    return (
-      <Card className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
-        <CardContent className="p-4 sm:p-6">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start space-x-3 sm:space-x-4">
-              <div className={`w-10 sm:w-12 h-10 sm:h-12 ${color} rounded-full flex items-center justify-center flex-shrink-0`}>
-                <Icon className="h-5 sm:h-6 w-5 sm:w-6 text-white" />
-              </div>
-              <div className="flex-1">
-                <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">{title}</p>
-                {description && (
-                  <p className="text-xs text-gray-400 mb-2">{description}</p>
-                )}
-                {isEditing ? (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <div className="flex items-center border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-teal-500">
-                      <span className="px-2 text-gray-500 text-sm border-r border-gray-200">ZRK</span>
-                      <input
-                        ref={inputRef}
-                        type="text"
-                        inputMode="numeric"
-                        value={localValue}
-                        onChange={(e) => {
-                          const value = e.target.value.replace(/[^0-9]/g, '');
-                          setLocalValue(value);
-                        }}
-                        onKeyDown={handleKeyDown}
-                        className="w-28 px-2 py-2 text-lg font-bold focus:outline-none rounded-r-md"
-                        disabled={savingSettings}
-                      />
-                    </div>
-                    <button
-                      onClick={handleSave}
-                      disabled={savingSettings}
-                      className="w-8 h-8 rounded-md bg-green-600 hover:bg-green-700 text-white flex items-center justify-center transition-colors"
-                      title="Save"
-                    >
-                      {savingSettings ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    </button>
-                    <button
-                      onClick={handleCancel}
-                      className="w-8 h-8 rounded-md bg-gray-300 hover:bg-gray-400 text-gray-800 flex items-center justify-center transition-colors"
-                      title="Cancel"
-                    >
-                      <XCircle className="h-4 w-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-2xl sm:text-3xl font-bold text-gray-900">{value}</span>
-                    <span className="text-sm text-gray-400">ZRK</span>
-                    <button
-                      onClick={() => {
-                        setEditingReward(rewardKey)
-                        setLocalValue(value.toString())
-                      }}
-                      className="w-7 h-7 rounded-md hover:bg-gray-100 text-gray-400 hover:text-teal-600 flex items-center justify-center transition-colors"
-                      title="Edit Reward"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (loading || usersLoading || settingsLoading) {
+  if (loading || usersLoading) {
     return (
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
         <div className="flex justify-center items-center h-64">
           <div className="text-center">
             <Loader2 className="w-8 h-8 animate-spin text-teal-600 mx-auto mb-2" />
-            <p className="text-gray-500">Loading settings from server...</p>
+            <p className="text-gray-500">Loading...</p>
           </div>
         </div>
       </div>
     )
   }
 
-  // Main Settings View with Reward Cards
+  // Main Settings View (without reward cards)
   if (currentView === "main") {
     return (
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
@@ -1094,42 +879,7 @@ export default function SettingPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <div>
             <h1 className="text-2xl font-semibold text-gray-900">Settings</h1>
-            <p className="text-sm text-gray-500 mt-1">Manage your app rewards and configurations</p>
-          </div>
-        </div>
-
-        {/* Reward Settings Section */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <DollarSign className="h-5 w-5 text-teal-600" />
-            <h2 className="text-lg font-semibold text-gray-900">Reward Settings</h2>
-          </div>
-         
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            <RewardCard
-              title="Referral Rewards"
-              value={rewardSettings.referralReward}
-              rewardKey="referralReward"
-              icon={Users}
-              color="bg-purple-500"
-              description="Reward for referring a new user"
-            />
-            <RewardCard
-              title="Learning Rewards"
-              value={rewardSettings.learningReward}
-              rewardKey="learningReward"
-              icon={GraduationCap}
-              color="bg-blue-500"
-              description="Reward per learning session"
-            />
-            <RewardCard
-              title="Ad Base Rewards"
-              value={rewardSettings.adBaseReward}
-              rewardKey="adBaseReward"
-              icon={Video}
-              color="bg-orange-500"
-              description="Reward for watching video ads"
-            />
+            <p className="text-sm text-gray-500 mt-1">Manage admin control and notifications</p>
           </div>
         </div>
 
