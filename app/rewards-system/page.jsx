@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -8,9 +8,64 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from "recharts"
-import { TrendingUp, BarChart3, Shield, X, Eye, EyeOff, Lock } from "lucide-react"
+import { TrendingUp, BarChart3, Shield, X, Eye, EyeOff, Lock, Users, GraduationCap, Video, Save, XCircle, Pencil, Loader2, DollarSign } from "lucide-react"
 import { useUsers } from "../../hooks/useUsers"
 import { userHelpers } from "@/lib/api"
+
+// API Service for Settings
+const settingsAPI = {
+  async getSettings() {
+    try {
+      const token = localStorage.getItem("token")
+      const APP_BACKEND_URL = "https://zerokoinapp-production.up.railway.app/api"
+      
+      const response = await fetch(`${APP_BACKEND_URL}/settings`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+      
+      const result = await response.json()
+      return result
+    } catch (error) {
+      console.error("Error fetching settings:", error)
+      return { success: false, error: error.message }
+    }
+  },
+
+  async updateSettings(settingsData) {
+    try {
+      const token = localStorage.getItem("token")
+      const APP_BACKEND_URL = "https://zerokoinapp-production.up.railway.app/api"
+      
+      const response = await fetch(`${APP_BACKEND_URL}/settings`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+        body: JSON.stringify(settingsData),
+      })
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+      
+      const result = await response.json()
+      return result
+    } catch (error) {
+      console.error("Error updating settings:", error)
+      return { success: false, error: error.message }
+    }
+  },
+}
 
 export default function RewardsSystemPage() {
   const [currentView, setCurrentView] = useState("distribution")
@@ -22,6 +77,198 @@ export default function RewardsSystemPage() {
     id: "",
   })
   const [roleDisplayName, setRoleDisplayName] = useState("")
+  
+  // Reward settings state
+  const [rewardSettings, setRewardSettings] = useState({
+    referralReward: 50,
+    learningReward: 2,
+    adBaseReward: 30,
+  })
+  const [editingReward, setEditingReward] = useState(null)
+  const [settingsLoading, setSettingsLoading] = useState(true)
+  const [savingSettings, setSavingSettings] = useState(false)
+  const [message, setMessage] = useState({ type: "", text: "" })
+
+  // Load reward settings from API
+  useEffect(() => {
+    loadSettingsFromAPI()
+  }, [])
+
+  const loadSettingsFromAPI = async () => {
+    setSettingsLoading(true)
+    try {
+      const result = await settingsAPI.getSettings()
+      
+      if (result.success && result.data && result.data.rewards) {
+        setRewardSettings({
+          referralReward: result.data.rewards.referralReward || 50,
+          learningReward: result.data.rewards.learningReward || 2,
+          adBaseReward: result.data.rewards.adBaseReward || 30,
+        })
+      }
+    } catch (error) {
+      console.error("Failed to load settings:", error)
+    } finally {
+      setSettingsLoading(false)
+    }
+  }
+
+  const showTemporaryMessage = (type, text) => {
+    setMessage({ type, text })
+    setTimeout(() => setMessage({ type: "", text: "" }), 3000)
+  }
+
+  const saveRewardSettingsToAPI = async (newSettings) => {
+    setSavingSettings(true)
+    try {
+      const result = await settingsAPI.updateSettings({ rewards: newSettings })
+      
+      if (result.success) {
+        showTemporaryMessage("success", `✅ Saved successfully!`)
+        return true
+      } else {
+        throw new Error(result.error || "Failed to save")
+      }
+    } catch (error) {
+      console.error("❌ Save failed:", error)
+      showTemporaryMessage("error", `Failed to save: ${error.message}`)
+      return false
+    } finally {
+      setSavingSettings(false)
+    }
+  }
+
+  const handleSaveReward = async (rewardKey, newValue) => {
+    if (isNaN(newValue) || newValue < 0) {
+      showTemporaryMessage("error", "Please enter a valid positive number")
+      return false
+    }
+    
+    const updatedSettings = { ...rewardSettings, [rewardKey]: newValue }
+    setRewardSettings(updatedSettings)
+    
+    const saved = await saveRewardSettingsToAPI(updatedSettings)
+    
+    if (saved) {
+      setEditingReward(null)
+      return true
+    } else {
+      setRewardSettings(rewardSettings)
+      return false
+    }
+  }
+
+  // Reward Card Component
+  const RewardCard = ({ title, value, rewardKey, icon: Icon, color, description }) => {
+    const isEditing = editingReward === rewardKey
+    const [localValue, setLocalValue] = useState(value.toString())
+    const inputRef = useRef(null)
+
+    useEffect(() => {
+      if (isEditing && inputRef.current) {
+        setTimeout(() => {
+          inputRef.current?.focus()
+          inputRef.current?.select()
+        }, 50)
+      }
+    }, [isEditing])
+
+    const handleSave = async () => {
+      const newValue = parseInt(localValue)
+      if (isNaN(newValue) || newValue < 0) {
+        showTemporaryMessage("error", "Please enter a valid positive number")
+        return
+      }
+      const saved = await handleSaveReward(rewardKey, newValue)
+      if (!saved) {
+        setLocalValue(value.toString())
+      }
+    }
+
+    const handleCancel = () => {
+      setEditingReward(null)
+      setLocalValue(value.toString())
+    }
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Enter') {
+        handleSave()
+      }
+      if (e.key === 'Escape') {
+        handleCancel()
+      }
+    }
+
+    return (
+      <Card className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start space-x-3 sm:space-x-4">
+              <div className={`w-10 sm:w-12 h-10 sm:h-12 ${color} rounded-full flex items-center justify-center flex-shrink-0`}>
+                <Icon className="h-5 sm:h-6 w-5 sm:w-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">{title}</p>
+                {description && (
+                  <p className="text-xs text-gray-400 mb-2">{description}</p>
+                )}
+                {isEditing ? (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-teal-500">
+                      <span className="px-2 text-gray-500 text-sm border-r border-gray-200">ZRK</span>
+                      <input
+                        ref={inputRef}
+                        type="text"
+                        inputMode="numeric"
+                        value={localValue}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9]/g, '');
+                          setLocalValue(value);
+                        }}
+                        onKeyDown={handleKeyDown}
+                        className="w-28 px-2 py-2 text-lg font-bold focus:outline-none rounded-r-md"
+                        disabled={savingSettings}
+                      />
+                    </div>
+                    <button
+                      onClick={handleSave}
+                      disabled={savingSettings}
+                      className="w-8 h-8 rounded-md bg-green-600 hover:bg-green-700 text-white flex items-center justify-center transition-colors"
+                      title="Save"
+                    >
+                      {savingSettings ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    </button>
+                    <button
+                      onClick={handleCancel}
+                      className="w-8 h-8 rounded-md bg-gray-300 hover:bg-gray-400 text-gray-800 flex items-center justify-center transition-colors"
+                      title="Cancel"
+                    >
+                      <XCircle className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-2xl sm:text-3xl font-bold text-gray-900">{value}</span>
+                    <span className="text-sm text-gray-400">ZRK</span>
+                    <button
+                      onClick={() => {
+                        setEditingReward(rewardKey)
+                        setLocalValue(value.toString())
+                      }}
+                      className="w-7 h-7 rounded-md hover:bg-gray-100 text-gray-400 hover:text-teal-600 flex items-center justify-center transition-colors"
+                      title="Edit Reward"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   // Get user data from localStorage
   const getUserData = () => {
@@ -68,9 +315,9 @@ export default function RewardsSystemPage() {
     const role = userData.role
     switch (role) {
       case "superadmin":
-        return ["view", "edit", "viewDetails", "viewProfile", "viewSensitiveData"].includes(action)
+        return ["view", "edit", "viewDetails", "viewProfile", "viewSensitiveData", "editRewards"].includes(action)
       case "editor":
-        return ["view", "viewDetails"].includes(action)
+        return ["view", "viewDetails", "editRewards"].includes(action)
       case "viewer":
         return ["view"].includes(action)
       default:
@@ -102,7 +349,6 @@ export default function RewardsSystemPage() {
       ]
     }
 
-    // Generate mock monthly data based on user creation dates
     const monthlyData = {}
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"]
 
@@ -203,7 +449,7 @@ export default function RewardsSystemPage() {
     )
   }
 
-  if (loading) {
+  if (loading || settingsLoading) {
     return (
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
         <div className="flex justify-center items-center h-64">
@@ -260,7 +506,6 @@ export default function RewardsSystemPage() {
 
     return (
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
-        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <div>
             <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">User Profile</h1>
@@ -279,7 +524,6 @@ export default function RewardsSystemPage() {
           </Button>
         </div>
 
-        {/* User Profile Card */}
         <div className="flex justify-center px-3 sm:px-0">
           <Card className="bg-white border border-gray-200 w-full max-w-md">
             <CardContent className="p-4 sm:p-6">
@@ -296,37 +540,20 @@ export default function RewardsSystemPage() {
               </div>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name" className="text-sm font-medium text-gray-700">
-                    Name
-                  </Label>
+                  <Label htmlFor="name" className="text-sm font-medium text-gray-700">Name</Label>
                   <Input id="name" value={user.name} className="border-gray-200 text-gray-900" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-sm font-medium text-gray-700">
-                    Email
-                  </Label>
+                  <Label htmlFor="email" className="text-sm font-medium text-gray-700">Email</Label>
                   <Input id="email" value={user.email} className="border-gray-200 text-gray-900" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="wallet" className="text-sm font-medium text-gray-700">
-                    Wallet Address
-                  </Label>
-                  <Input
-                    id="wallet"
-                    value={user.walletAddress}
-                    className="border-gray-200 text-gray-900 text-xs font-mono"
-                  />
+                  <Label htmlFor="wallet" className="text-sm font-medium text-gray-700">Wallet Address</Label>
+                  <Input id="wallet" value={user.walletAddress} className="border-gray-200 text-gray-900 text-xs font-mono" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="coins" className="text-sm font-medium text-gray-700">
-                    Coins Earned
-                  </Label>
-                  <Input
-                    id="coins"
-                    value={`${user.balance}$`}
-                    readOnly
-                    className="bg-gray-50 border-gray-200 text-gray-900"
-                  />
+                  <Label htmlFor="coins" className="text-sm font-medium text-gray-700">Coins Earned</Label>
+                  <Input id="coins" value={`${user.balance}$`} readOnly className="bg-gray-50 border-gray-200 text-gray-900" />
                 </div>
               </div>
             </CardContent>
@@ -361,7 +588,6 @@ export default function RewardsSystemPage() {
 
     return (
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
-        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <div>
             <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Referrals Log</h1>
@@ -379,7 +605,6 @@ export default function RewardsSystemPage() {
           </Button>
         </div>
 
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           <Card className="bg-white border border-gray-200">
             <CardContent className="p-4 sm:p-6">
@@ -427,7 +652,6 @@ export default function RewardsSystemPage() {
           </Card>
         </div>
 
-        {/* Referrals Log Table */}
         <Card className="bg-white border border-gray-200">
           <CardContent className="p-3 sm:p-6">
             <div className="overflow-x-auto">
@@ -435,9 +659,7 @@ export default function RewardsSystemPage() {
                 <TableHeader>
                   <TableRow className="border-b border-gray-200">
                     <TableHead className="font-semibold text-gray-700 py-4 px-3 sm:px-6 min-w-[100px]">Date</TableHead>
-                    <TableHead className="font-semibold text-gray-700 py-4 px-3 sm:px-6 min-w-[200px]">
-                      Referrals Email
-                    </TableHead>
+                    <TableHead className="font-semibold text-gray-700 py-4 px-3 sm:px-6 min-w-[200px]">Referrals Email</TableHead>
                     <TableHead className="font-semibold text-gray-700 py-4 px-3 sm:px-6 min-w-[120px]">UID</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -458,7 +680,7 @@ export default function RewardsSystemPage() {
     )
   }
 
-  // Main Distribution View (All Roles)
+  // Main Distribution View (All Roles) - WITH 3 REWARD CARDS
   return (
     <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
       {/* Header */}
@@ -488,6 +710,55 @@ export default function RewardsSystemPage() {
               View Log
             </Button>
           )}
+        </div>
+      </div>
+
+      {/* Success/Error Message */}
+      {message.text && (
+        <div className={`p-3 rounded-lg ${
+          message.type === "success" ? "bg-green-100 text-green-700 border border-green-300" : 
+          message.type === "error" ? "bg-red-100 text-red-700 border border-red-300" :
+          "bg-yellow-100 text-yellow-700 border border-yellow-300"
+        }`}>
+          {message.text}
+        </div>
+      )}
+
+      {/* REWARD CARDS SECTION - 3 CARDS */}
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <DollarSign className="h-5 w-5 text-teal-600" />
+          <h2 className="text-lg font-semibold text-gray-900">Reward Settings</h2>
+          {!hasPermission("editRewards") && (
+            <span className="text-xs text-gray-400 ml-2">(View Only)</span>
+          )}
+        </div>
+       
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          <RewardCard
+            title="Referral Rewards"
+            value={rewardSettings.referralReward}
+            rewardKey="referralReward"
+            icon={Users}
+            color="bg-purple-500"
+            description="Reward for referring a new user"
+          />
+          <RewardCard
+            title="Learning Rewards"
+            value={rewardSettings.learningReward}
+            rewardKey="learningReward"
+            icon={GraduationCap}
+            color="bg-blue-500"
+            description="Reward per learning session"
+          />
+          <RewardCard
+            title="Ad Base Rewards"
+            value={rewardSettings.adBaseReward}
+            rewardKey="adBaseReward"
+            icon={Video}
+            color="bg-orange-500"
+            description="Reward for watching video ads"
+          />
         </div>
       </div>
 
