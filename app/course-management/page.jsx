@@ -275,7 +275,7 @@ export default function CourseManagementPage() {
       console.log("Delete response:", data);
 
       if (response.ok && data.success) {
-        setCourses(prev => prev.filter(course => course._id !== courseId));
+        setCourses(prev => prev.filter(course => course.id !== courseId));
         return { success: true };
       } else {
         throw new Error(data.message || "Failed to delete course");
@@ -635,7 +635,7 @@ export default function CourseManagementPage() {
                     const languages = course?.languages ? Object.keys(course.languages) : [];
                     
                     return (
-                      <TableRow key={course._id}>
+                      <TableRow key={course.id}>
                         <TableCell className="font-medium">{courseName}</TableCell>
                         <TableCell>
                           <div className="flex gap-1 flex-wrap">
