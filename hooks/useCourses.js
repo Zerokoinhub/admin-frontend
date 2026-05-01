@@ -8,9 +8,8 @@ import {
   hasPermission,
   getRoleDisplayName,
   getPermissionsList,
-  makeAuthenticatedRequest,
-  debugAuthState,
   getAuthHeaders,
+  debugAuthState,
 } from "@/lib/auth";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://zerokoinapp-production.up.railway.app/api";
@@ -20,7 +19,6 @@ export const useCourses = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Fetch all courses
   const fetchCourses = useCallback(async () => {
     try {
       setLoading(true);
@@ -35,14 +33,11 @@ export const useCourses = () => {
 
       const currentUser = getCurrentUser();
       console.log("Fetching courses for user:", currentUser?.email);
-      console.log("API URL:", `${API_BASE_URL}/courses`);
 
       const response = await fetch(`${API_BASE_URL}/courses`, {
         method: "GET",
         headers: getAuthHeaders(),
       });
-
-      console.log("Response status:", response.status);
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -51,7 +46,6 @@ export const useCourses = () => {
       const data = await response.json();
       console.log("Courses API response:", data);
 
-      // Parse different response formats
       let coursesArray = [];
       
       if (data && data.success) {
@@ -59,8 +53,6 @@ export const useCourses = () => {
           coursesArray = data.courses;
         } else if (data.data && Array.isArray(data.data)) {
           coursesArray = data.data;
-        } else if (data.data && data.data.courses && Array.isArray(data.data.courses)) {
-          coursesArray = data.data.courses;
         }
       } else if (Array.isArray(data)) {
         coursesArray = data;
@@ -78,14 +70,11 @@ export const useCourses = () => {
     }
   }, []);
 
-  // Create a new course
   const createCourse = async (courseData) => {
     try {
       if (!isAuthenticated()) {
-        throw new Error("User not authenticated. Please log in again.");
+        throw new Error("User not authenticated");
       }
-
-      console.log("Creating course:", courseData);
 
       const response = await fetch(`${API_BASE_URL}/courses`, {
         method: "POST",
@@ -94,7 +83,6 @@ export const useCourses = () => {
       });
 
       const data = await response.json();
-      console.log("Create response:", data);
 
       if (response.ok && data.success) {
         await fetchCourses();
@@ -108,14 +96,11 @@ export const useCourses = () => {
     }
   };
 
-  // Update a course
   const updateCourse = async (courseId, courseData) => {
     try {
       if (!isAuthenticated()) {
-        throw new Error("User not authenticated. Please log in again.");
+        throw new Error("User not authenticated");
       }
-
-      console.log("Updating course:", courseId);
 
       const response = await fetch(`${API_BASE_URL}/courses/${courseId}`, {
         method: "PUT",
@@ -124,7 +109,6 @@ export const useCourses = () => {
       });
 
       const data = await response.json();
-      console.log("Update response:", data);
 
       if (response.ok && data.success) {
         await fetchCourses();
@@ -138,11 +122,10 @@ export const useCourses = () => {
     }
   };
 
-  // Delete a course
   const deleteCourse = async (courseId) => {
     try {
       if (!isAuthenticated()) {
-        throw new Error("User not authenticated. Please log in again.");
+        throw new Error("User not authenticated");
       }
 
       const response = await fetch(`${API_BASE_URL}/courses/${courseId}`, {
@@ -151,7 +134,6 @@ export const useCourses = () => {
       });
 
       const data = await response.json();
-      console.log("Delete response:", data);
 
       if (response.ok && data.success) {
         setCourses(prev => prev.filter(course => course._id !== courseId));
@@ -165,7 +147,6 @@ export const useCourses = () => {
     }
   };
 
-  // Initial fetch
   useEffect(() => {
     console.log("useCourses hook initialized");
     debugAuthState();
