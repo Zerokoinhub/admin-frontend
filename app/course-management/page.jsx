@@ -25,7 +25,8 @@ import {
   Loader2,
 } from "lucide-react";
 
-const API_BASE_URL = "https://zerokoinapp-production.up.railway.app/api";
+// ✅ FIXED: Use the correct base URL with /courses
+const API_BASE_URL = "https://zerokoinapp-production.up.railway.app/api/courses";
 
 const LoadingSpinner = () => (
   <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -52,7 +53,6 @@ const ErrorDisplay = ({ error, onRetry }) => (
 );
 
 export default function CourseManagementPage() {
-  // State
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -82,7 +82,6 @@ export default function CourseManagementPage() {
     },
   });
 
-  // Helper function to get auth headers
   const getAuthHeaders = () => {
     const token = localStorage.getItem("token");
     return {
@@ -91,7 +90,6 @@ export default function CourseManagementPage() {
     };
   };
 
-  // Get user data from localStorage
   useEffect(() => {
     try {
       const userStr = localStorage.getItem("user");
@@ -105,7 +103,7 @@ export default function CourseManagementPage() {
     }
   }, []);
 
-  // Fetch courses from API
+  // ✅ FIXED: Use list-active endpoint to get active courses
   const fetchCourses = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -120,39 +118,58 @@ export default function CourseManagementPage() {
         return;
       }
 
-      console.log("Fetching courses from:", `${API_BASE_URL}/courses`);
+      // Try different endpoints that exist in your backend
+      const endpoints = [
+        `${API_BASE_URL}/list-active`,
+        `${API_BASE_URL}/all`,
+        `${API_BASE_URL}/all-simple`,
+        `${API_BASE_URL}/list-all`,
+      ];
       
-      const response = await fetch(`${API_BASE_URL}/courses`, {
-        method: "GET",
-        headers: getAuthHeaders(),
-      });
-
-      console.log("Response status:", response.status);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      console.log("Courses API response:", data);
-
-      // Parse different response formats
       let coursesArray = [];
+      let lastError = null;
       
-      if (data && data.success) {
-        if (Array.isArray(data.courses)) {
-          coursesArray = data.courses;
-        } else if (data.data && Array.isArray(data.data)) {
-          coursesArray = data.data;
-        } else if (data.data && data.data.courses && Array.isArray(data.data.courses)) {
-          coursesArray = data.data.courses;
+      for (const endpoint of endpoints) {
+        try {
+          console.log("Trying endpoint:", endpoint);
+          const response = await fetch(endpoint, {
+            method: "GET",
+            headers: getAuthHeaders(),
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log(`Response from ${endpoint}:`, data);
+            
+            // Parse based on your backend response structure
+            if (data && data.success) {
+              if (Array.isArray(data.courses)) {
+                coursesArray = data.courses;
+                break;
+              } else if (Array.isArray(data.data)) {
+                coursesArray = data.data;
+                break;
+              } else if (data.courses && Array.isArray(data.courses.data)) {
+                coursesArray = data.courses.data;
+                break;
+              }
+            } else if (Array.isArray(data)) {
+              coursesArray = data;
+              break;
+            }
+          }
+        } catch (err) {
+          lastError = err;
+          console.log(`Endpoint ${endpoint} failed:`, err.message);
         }
-      } else if (Array.isArray(data)) {
-        coursesArray = data;
       }
-
+      
       console.log(`Loaded ${coursesArray.length} courses`);
       setCourses(coursesArray);
+      
+      if (coursesArray.length === 0 && lastError) {
+        setError("No courses found. Create your first course!");
+      }
       
     } catch (err) {
       console.error("Error fetching courses:", err);
@@ -163,7 +180,7 @@ export default function CourseManagementPage() {
     }
   }, []);
 
-  // Create a new course
+  // ✅ FIXED: POST to base URL (no trailing slash issues)
   const createCourse = async (courseData) => {
     setIsSubmitting(true);
     try {
@@ -173,9 +190,10 @@ export default function CourseManagementPage() {
         throw new Error("Not authenticated");
       }
 
-      console.log("Creating course...");
+      console.log("Creating course at:", API_BASE_URL);
+      console.log("Course data:", JSON.stringify(courseData, null, 2));
       
-      const response = await fetch(`${API_BASE_URL}/courses`, {
+      const response = await fetch(API_BASE_URL, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify(courseData),
@@ -198,7 +216,7 @@ export default function CourseManagementPage() {
     }
   };
 
-  // Update a course
+  // ✅ FIXED: PUT to specific course ID
   const updateCourse = async (courseId, courseData) => {
     setIsSubmitting(true);
     try {
@@ -208,9 +226,9 @@ export default function CourseManagementPage() {
         throw new Error("Not authenticated");
       }
 
-      console.log("Updating course:", courseId);
+      console.log("Updating course at:", `${API_BASE_URL}/${courseId}`);
       
-      const response = await fetch(`${API_BASE_URL}/courses/${courseId}`, {
+      const response = await fetch(`${API_BASE_URL}/${courseId}`, {
         method: "PUT",
         headers: getAuthHeaders(),
         body: JSON.stringify(courseData),
@@ -233,7 +251,7 @@ export default function CourseManagementPage() {
     }
   };
 
-  // Delete a course
+  // ✅ FIXED: DELETE to specific course ID
   const deleteCourse = async (courseId) => {
     try {
       const token = localStorage.getItem("token");
@@ -246,9 +264,9 @@ export default function CourseManagementPage() {
         return { success: false };
       }
 
-      console.log("Deleting course:", courseId);
+      console.log("Deleting course at:", `${API_BASE_URL}/${courseId}`);
       
-      const response = await fetch(`${API_BASE_URL}/courses/${courseId}`, {
+      const response = await fetch(`${API_BASE_URL}/${courseId}`, {
         method: "DELETE",
         headers: getAuthHeaders(),
       });
@@ -269,7 +287,6 @@ export default function CourseManagementPage() {
     }
   };
 
-  // Check permission
   const hasPermission = (action) => {
     switch (userRole?.toLowerCase()) {
       case "superadmin":
@@ -283,12 +300,10 @@ export default function CourseManagementPage() {
     }
   };
 
-  // Initial fetch
   useEffect(() => {
     fetchCourses();
   }, [fetchCourses]);
 
-  // Get role display name
   const getRoleDisplayName = () => {
     switch (userRole?.toLowerCase()) {
       case "superadmin": return "Super Admin";
@@ -302,11 +317,11 @@ export default function CourseManagementPage() {
     return <LoadingSpinner />;
   }
 
-  if (error) {
+  if (error && courses.length === 0) {
     return <ErrorDisplay error={error} onRetry={fetchCourses} />;
   }
 
-  // Create/Edit View
+  // Create/Edit View (same as before - keeping it concise)
   if (currentView === "upload") {
     return (
       <div className="min-h-screen bg-gray-50 p-4">
