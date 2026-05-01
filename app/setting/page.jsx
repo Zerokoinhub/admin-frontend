@@ -1069,4 +1069,732 @@ export default function SettingPage() {
               {showExpiryDropdown && (
                 <div className="absolute right-0 mt-1 w-24 bg-white border border-gray-200 rounded shadow-lg z-10">
                   <div className="py-1">
-                    {["1 Day
+                    {["1 Day", "2 Day", "3 Day", "4 Day", "5 Day"].map((option) => (
+                      <button
+                        key={option}
+                        onClick={() => {
+                          setSelectedExpiry(option.split(" ")[0] + ":00")
+                          setShowExpiryDropdown(false)
+                        }}
+                        className="block w-full text-left px-2 py-1 text-xs text-gray-700 hover:bg-gray-100"
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Navigation Buttons */}
+        <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 pt-4 sm:pt-8">
+          <Button
+            onClick={handleViewControl}
+            className="bg-teal-600 hover:bg-teal-700 text-white px-4 sm:px-6 py-2 rounded-md text-sm font-medium w-full sm:w-auto"
+          >
+            View Admin Control
+          </Button>
+          {(userRole === "superadmin" || userRole === "editor") && (
+            <Button
+              onClick={handleNotificationSettings}
+              className="bg-teal-600 hover:bg-teal-700 text-white px-4 sm:px-6 py-2 rounded-md text-sm font-medium w-full sm:w-auto"
+            >
+              Notification Settings
+            </Button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // Admin Control View
+  if (currentView === "control") {
+    return (
+      <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex items-center gap-3">
+            <Button onClick={() => setCurrentView("main")} variant="outline" size="sm" className="flex items-center gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              Back to Settings
+            </Button>
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Admin Control</h1>
+          </div>
+          {userRole === "superadmin" && (
+            <Button onClick={handleAddNewAdmin} className="bg-teal-600 hover:bg-teal-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium w-full sm:w-auto">
+              Add New Admin
+            </Button>
+          )}
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          <Card className="bg-white border border-gray-200">
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex items-center space-x-3 sm:space-x-4">
+                <div className="w-10 sm:w-12 h-10 sm:h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <GraduationCap className="h-5 sm:h-6 w-5 sm:w-6 text-blue-600" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Learning Rewards Given</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
+                    {userRole === "superadmin" ? stats.learningRewards : "***"}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-white border border-gray-200">
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex items-center space-x-3 sm:space-x-4">
+                <div className="w-10 sm:w-12 h-10 sm:h-12 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Users className="h-5 sm:h-6 w-5 sm:w-6 text-purple-600" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Referrals Rewards Given</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.referralsRewards}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-white border border-gray-200 sm:col-span-2 lg:col-span-1">
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex items-center space-x-3 sm:space-x-4">
+                <div className="w-10 sm:w-12 h-10 sm:h-12 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Video className="h-5 sm:h-6 w-5 sm:w-6 text-orange-600" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Ad Base Rewards Given</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
+                    {userRole === "superadmin" ? stats.adBaseRewards : "***"}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Admin Access Table */}
+        <Card className="bg-white border border-gray-200">
+          <CardContent className="p-3 sm:p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Admin Access Table</h3>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-b border-gray-200">
+                    <TableHead className="font-semibold text-gray-700 py-3 min-w-[200px]">Admin Email</TableHead>
+                    <TableHead className="font-semibold text-gray-700 py-3 min-w-[120px]">Role</TableHead>
+                    {userRole === "superadmin" && (
+                      <TableHead className="font-semibold text-gray-700 py-3 min-w-[160px]">Action</TableHead>
+                    )}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {adminsLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={userRole === "superadmin" ? 3 : 2} className="text-center py-8">
+                        <div className="flex justify-center">
+                          <Loader2 className="w-6 h-6 animate-spin text-teal-600" />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : adminsError ? (
+                    <TableRow>
+                      <TableCell colSpan={userRole === "superadmin" ? 3 : 2} className="text-center py-8 text-red-600">
+                        Error loading admins: {adminsError}
+                      </TableCell>
+                    </TableRow>
+                  ) : admins.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={userRole === "superadmin" ? 3 : 2} className="text-center py-8 text-gray-500">
+                        No admins found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    admins.map((admin) => (
+                      <TableRow key={admin._id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <TableCell className="py-3 text-gray-900 text-sm">{admin.email}</TableCell>
+                        <TableCell className="py-3 text-gray-900 text-sm">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            admin.role === "superadmin" ? "bg-purple-100 text-purple-800" :
+                            admin.role === "editor" ? "bg-blue-100 text-blue-800" :
+                            admin.role === "viewer" ? "bg-green-100 text-green-800" :
+                            "bg-gray-100 text-gray-800"
+                          }`}>
+                            {admin.role === "superadmin" ? "Super Admin" :
+                             admin.role === "editor" ? "Editor" :
+                             admin.role === "viewer" ? "Viewer" : admin.role}
+                          </span>
+                        </TableCell>
+                        {userRole === "superadmin" && (
+                          <TableCell className="py-3">
+                            <div className="flex flex-col sm:flex-row gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => handleRemoveAdmin(admin._id)}
+                                className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 text-xs flex items-center gap-1 justify-center"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                                <span className="hidden sm:inline">Remove</span>
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => handleEditAdmin(admin)}
+                                className="bg-teal-600 hover:bg-teal-700 text-white px-2 py-1 text-xs flex items-center gap-1 justify-center"
+                              >
+                                <Edit3 className="h-3 w-3" />
+                                <span className="hidden sm:inline">Edit</span>
+                              </Button>
+                            </div>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Add Admin Modal */}
+        <Dialog open={showAddAdminModal} onOpenChange={setShowAddAdminModal}>
+          <DialogContent className="sm:max-w-md bg-white">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-semibold text-gray-900">Add New Admin</h2>
+                <Button variant="ghost" size="sm" onClick={() => setShowAddAdminModal(false)} className="h-6 w-6 p-0">
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="add-name" className="text-sm font-medium text-gray-700">Username *</Label>
+                  <Input
+                    id="add-name"
+                    value={adminFormData.username}
+                    onChange={(e) => setAdminFormData({ ...adminFormData, username: e.target.value })}
+                    className="border-gray-200"
+                    placeholder="Enter admin username"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="add-email" className="text-sm font-medium text-gray-700">Email *</Label>
+                  <Input
+                    id="add-email"
+                    type="email"
+                    value={adminFormData.email}
+                    onChange={(e) => setAdminFormData({ ...adminFormData, email: e.target.value })}
+                    className="border-gray-200"
+                    placeholder="Enter admin email"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="add-role" className="text-sm font-medium text-gray-700">Role *</Label>
+                  <Select
+                    value={adminFormData.role}
+                    onValueChange={(value) => setAdminFormData({ ...adminFormData, role: value })}
+                  >
+                    <SelectTrigger className="border-gray-200">
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="superadmin">Super Admin</SelectItem>
+                      <SelectItem value="editor">Editor</SelectItem>
+                      <SelectItem value="viewer">Viewer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="add-password" className="text-sm font-medium text-gray-700">Password *</Label>
+                  <Input
+                    id="add-password"
+                    type="password"
+                    value={adminFormData.password}
+                    onChange={(e) => setAdminFormData({ ...adminFormData, password: e.target.value })}
+                    className="border-gray-200"
+                    placeholder="Enter password"
+                  />
+                </div>
+                <div className="flex justify-end gap-3 pt-4">
+                  <Button variant="outline" onClick={() => setShowAddAdminModal(false)}>Cancel</Button>
+                  <Button onClick={handleAddAdminSubmit} className="bg-teal-600 hover:bg-teal-700 text-white">Add Admin</Button>
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Admin Modal */}
+        <Dialog open={showEditAdminModal} onOpenChange={setShowEditAdminModal}>
+          <DialogContent className="sm:max-w-md bg-white">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-semibold text-gray-900">Edit Admin</h2>
+                <Button variant="ghost" size="sm" onClick={() => setShowEditAdminModal(false)} className="h-6 w-6 p-0">
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-name">Username *</Label>
+                  <Input
+                    id="edit-name"
+                    value={adminFormData.username}
+                    onChange={(e) => setAdminFormData({ ...adminFormData, username: e.target.value })}
+                    disabled={userRole !== "superadmin"}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-email">Email *</Label>
+                  <Input
+                    id="edit-email"
+                    type="email"
+                    value={adminFormData.email}
+                    onChange={(e) => setAdminFormData({ ...adminFormData, email: e.target.value })}
+                    disabled={userRole !== "superadmin"}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-role">Role *</Label>
+                  <Select
+                    value={adminFormData.role}
+                    onValueChange={(value) => setAdminFormData({ ...adminFormData, role: value })}
+                    disabled={userRole !== "superadmin"}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="superadmin">Super Admin</SelectItem>
+                      <SelectItem value="editor">Editor</SelectItem>
+                      <SelectItem value="viewer">Viewer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex justify-end gap-3 pt-4">
+                  <Button variant="outline" onClick={() => setShowEditAdminModal(false)}>Cancel</Button>
+                  {userRole === "superadmin" && (
+                    <Button onClick={handleEditAdminSubmit} className="bg-teal-600 hover:bg-teal-700 text-white">Update Admin</Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    )
+  }
+
+  // Notification List View
+  if (currentView === "notifications" && notificationView === "list") {
+    return (
+      <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex items-center gap-3">
+            <Button onClick={() => setCurrentView("main")} variant="outline" size="sm" className="flex items-center gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              Back to Settings
+            </Button>
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Notification Settings</h1>
+          </div>
+          {(userRole === "superadmin" || userRole === "editor") && (
+            <Button onClick={handleCreateNotification} className="bg-teal-600 hover:bg-teal-700 text-white">
+              Create Notification
+            </Button>
+          )}
+        </div>
+
+        {sentNotifications.length === 0 ? (
+          <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6">
+            <div className="w-24 sm:w-32 h-24 sm:h-32 bg-teal-100 rounded-full flex items-center justify-center">
+              <Bell className="h-12 sm:h-16 w-12 sm:w-16 text-teal-600" />
+            </div>
+            <div className="text-center space-y-2">
+              <h2 className="text-lg sm:text-xl font-medium text-gray-900">No Notifications Yet!</h2>
+              <p className="text-gray-600">Click "Create Notification" to get started.</p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {sentNotifications.map((notification) => (
+              <Card key={notification.id} className="bg-white border border-gray-200">
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-start mb-3">
+                    <h3 className="font-semibold text-gray-900 line-clamp-1">{notification.title}</h3>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ml-2 ${
+                      notification.priority === "new-user" ? "bg-green-100 text-green-800" :
+                      notification.priority === "top-rated-user" ? "bg-purple-100 text-purple-800" :
+                      "bg-blue-100 text-blue-800"
+                    }`}>
+                      {notification.sentTo}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-3 line-clamp-2">{notification.description}</p>
+                  <p className="text-xs text-gray-400">{new Date(notification.timestamp).toLocaleDateString()}</p>
+                  {(userRole === "superadmin" || userRole === "editor") && (
+                    <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+                      <Button size="sm" variant="outline" onClick={() => handleEditNotification(notification)} className="flex-1">
+                        <Edit3 className="h-3 w-3 mr-1" /> Edit
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => handleDeleteNotification(notification.id)} className="flex-1 text-red-600 hover:text-red-700">
+                        <Trash2 className="h-3 w-3 mr-1" /> Delete
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Create Notification View
+  if (currentView === "notifications" && notificationView === "create") {
+    return (
+      <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
+        <div className="flex items-center gap-3 mb-6">
+          <Button onClick={() => setNotificationView("list")} variant="outline" size="sm" className="flex items-center gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Button>
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Create Notification</h1>
+        </div>
+
+        <Card className="bg-white border border-gray-200 max-w-2xl mx-auto">
+          <CardContent className="p-6">
+            <div className="space-y-6">
+              {/* Send To Selection */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700">Send To *</Label>
+                <div className="relative">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowSendToDropdown(!showSendToDropdown)}
+                    className="w-full justify-between border-gray-200"
+                  >
+                    {selectedSendTo}
+                    <ChevronDown className="h-4 w-4 ml-2" />
+                  </Button>
+                  {showSendToDropdown && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10">
+                      {["Send to", "New User", "Old User", "Top rated user"].map((option) => (
+                        <button
+                          key={option}
+                          onClick={() => {
+                            setSelectedSendTo(option)
+                            setShowSendToDropdown(false)
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Title */}
+              <div className="space-y-2">
+                <Label htmlFor="title" className="text-sm font-medium text-gray-700">Title *</Label>
+                <Input
+                  id="title"
+                  value={notificationData.title}
+                  onChange={(e) => setNotificationData({ ...notificationData, title: e.target.value })}
+                  placeholder="Enter notification title"
+                  className="border-gray-200"
+                />
+              </div>
+
+              {/* Description */}
+              <div className="space-y-2">
+                <Label htmlFor="description" className="text-sm font-medium text-gray-700">Description *</Label>
+                <textarea
+                  id="description"
+                  value={notificationData.description}
+                  onChange={(e) => setNotificationData({ ...notificationData, description: e.target.value })}
+                  placeholder="Enter notification description"
+                  className="w-full min-h-[120px] px-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+
+              {/* Link */}
+              <div className="space-y-2">
+                <Label htmlFor="link" className="text-sm font-medium text-gray-700">Link (Optional)</Label>
+                <Input
+                  id="link"
+                  value={notificationData.link}
+                  onChange={(e) => setNotificationData({ ...notificationData, link: e.target.value })}
+                  placeholder="https://example.com"
+                  className="border-gray-200"
+                />
+              </div>
+
+              {/* Image Upload */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700">Image (Optional)</Label>
+                <div className="flex items-center gap-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleUploadClick}
+                    className="border-gray-200"
+                    disabled={isUploading}
+                  >
+                    {isUploading ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <Upload className="h-4 w-4 mr-2" />
+                    )}
+                    Upload Image
+                  </Button>
+                  <input
+                    id="image-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                  {uploadedImage && (
+                    <div className="relative w-12 h-12">
+                      <img
+                        src={uploadedImage}
+                        alt="Preview"
+                        className="w-full h-full object-cover rounded-md"
+                      />
+                      <button
+                        onClick={() => {
+                          setUploadedImage(null)
+                          setUploadedImageFile(null)
+                        }}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Preview Section */}
+              {(notificationData.title || notificationData.description || uploadedImage) && (
+                <div className="border-t border-gray-200 pt-4">
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">Preview</h3>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    {uploadedImage && (
+                      <div className="relative w-full h-32 mb-3">
+                        <img
+                          src={uploadedImage}
+                          alt="Preview"
+                          className="w-full h-full object-cover rounded-lg"
+                        />
+                      </div>
+                    )}
+                    <p className="text-xs text-gray-500 mb-1">To: {selectedSendTo !== "Send to" ? selectedSendTo : "Not selected"}</p>
+                    <h4 className="font-semibold text-gray-900">{notificationData.title || "Title will appear here"}</h4>
+                    <p className="text-sm text-gray-600 mt-1">{notificationData.description || "Description will appear here"}</p>
+                    {notificationData.link && (
+                      <a href="#" className="text-teal-600 text-sm mt-2 inline-flex items-center gap-1">
+                        View Link <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-4">
+                <Button variant="outline" onClick={() => setNotificationView("list")}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSendNotification}
+                  disabled={isSending || selectedSendTo === "Send to" || !notificationData.title || !notificationData.description}
+                  className="bg-teal-600 hover:bg-teal-700 text-white"
+                >
+                  {isSending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Sending...
+                    </>
+                  ) : (
+                    'Send Notification'
+                  )}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Success Modal */}
+        {showSuccessModal && (
+          <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/50">
+            <Card className="bg-white max-w-md mx-4">
+              <CardContent className="p-6 text-center">
+                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Notification Sent!</h3>
+                <p className="text-gray-600">Your notification has been sent successfully.</p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Edit Notification View
+  if (currentView === "notifications" && notificationView === "edit") {
+    return (
+      <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
+        <div className="flex items-center gap-3 mb-6">
+          <Button onClick={() => setNotificationView("list")} variant="outline" size="sm" className="flex items-center gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Button>
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Edit Notification</h1>
+        </div>
+
+        <Card className="bg-white border border-gray-200 max-w-2xl mx-auto">
+          <CardContent className="p-6">
+            <div className="space-y-6">
+              {/* Send To Selection */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700">Send To *</Label>
+                <div className="relative">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowSendToDropdown(!showSendToDropdown)}
+                    className="w-full justify-between border-gray-200"
+                  >
+                    {selectedSendTo}
+                    <ChevronDown className="h-4 w-4 ml-2" />
+                  </Button>
+                  {showSendToDropdown && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10">
+                      {["New User", "Old User", "Top rated user"].map((option) => (
+                        <button
+                          key={option}
+                          onClick={() => {
+                            setSelectedSendTo(option)
+                            setShowSendToDropdown(false)
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Title */}
+              <div className="space-y-2">
+                <Label htmlFor="edit-title" className="text-sm font-medium text-gray-700">Title *</Label>
+                <Input
+                  id="edit-title"
+                  value={notificationData.title}
+                  onChange={(e) => setNotificationData({ ...notificationData, title: e.target.value })}
+                  className="border-gray-200"
+                />
+              </div>
+
+              {/* Description */}
+              <div className="space-y-2">
+                <Label htmlFor="edit-description" className="text-sm font-medium text-gray-700">Description *</Label>
+                <textarea
+                  id="edit-description"
+                  value={notificationData.description}
+                  onChange={(e) => setNotificationData({ ...notificationData, description: e.target.value })}
+                  className="w-full min-h-[120px] px-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+
+              {/* Link */}
+              <div className="space-y-2">
+                <Label htmlFor="edit-link" className="text-sm font-medium text-gray-700">Link (Optional)</Label>
+                <Input
+                  id="edit-link"
+                  value={notificationData.link}
+                  onChange={(e) => setNotificationData({ ...notificationData, link: e.target.value })}
+                  className="border-gray-200"
+                />
+              </div>
+
+              {/* Image Upload */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700">Image (Optional)</Label>
+                <div className="flex items-center gap-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleUploadClick}
+                    className="border-gray-200"
+                    disabled={isUploading}
+                  >
+                    {isUploading ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <Upload className="h-4 w-4 mr-2" />
+                    )}
+                    {uploadedImage ? "Change Image" : "Upload Image"}
+                  </Button>
+                  <input
+                    id="image-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+                  {uploadedImage && (
+                    <div className="relative w-12 h-12">
+                      <img
+                        src={uploadedImage}
+                        alt="Preview"
+                        className="w-full h-full object-cover rounded-md"
+                      />
+                      <button
+                        onClick={() => {
+                          setUploadedImage(null)
+                          setUploadedImageFile(null)
+                        }}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-4">
+                <Button variant="outline" onClick={() => setNotificationView("list")}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleUpdateNotification}
+                  className="bg-teal-600 hover:bg-teal-700 text-white"
+                >
+                  Update Notification
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  return null
+}
