@@ -546,7 +546,7 @@ export default function CourseManagementPage() {
                   
                   let result;
                   if (isEditing && selectedCourse) {
-                    result = await updateCourse(selectedCourse._id, payload);
+                    result = await updateCourse(selectedCourse.id, payload);
                   } else {
                     result = await createCourse(payload);
                   }
@@ -718,7 +718,7 @@ export default function CourseManagementPage() {
                                 size="sm"
                                 className="text-red-600"
                                 onClick={async () => {
-                                  const result = await deleteCourse(course._id);
+                                  const result = await deleteCourse(course.id);
                                   if (result.success) {
                                     alert("Course deleted successfully!");
                                     fetchCourses();
