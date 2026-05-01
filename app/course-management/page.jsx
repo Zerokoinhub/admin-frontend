@@ -25,7 +25,6 @@ import {
   Loader2,
 } from "lucide-react";
 
-// ✅ FIXED: Use the correct base URL with /courses
 const API_BASE_URL = "https://admin-backend-production-4ff2.up.railway.app/api/courses";
 
 const LoadingSpinner = () => (
@@ -103,7 +102,7 @@ export default function CourseManagementPage() {
     }
   }, []);
 
-  // ✅ FIXED: Use list-active endpoint to get active courses
+  // Fetch courses from API
   const fetchCourses = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -118,57 +117,23 @@ export default function CourseManagementPage() {
         return;
       }
 
-      // Try different endpoints that exist in your backend
-      const endpoints = [
-        `${API_BASE_URL}/list-active`,
-        `${API_BASE_URL}/all`,
-        `${API_BASE_URL}/all-simple`,
-        `${API_BASE_URL}/list-all`,
-      ];
+      const response = await fetch(`${API_BASE_URL}/list-active`, {
+        method: "GET",
+        headers: getAuthHeaders(),
+      });
       
-      let coursesArray = [];
-      let lastError = null;
-      
-      for (const endpoint of endpoints) {
-        try {
-          console.log("Trying endpoint:", endpoint);
-          const response = await fetch(endpoint, {
-            method: "GET",
-            headers: getAuthHeaders(),
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            console.log(`Response from ${endpoint}:`, data);
-            
-            // Parse based on your backend response structure
-            if (data && data.success) {
-              if (Array.isArray(data.courses)) {
-                coursesArray = data.courses;
-                break;
-              } else if (Array.isArray(data.data)) {
-                coursesArray = data.data;
-                break;
-              } else if (data.courses && Array.isArray(data.courses.data)) {
-                coursesArray = data.courses.data;
-                break;
-              }
-            } else if (Array.isArray(data)) {
-              coursesArray = data;
-              break;
-            }
-          }
-        } catch (err) {
-          lastError = err;
-          console.log(`Endpoint ${endpoint} failed:`, err.message);
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Courses data:", data);
+        
+        if (data && data.success && Array.isArray(data.courses)) {
+          setCourses(data.courses);
+          console.log(`Loaded ${data.courses.length} courses`);
+        } else {
+          setCourses([]);
         }
-      }
-      
-      console.log(`Loaded ${coursesArray.length} courses`);
-      setCourses(coursesArray);
-      
-      if (coursesArray.length === 0 && lastError) {
-        setError("No courses found. Create your first course!");
+      } else {
+        throw new Error(`HTTP ${response.status}`);
       }
       
     } catch (err) {
@@ -180,7 +145,45 @@ export default function CourseManagementPage() {
     }
   }, []);
 
-  // ✅ FIXED: POST to base URL (no trailing slash issues)
+  // Fetch full course details by ID (for view modal)
+  const fetchFullCourseDetails = async (courseId) => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_BASE_URL}/${courseId}`, {
+        method: "GET",
+        headers: getAuthHeaders(),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Full course details:", data);
+        
+        let fullCourse = null;
+        if (data.success && data.course) {
+          fullCourse = data.course;
+        } else if (data.course) {
+          fullCourse = data.course;
+        } else if (data.data) {
+          fullCourse = data.data;
+        } else {
+          fullCourse = data;
+        }
+        
+        setSelectedCourse(fullCourse);
+        setCurrentView("course");
+      } else {
+        alert("Failed to load course details");
+      }
+    } catch (err) {
+      console.error("Error fetching course details:", err);
+      alert("Error loading course: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Create a new course
   const createCourse = async (courseData) => {
     setIsSubmitting(true);
     try {
@@ -191,7 +194,6 @@ export default function CourseManagementPage() {
       }
 
       console.log("Creating course at:", API_BASE_URL);
-      console.log("Course data:", JSON.stringify(courseData, null, 2));
       
       const response = await fetch(API_BASE_URL, {
         method: "POST",
@@ -216,7 +218,7 @@ export default function CourseManagementPage() {
     }
   };
 
-  // ✅ FIXED: PUT to specific course ID
+  // Update an existing course
   const updateCourse = async (courseId, courseData) => {
     setIsSubmitting(true);
     try {
@@ -251,7 +253,7 @@ export default function CourseManagementPage() {
     }
   };
 
-  // ✅ FIXED: DELETE to specific course ID
+  // Delete a course
   const deleteCourse = async (courseId) => {
     try {
       const token = localStorage.getItem("token");
@@ -321,7 +323,7 @@ export default function CourseManagementPage() {
     return <ErrorDisplay error={error} onRetry={fetchCourses} />;
   }
 
-  // Create/Edit View (same as before - keeping it concise)
+  // Create/Edit View
   if (currentView === "upload") {
     return (
       <div className="min-h-screen bg-gray-50 p-4">
@@ -630,9 +632,9 @@ export default function CourseManagementPage() {
                 </TableHeader>
                 <TableBody>
                   {courses.map((course) => {
-                    const courseName = course?.languages?.en?.courseName || course?.courseName || "Untitled";
-                    const pageCount = course?.languages?.en?.pages?.length || course?.pages?.length || 0;
-                    const languages = course?.languages ? Object.keys(course.languages) : [];
+                    const courseName = course.englishName || course.courseName || "Untitled";
+                    const pageCount = course.pagesCount?.en || 0;
+                    const languages = course.availableLanguages || [];
                     
                     return (
                       <TableRow key={course.id}>
@@ -654,64 +656,83 @@ export default function CourseManagementPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
+                            {/* View Button - Fetches full course details */}
                             <Button 
                               variant="ghost" 
                               size="sm"
-                              onClick={() => {
-                                setSelectedCourse(course);
-                                setCurrentView("course");
-                              }}
+                              onClick={() => fetchFullCourseDetails(course.id)}
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
+                            
+                            {/* Edit Button */}
                             {hasPermission("edit") && (
                               <Button 
                                 variant="ghost" 
                                 size="sm"
-                                onClick={() => {
-                                  const newFormData = { languages: {} };
-                                  for (const lang of availableLanguages) {
-                                    const langData = course.languages?.[lang.code];
-                                    if (langData) {
-                                      newFormData.languages[lang.code] = {
-                                        courseName: langData.courseName || "",
-                                        pages: (langData.pages || []).map(page => {
-                                          let timeValue = "120";
-                                          let timeUnit = "minutes";
-                                          try {
-                                            if (page.time) {
-                                              const parsed = JSON.parse(page.time);
-                                              timeValue = parsed?.value?.toString() || "120";
-                                              timeUnit = parsed?.unit || "minutes";
-                                            }
-                                          } catch (e) {
-                                            timeValue = page.time || "120";
-                                          }
-                                          return {
-                                            title: page.title || "",
-                                            content: page.content || "",
-                                            time: timeValue,
-                                            timeUnit: timeUnit,
+                                onClick={async () => {
+                                  // Fetch full course data for editing
+                                  try {
+                                    const token = localStorage.getItem("token");
+                                    const response = await fetch(`${API_BASE_URL}/${course.id}`, {
+                                      headers: getAuthHeaders(),
+                                    });
+                                    const data = await response.json();
+                                    const fullCourse = data.course || data.data || data;
+                                    
+                                    if (fullCourse && fullCourse.languages) {
+                                      const newFormData = { languages: {} };
+                                      for (const lang of availableLanguages) {
+                                        const langData = fullCourse.languages[lang.code];
+                                        if (langData) {
+                                          newFormData.languages[lang.code] = {
+                                            courseName: langData.courseName || "",
+                                            pages: (langData.pages || []).map(page => {
+                                              let timeValue = "120";
+                                              let timeUnit = "minutes";
+                                              try {
+                                                if (page.time) {
+                                                  const parsed = JSON.parse(page.time);
+                                                  timeValue = parsed?.value?.toString() || "120";
+                                                  timeUnit = parsed?.unit || "minutes";
+                                                }
+                                              } catch (e) {
+                                                timeValue = page.time || "120";
+                                              }
+                                              return {
+                                                title: page.title || "",
+                                                content: page.content || "",
+                                                time: timeValue,
+                                                timeUnit: timeUnit,
+                                              };
+                                            }),
                                           };
-                                        }),
-                                      };
+                                        } else {
+                                          newFormData.languages[lang.code] = {
+                                            courseName: "",
+                                            pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
+                                          };
+                                        }
+                                      }
+                                      setFormData(newFormData);
+                                      setIsEditing(true);
+                                      setSelectedCourse(fullCourse);
+                                      setCurrentLanguage("en");
+                                      setCurrentView("upload");
                                     } else {
-                                      newFormData.languages[lang.code] = {
-                                        courseName: "",
-                                        pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
-                                      };
+                                      alert("Could not load course data for editing");
                                     }
+                                  } catch (err) {
+                                    console.error("Error loading course for edit:", err);
+                                    alert("Failed to load course data");
                                   }
-                                  setFormData(newFormData);
-                                  setIsEditing(true);
-                                  setSelectedCourse(course);
-                                  setCurrentLanguage("en");
-                                  setCurrentView("upload");
                                 }}
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
                             )}
+                            
+                            {/* Delete Button */}
                             {hasPermission("delete") && (
                               <Button 
                                 variant="ghost" 
@@ -740,14 +761,17 @@ export default function CourseManagementPage() {
         </CardContent>
       </Card>
 
-      {/* Course Viewer Modal */}
+      {/* Course Viewer Modal - Now properly displays content */}
       {currentView === "course" && selectedCourse && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <Card className="max-w-2xl w-full max-h-[80vh] overflow-y-auto">
             <CardContent className="p-6">
               <div className="flex justify-between items-start mb-4">
                 <h2 className="text-xl font-semibold">
-                  {selectedCourse?.languages?.en?.courseName || selectedCourse?.courseName}
+                  {selectedCourse?.languages?.en?.courseName || 
+                   selectedCourse?.englishName || 
+                   selectedCourse?.courseName || 
+                   "Course Details"}
                 </h2>
                 <Button variant="ghost" size="sm" onClick={() => {
                   setSelectedCourse(null);
@@ -758,12 +782,33 @@ export default function CourseManagementPage() {
               </div>
               
               <div className="space-y-4">
-                {(selectedCourse?.languages?.en?.pages || selectedCourse?.pages || []).map((page, idx) => (
-                  <div key={idx} className="border rounded-lg p-4">
-                    <h3 className="font-semibold text-lg">{page.title || `Page ${idx + 1}`}</h3>
-                    <p className="text-gray-600 mt-2 whitespace-pre-wrap">{page.content || "No content"}</p>
+                {selectedCourse?.languages?.en?.pages && selectedCourse.languages.en.pages.length > 0 ? (
+                  selectedCourse.languages.en.pages.map((page, idx) => (
+                    <div key={idx} className="border rounded-lg p-4">
+                      <h3 className="font-semibold text-lg">{page.title || `Page ${idx + 1}`}</h3>
+                      <p className="text-gray-600 mt-2 whitespace-pre-wrap">{page.content || "No content"}</p>
+                      {page.time && (
+                        <p className="text-sm text-gray-400 mt-2">
+                          Duration: {typeof page.time === 'string' ? page.time : JSON.stringify(page.time)}
+                        </p>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>No page content available for this course.</p>
+                    <p className="text-sm mt-2">Click Edit to add content.</p>
                   </div>
-                ))}
+                )}
+                
+                {/* Show available languages */}
+                {selectedCourse?.availableLanguages && selectedCourse.availableLanguages.length > 0 && (
+                  <div className="mt-4 pt-4 border-t">
+                    <p className="text-sm text-gray-500">
+                      Available Languages: {selectedCourse.availableLanguages.join(', ')}
+                    </p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
