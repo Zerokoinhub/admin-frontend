@@ -27,15 +27,15 @@ import {
   BarChart3,
   AlertCircle,
   ChevronLeft,
+  Loader2,
 } from "lucide-react";
-import { useCourses } from "../../hooks/useCourses";
 
 // Simple loading component
 const LoadingSpinner = () => (
   <div className="min-h-screen bg-gray-50 flex items-center justify-center">
     <div className="text-center">
-      <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600"></div>
-      <p className="mt-4 text-gray-600">Loading...</p>
+      <Loader2 className="inline-block animate-spin rounded-full h-12 w-12 text-teal-600" />
+      <p className="mt-4 text-gray-600">Loading courses...</p>
     </div>
   </div>
 );
@@ -46,9 +46,9 @@ const ErrorDisplay = ({ error, onRetry }) => (
     <Card className="bg-white border border-red-200 max-w-md mx-auto mt-8">
       <CardContent className="p-6 text-center">
         <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-        <h2 className="text-xl font-semibold text-red-600 mb-2">Error</h2>
+        <h2 className="text-xl font-semibold text-red-600 mb-2">Error Loading Courses</h2>
         <p className="text-gray-600 mb-4">{error}</p>
-        <Button onClick={onRetry} className="bg-blue-600 hover:bg-blue-700 text-white">
+        <Button onClick={onRetry} className="bg-teal-600 hover:bg-teal-700 text-white">
           Retry
         </Button>
       </CardContent>
@@ -63,11 +63,14 @@ export default function CourseManagementPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState("en");
   const [hasRenderError, setHasRenderError] = useState(false);
+  const [localCourses, setLocalCourses] = useState([]);
+  const [localLoading, setLocalLoading] = useState(true);
+  const [localError, setLocalError] = useState(null);
   
   const {
-    courses,
-    loading,
-    error,
+    courses: hookCourses,
+    loading: hookLoading,
+    error: hookError,
     createCourse,
     updateCourse,
     deleteCourse,
@@ -78,6 +81,22 @@ export default function CourseManagementPage() {
     userData,
     isAuthenticated,
   } = useCourses();
+
+  // Use local state to track courses
+  useEffect(() => {
+    console.log("Hook courses updated:", hookCourses);
+    if (hookCourses && Array.isArray(hookCourses)) {
+      setLocalCourses(hookCourses);
+    } else if (hookCourses && typeof hookCourses === 'object') {
+      // If hook returns an object with data property
+      const coursesArray = hookCourses.data || hookCourses.courses || [];
+      setLocalCourses(Array.isArray(coursesArray) ? coursesArray : []);
+    } else {
+      setLocalCourses([]);
+    }
+    setLocalLoading(hookLoading);
+    setLocalError(hookError);
+  }, [hookCourses, hookLoading, hookError]);
 
   // All 5 languages
   const availableLanguages = [
@@ -116,17 +135,66 @@ export default function CourseManagementPage() {
 
   // Debug logging
   useEffect(() => {
-    console.log("=== DEBUG ===");
-    console.log("Courses:", courses);
-    console.log("Courses type:", typeof courses);
-    console.log("Is array:", Array.isArray(courses));
-    console.log("Loading:", loading);
-    console.log("Error:", error);
+    console.log("=== COURSE MANAGEMENT DEBUG ===");
+    console.log("Hook Courses:", hookCourses);
+    console.log("Local Courses:", localCourses);
+    console.log("Courses type:", typeof hookCourses);
+    console.log("Is array:", Array.isArray(hookCourses));
+    console.log("Hook Loading:", hookLoading);
+    console.log("Local Loading:", localLoading);
+    console.log("Hook Error:", hookError);
+    console.log("Local Error:", localError);
     console.log("Auth:", isAuthenticated);
-  }, [courses, loading, error, isAuthenticated]);
+    console.log("User Data:", userData);
+  }, [hookCourses, localCourses, hookLoading, localLoading, hookError, localError, isAuthenticated, userData]);
 
   // Safe courses array
-  const safeCourses = Array.isArray(courses) ? courses : [];
+  const safeCourses = Array.isArray(localCourses) && localCourses.length > 0 ? localCourses : [];
+
+  // Try to manually fetch courses if hook fails
+  const manualFetchCourses = async () => {
+    setLocalLoading(true);
+    setLocalError(null);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("https://zerokoinapp-production.up.railway.app/api/courses", {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log("Manual fetch result:", result);
+        
+        let coursesArray = [];
+        if (result.success && result.data) {
+          coursesArray = Array.isArray(result.data) ? result.data : [];
+        } else if (Array.isArray(result)) {
+          coursesArray = result;
+        } else if (result.courses && Array.isArray(result.courses)) {
+          coursesArray = result.courses;
+        }
+        
+        setLocalCourses(coursesArray);
+      } else {
+        throw new Error(`HTTP ${response.status}`);
+      }
+    } catch (err) {
+      console.error("Manual fetch error:", err);
+      setLocalError(err.message);
+    } finally {
+      setLocalLoading(false);
+    }
+  };
+
+  // Retry function
+  const handleRetry = () => {
+    if (refreshCourses) {
+      refreshCourses();
+    }
+    manualFetchCourses();
+  };
 
   // Ensure language exists in formData
   const ensureLanguageExists = (langCode) => {
@@ -230,7 +298,7 @@ export default function CourseManagementPage() {
             <Button onClick={() => {
               setHasRenderError(false);
               window.location.reload();
-            }} className="bg-blue-600 hover:bg-blue-700 text-white">
+            }} className="bg-teal-600 hover:bg-teal-700 text-white">
               Reload Page
             </Button>
           </CardContent>
@@ -240,13 +308,13 @@ export default function CourseManagementPage() {
   }
 
   // Loading state
-  if (loading) {
+  if (localLoading || hookLoading) {
     return <LoadingSpinner />;
   }
 
   // Error state
-  if (error) {
-    return <ErrorDisplay error={error} onRetry={refreshCourses} />;
+  if (localError || hookError) {
+    return <ErrorDisplay error={localError || hookError} onRetry={handleRetry} />;
   }
 
   // Not authenticated
@@ -258,7 +326,7 @@ export default function CourseManagementPage() {
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-red-600 mb-2">Authentication Required</h2>
             <p className="text-gray-600 mb-4">Please log in to continue.</p>
-            <Button onClick={() => window.location.reload()} className="bg-blue-600 hover:bg-blue-700 text-white">
+            <Button onClick={() => window.location.reload()} className="bg-teal-600 hover:bg-teal-700 text-white">
               Refresh
             </Button>
           </CardContent>
@@ -442,7 +510,8 @@ export default function CourseManagementPage() {
                     if (result?.success) {
                       alert(`Course ${isEditing ? "updated" : "created"} successfully!`);
                       setCurrentView("main");
-                      refreshCourses();
+                      if (refreshCourses) refreshCourses();
+                      manualFetchCourses();
                     } else {
                       alert("Failed to save course: " + (result?.error || "Unknown error"));
                     }
@@ -465,27 +534,25 @@ export default function CourseManagementPage() {
   // Main View - Courses List
   return (
     <div className="min-h-screen bg-gray-50 p-4">
-      {/* Deployment Banner */}
-      <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-2 rounded-lg text-sm text-center mb-4">
-        ✅ Code Deployed | Safe Mode | Courses: {safeCourses.length}
+      {/* Debug Banner */}
+      <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-2 rounded-lg text-sm text-center mb-4">
+        📊 Debug | Courses in State: {safeCourses.length} | Loading: {String(localLoading)} | Auth: {String(isAuthenticated)}
       </div>
 
       <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Course Management</h1>
-          <p className="text-sm text-gray-600">{userData?.email} • {roleDisplayName}</p>
+          <p className="text-sm text-gray-600">{userData?.email || userData?.username || "User"} • {roleDisplayName || userRole || "Loading..."}</p>
         </div>
         <div className="flex gap-2">
           <Button 
-            onClick={() => setCurrentView("analytics")} 
+            onClick={manualFetchCourses}
             variant="outline"
-            disabled={true}
           >
-            <BarChart3 className="h-4 w-4 mr-2" /> Analytics (Disabled)
+            Refresh
           </Button>
           {hasPermission?.("create") && (
             <Button onClick={() => {
-              // Reset form data
               setFormData({
                 languages: {
                   en: { courseName: "", pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }] },
@@ -511,7 +578,8 @@ export default function CourseManagementPage() {
 
           {safeCourses.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
-              No courses found. Click "Create Course" to add one.
+              <p>No courses found.</p>
+              <p className="text-sm mt-2">Click "Create Course" to add one, or "Refresh" to reload.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -528,31 +596,55 @@ export default function CourseManagementPage() {
                 </TableHeader>
                 <TableBody>
                   {safeCourses.map((course) => {
-                    const courseName = course?.languages?.en?.courseName || course?.courseName || "Untitled";
-                    const pageCount = course?.languages?.en?.pages?.length || course?.pages?.length || 0;
+                    // Safely extract course data
+                    const courseId = course?._id || course?.id;
+                    const courseName = course?.languages?.en?.courseName || 
+                                      course?.courseName || 
+                                      "Untitled";
+                    const pageCount = course?.languages?.en?.pages?.length || 
+                                    course?.pages?.length || 
+                                    0;
                     const languages = course?.languages ? Object.keys(course.languages) : [];
+                    const isActive = course?.isActive !== false;
+                    const createdBy = course?.uploadedBy?.username || 
+                                     course?.uploadedBy?.email || 
+                                     course?.uploadedBy || 
+                                     "Unknown";
                     
                     return (
-                      <TableRow key={course?._id || Math.random()}>
+                      <TableRow key={courseId || Math.random()}>
                         <TableCell className="font-medium">{courseName}</TableCell>
                         <TableCell>
                           <div className="flex gap-1 flex-wrap">
-                            {languages.map(lang => (
+                            {languages.length > 0 ? languages.map(lang => (
                               <Badge key={lang} variant="outline" className="text-xs">
                                 {lang.toUpperCase()}
                               </Badge>
-                            ))}
+                            )) : (
+                              <Badge variant="outline" className="text-xs">EN</Badge>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>{pageCount}</TableCell>
                         <TableCell>
-                          <Badge className={course?.isActive !== false ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-                            {course?.isActive !== false ? "Active" : "Inactive"}
+                          <Badge className={isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                            {isActive ? "Active" : "Inactive"}
                           </Badge>
                         </TableCell>
-                        <TableCell>{course?.uploadedBy?.username || course?.uploadedBy || "Unknown"}</TableCell>
+                        <TableCell>{createdBy}</TableCell>
                         <TableCell>
                           <div className="flex gap-2">
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => {
+                                // View course
+                                setSelectedCourse(course);
+                                setCurrentView("course");
+                              }}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
                             <Button 
                               variant="ghost" 
                               size="sm"
@@ -565,12 +657,25 @@ export default function CourseManagementPage() {
                                     if (langData) {
                                       newFormData.languages[lang.code] = {
                                         courseName: langData.courseName || "",
-                                        pages: (langData.pages || []).map(page => ({
-                                          title: page.title || "",
-                                          content: page.content || "",
-                                          time: page.time ? (JSON.parse(page.time)?.value?.toString() || "120") : "120",
-                                          timeUnit: page.time ? (JSON.parse(page.time)?.unit || "minutes") : "minutes",
-                                        })),
+                                        pages: (langData.pages || []).map(page => {
+                                          let timeValue = "120";
+                                          let timeUnit = "minutes";
+                                          try {
+                                            if (page.time) {
+                                              const parsed = JSON.parse(page.time);
+                                              timeValue = parsed?.value?.toString() || "120";
+                                              timeUnit = parsed?.unit || "minutes";
+                                            }
+                                          } catch (e) {
+                                            timeValue = page.time || "120";
+                                          }
+                                          return {
+                                            title: page.title || "",
+                                            content: page.content || "",
+                                            time: timeValue,
+                                            timeUnit: timeUnit,
+                                          };
+                                        }),
                                       };
                                     } else {
                                       newFormData.languages[lang.code] = {
@@ -585,7 +690,7 @@ export default function CourseManagementPage() {
                                   setCurrentLanguage("en");
                                   setCurrentView("upload");
                                 } else {
-                                  alert("Edit feature - Course ID: " + course._id);
+                                  alert("Edit feature - Course ID: " + courseId);
                                 }
                               }}
                             >
@@ -598,10 +703,13 @@ export default function CourseManagementPage() {
                                 className="text-red-600"
                                 onClick={async () => {
                                   if (confirm("Delete this course?")) {
-                                    const result = await deleteCourse(course._id);
-                                    if (result.success) {
-                                      alert("Deleted!");
-                                      refreshCourses();
+                                    const result = await deleteCourse(courseId);
+                                    if (result?.success) {
+                                      alert("Deleted successfully!");
+                                      if (refreshCourses) refreshCourses();
+                                      manualFetchCourses();
+                                    } else {
+                                      alert("Failed to delete: " + (result?.error || "Unknown error"));
                                     }
                                   }
                                 }}
@@ -628,18 +736,26 @@ export default function CourseManagementPage() {
             <CardContent className="p-6">
               <div className="flex justify-between items-start mb-4">
                 <h2 className="text-xl font-semibold">
-                  {selectedCourse?.languages?.en?.courseName || selectedCourse?.courseName}
+                  {selectedCourse?.languages?.en?.courseName || selectedCourse?.courseName || "Course Details"}
                 </h2>
-                <Button variant="ghost" size="sm" onClick={() => setSelectedCourse(null)}>
+                <Button variant="ghost" size="sm" onClick={() => {
+                  setSelectedCourse(null);
+                  setCurrentView("main");
+                }}>
                   <X className="h-4 w-4" />
                 </Button>
               </div>
               
               <div className="space-y-4">
                 {(selectedCourse?.languages?.en?.pages || selectedCourse?.pages || []).map((page, idx) => (
-                  <div key={idx} className="border rounded p-4">
-                    <h3 className="font-medium">{page?.title}</h3>
-                    <p className="text-gray-600 mt-2">{page?.content}</p>
+                  <div key={idx} className="border rounded-lg p-4">
+                    <h3 className="font-semibold text-lg">{page?.title || `Page ${idx + 1}`}</h3>
+                    <p className="text-gray-600 mt-2 whitespace-pre-wrap">{page?.content || "No content"}</p>
+                    {page?.time && (
+                      <p className="text-sm text-gray-400 mt-2">
+                        Duration: {typeof page.time === 'string' ? page.time : JSON.stringify(page.time)}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
