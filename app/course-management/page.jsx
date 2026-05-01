@@ -1,7 +1,6 @@
-// app/course-management/page.js
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -26,8 +25,7 @@ import {
   Loader2,
 } from "lucide-react";
 
-// ✅ THIS IS THE IMPORT THAT WAS MISSING - ADD THIS LINE
-import { useCourses } from "@/hooks/useCourses";
+const API_BASE_URL = "https://zerokoinapp-production.up.railway.app/api";
 
 const LoadingSpinner = () => (
   <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -54,27 +52,17 @@ const ErrorDisplay = ({ error, onRetry }) => (
 );
 
 export default function CourseManagementPage() {
-  // ✅ NOW useCourses() will be defined because we imported it above
-  const {
-    courses,
-    loading,
-    error,
-    createCourse,
-    updateCourse,
-    deleteCourse,
-    refreshCourses,
-    hasPermission,
-    userRole,
-    roleDisplayName,
-    userData,
-    isAuthenticated,
-  } = useCourses();
-
+  // State
+  const [courses, setCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [currentView, setCurrentView] = useState("main");
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState("en");
+  const [userData, setUserData] = useState(null);
+  const [userRole, setUserRole] = useState("");
 
   const availableLanguages = [
     { code: "en", name: "English" },
@@ -94,39 +82,228 @@ export default function CourseManagementPage() {
     },
   });
 
-  // Debug logging
+  // Helper function to get auth headers
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem("token");
+    return {
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
+    };
+  };
+
+  // Get user data from localStorage
   useEffect(() => {
-    console.log("=== CourseManagementPage Debug ===");
-    console.log("Courses:", courses);
-    console.log("Loading:", loading);
-    console.log("Error:", error);
-    console.log("Authenticated:", isAuthenticated);
-    console.log("================================");
-  }, [courses, loading, error, isAuthenticated]);
+    try {
+      const userStr = localStorage.getItem("user");
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        setUserData(user);
+        setUserRole(user.role || "");
+      }
+    } catch (err) {
+      console.error("Error getting user data:", err);
+    }
+  }, []);
+
+  // Fetch courses from API
+  const fetchCourses = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const token = localStorage.getItem("token");
+      
+      if (!token) {
+        console.warn("No token found");
+        setCourses([]);
+        setLoading(false);
+        return;
+      }
+
+      console.log("Fetching courses from:", `${API_BASE_URL}/courses`);
+      
+      const response = await fetch(`${API_BASE_URL}/courses`, {
+        method: "GET",
+        headers: getAuthHeaders(),
+      });
+
+      console.log("Response status:", response.status);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log("Courses API response:", data);
+
+      // Parse different response formats
+      let coursesArray = [];
+      
+      if (data && data.success) {
+        if (Array.isArray(data.courses)) {
+          coursesArray = data.courses;
+        } else if (data.data && Array.isArray(data.data)) {
+          coursesArray = data.data;
+        } else if (data.data && data.data.courses && Array.isArray(data.data.courses)) {
+          coursesArray = data.data.courses;
+        }
+      } else if (Array.isArray(data)) {
+        coursesArray = data;
+      }
+
+      console.log(`Loaded ${coursesArray.length} courses`);
+      setCourses(coursesArray);
+      
+    } catch (err) {
+      console.error("Error fetching courses:", err);
+      setError(err.message);
+      setCourses([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Create a new course
+  const createCourse = async (courseData) => {
+    setIsSubmitting(true);
+    try {
+      const token = localStorage.getItem("token");
+      
+      if (!token) {
+        throw new Error("Not authenticated");
+      }
+
+      console.log("Creating course...");
+      
+      const response = await fetch(`${API_BASE_URL}/courses`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(courseData),
+      });
+
+      const data = await response.json();
+      console.log("Create response:", data);
+
+      if (response.ok && data.success) {
+        await fetchCourses();
+        return { success: true };
+      } else {
+        throw new Error(data.message || "Failed to create course");
+      }
+    } catch (err) {
+      console.error("Error creating course:", err);
+      return { success: false, error: err.message };
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Update a course
+  const updateCourse = async (courseId, courseData) => {
+    setIsSubmitting(true);
+    try {
+      const token = localStorage.getItem("token");
+      
+      if (!token) {
+        throw new Error("Not authenticated");
+      }
+
+      console.log("Updating course:", courseId);
+      
+      const response = await fetch(`${API_BASE_URL}/courses/${courseId}`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(courseData),
+      });
+
+      const data = await response.json();
+      console.log("Update response:", data);
+
+      if (response.ok && data.success) {
+        await fetchCourses();
+        return { success: true };
+      } else {
+        throw new Error(data.message || "Failed to update course");
+      }
+    } catch (err) {
+      console.error("Error updating course:", err);
+      return { success: false, error: err.message };
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Delete a course
+  const deleteCourse = async (courseId) => {
+    try {
+      const token = localStorage.getItem("token");
+      
+      if (!token) {
+        throw new Error("Not authenticated");
+      }
+
+      if (!confirm("Are you sure you want to delete this course?")) {
+        return { success: false };
+      }
+
+      console.log("Deleting course:", courseId);
+      
+      const response = await fetch(`${API_BASE_URL}/courses/${courseId}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+
+      const data = await response.json();
+      console.log("Delete response:", data);
+
+      if (response.ok && data.success) {
+        setCourses(prev => prev.filter(course => course._id !== courseId));
+        return { success: true };
+      } else {
+        throw new Error(data.message || "Failed to delete course");
+      }
+    } catch (err) {
+      console.error("Error deleting course:", err);
+      alert("Error: " + err.message);
+      return { success: false, error: err.message };
+    }
+  };
+
+  // Check permission
+  const hasPermission = (action) => {
+    switch (userRole?.toLowerCase()) {
+      case "superadmin":
+        return true;
+      case "editor":
+        return ["view", "create", "edit"].includes(action);
+      case "viewer":
+        return action === "view";
+      default:
+        return false;
+    }
+  };
+
+  // Initial fetch
+  useEffect(() => {
+    fetchCourses();
+  }, [fetchCourses]);
+
+  // Get role display name
+  const getRoleDisplayName = () => {
+    switch (userRole?.toLowerCase()) {
+      case "superadmin": return "Super Admin";
+      case "editor": return "Editor";
+      case "viewer": return "Viewer";
+      default: return "User";
+    }
+  };
 
   if (loading) {
     return <LoadingSpinner />;
   }
 
   if (error) {
-    return <ErrorDisplay error={error} onRetry={refreshCourses} />;
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gray-50 p-4">
-        <Card className="bg-white border border-red-200 max-w-md mx-auto mt-8">
-          <CardContent className="p-6 text-center">
-            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-red-600 mb-2">Authentication Required</h2>
-            <p className="text-gray-600 mb-4">Please log in to access courses.</p>
-            <Button onClick={() => window.location.href = "/login"} className="bg-teal-600 hover:bg-teal-700 text-white">
-              Go to Login
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <ErrorDisplay error={error} onRetry={fetchCourses} />;
   }
 
   // Create/Edit View
@@ -335,42 +512,35 @@ export default function CourseManagementPage() {
                     }
                   }
                   
-                  setIsSubmitting(true);
-                  try {
-                    const languages = {};
-                    for (const lang of availableLanguages) {
-                      const langData = formData.languages[lang.code];
-                      if (langData && langData.courseName && langData.courseName.trim()) {
-                        languages[lang.code] = {
-                          courseName: langData.courseName.trim(),
-                          pages: langData.pages.map(p => ({
-                            title: p.title.trim(),
-                            content: p.content.trim(),
-                            time: JSON.stringify({ value: parseInt(p.time) || 60, unit: p.timeUnit || "minutes" }),
-                          })),
-                        };
-                      }
+                  const languages = {};
+                  for (const lang of availableLanguages) {
+                    const langData = formData.languages[lang.code];
+                    if (langData && langData.courseName && langData.courseName.trim()) {
+                      languages[lang.code] = {
+                        courseName: langData.courseName.trim(),
+                        pages: langData.pages.map(p => ({
+                          title: p.title.trim(),
+                          content: p.content.trim(),
+                          time: JSON.stringify({ value: parseInt(p.time) || 60, unit: p.timeUnit || "minutes" }),
+                        })),
+                      };
                     }
-                    
-                    const payload = { languages };
-                    
-                    let result;
-                    if (isEditing && selectedCourse) {
-                      result = await updateCourse(selectedCourse._id, payload);
-                    } else {
-                      result = await createCourse(payload);
-                    }
-                    
-                    if (result?.success) {
-                      alert(`Course ${isEditing ? "updated" : "created"} successfully!`);
-                      setCurrentView("main");
-                    } else {
-                      alert("Failed to save course: " + (result?.error || "Unknown error"));
-                    }
-                  } catch (err) {
-                    alert("Error: " + err.message);
-                  } finally {
-                    setIsSubmitting(false);
+                  }
+                  
+                  const payload = { languages };
+                  
+                  let result;
+                  if (isEditing && selectedCourse) {
+                    result = await updateCourse(selectedCourse._id, payload);
+                  } else {
+                    result = await createCourse(payload);
+                  }
+                  
+                  if (result?.success) {
+                    alert(`Course ${isEditing ? "updated" : "created"} successfully!`);
+                    setCurrentView("main");
+                  } else {
+                    alert("Failed to save course: " + (result?.error || "Unknown error"));
                   }
                 }}
               >
@@ -387,16 +557,16 @@ export default function CourseManagementPage() {
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-2 rounded-lg text-sm text-center mb-4">
-        ✅ Courses Loaded: {courses.length} | Role: {roleDisplayName}
+        ✅ Courses Loaded: {courses.length} | Role: {getRoleDisplayName()}
       </div>
 
       <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Course Management</h1>
-          <p className="text-sm text-gray-600">{userData?.email} • {roleDisplayName}</p>
+          <p className="text-sm text-gray-600">{userData?.email} • {getRoleDisplayName()}</p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={refreshCourses} variant="outline">
+          <Button onClick={fetchCourses} variant="outline">
             Refresh
           </Button>
           {hasPermission("create") && (
@@ -454,11 +624,13 @@ export default function CourseManagementPage() {
                         <TableCell className="font-medium">{courseName}</TableCell>
                         <TableCell>
                           <div className="flex gap-1 flex-wrap">
-                            {languages.map(lang => (
+                            {languages.length > 0 ? languages.map(lang => (
                               <Badge key={lang} variant="outline" className="text-xs">
                                 {lang.toUpperCase()}
                               </Badge>
-                            ))}
+                            )) : (
+                              <Badge variant="outline" className="text-xs">EN</Badge>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>{pageCount}</TableCell>
@@ -531,13 +703,10 @@ export default function CourseManagementPage() {
                                 size="sm"
                                 className="text-red-600"
                                 onClick={async () => {
-                                  if (confirm("Delete this course?")) {
-                                    const result = await deleteCourse(course._id);
-                                    if (result.success) {
-                                      alert("Course deleted!");
-                                    } else {
-                                      alert("Failed to delete: " + result.error);
-                                    }
+                                  const result = await deleteCourse(course._id);
+                                  if (result.success) {
+                                    alert("Course deleted successfully!");
+                                    fetchCourses();
                                   }
                                 }}
                               >
