@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 
 // ✅ FIXED: Use the correct base URL with /courses
-const API_BASE_URL = "https://zerokoinapp-production.up.railway.app/api/courses";
+const API_BASE_URL = "https://admin-backend-production-4ff2.up.railway.app/api/courses";
 
 const LoadingSpinner = () => (
   <div className="min-h-screen bg-gray-50 flex items-center justify-center">
