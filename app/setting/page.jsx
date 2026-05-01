@@ -39,14 +39,12 @@ import { userAPI, userHelpers } from "../../src/lib/api"
 import { useUsers } from "../../hooks/useUsers"
 import { useAdmins } from "../../hooks/useAdmins"
 
-// API Service for Settings - FIXED AND WORKING
+// API Service for Settings
 const settingsAPI = {
   async getSettings() {
     try {
       const token = localStorage.getItem("token")
       const APP_BACKEND_URL = "https://zerokoinapp-production.up.railway.app/api"
-      
-      console.log("📡 Fetching settings from:", `${APP_BACKEND_URL}/settings`)
       
       const response = await fetch(`${APP_BACKEND_URL}/settings`, {
         method: "GET",
@@ -61,7 +59,6 @@ const settingsAPI = {
       }
       
       const result = await response.json()
-      console.log("📥 Settings loaded:", result.data?.rewards)
       return result
     } catch (error) {
       console.error("Error fetching settings:", error)
@@ -73,8 +70,6 @@ const settingsAPI = {
     try {
       const token = localStorage.getItem("token")
       const APP_BACKEND_URL = "https://zerokoinapp-production.up.railway.app/api"
-      
-      console.log("📤 SAVING to backend:", JSON.stringify(settingsData, null, 2))
       
       const response = await fetch(`${APP_BACKEND_URL}/settings`, {
         method: "PUT",
@@ -91,12 +86,6 @@ const settingsAPI = {
       }
       
       const result = await response.json()
-      console.log("📥 Save response:", result)
-      
-      if (result.success) {
-        console.log("✅ Successfully saved! New adBaseReward:", result.data?.rewards?.adBaseReward)
-      }
-      
       return result
     } catch (error) {
       console.error("Error updating settings:", error)
@@ -129,6 +118,16 @@ export default function SettingPage() {
     dateRange: "all",
   })
 
+  // Reward settings state
+  const [rewardSettings, setRewardSettings] = useState({
+    referralReward: 50,
+    learningReward: 2,
+    adBaseReward: 30,
+  })
+  const [editingReward, setEditingReward] = useState(null)
+  const [settingsLoading, setSettingsLoading] = useState(true)
+  const [savingSettings, setSavingSettings] = useState(false)
+
   // Settings specific state
   const [currentView, setCurrentView] = useState("main")
   const [showExpiryDropdown, setShowExpiryDropdown] = useState(false)
@@ -143,14 +142,13 @@ export default function SettingPage() {
   const [showChangePassword, setShowChangePassword] = useState(false)
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
-  const [notificationView, setNotificationView] = useState("empty")
+  const [notificationView, setNotificationView] = useState("list")
 
   const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL
 
   const [notificationData, setNotificationData] = useState({
-    title: "Upcoming Zero Koin1",
-    description:
-      "Zero Koin mining is the process of validating transactions and securing the Zero Koin blockchain by solving complex mathematical problems, typically using computing power, to earn rewards in Zero Koin.",
+    title: "",
+    description: "",
     link: "",
   })
 
@@ -165,6 +163,75 @@ export default function SettingPage() {
 
   const [sentNotifications, setSentNotifications] = useState([])
   const [editingNotification, setEditingNotification] = useState(null)
+
+  // Load reward settings from API on mount
+  useEffect(() => {
+    loadSettingsFromAPI()
+  }, [])
+
+  const loadSettingsFromAPI = async () => {
+    setSettingsLoading(true)
+    try {
+      const result = await settingsAPI.getSettings()
+      
+      if (result.success && result.data && result.data.rewards) {
+        setRewardSettings({
+          referralReward: result.data.rewards.referralReward || 50,
+          learningReward: result.data.rewards.learningReward || 2,
+          adBaseReward: result.data.rewards.adBaseReward || 30,
+        })
+      }
+    } catch (error) {
+      console.error("Failed to load settings:", error)
+    } finally {
+      setSettingsLoading(false)
+    }
+  }
+
+  const showTemporaryMessage = (type, text) => {
+    setMessage({ type, text })
+    setTimeout(() => setMessage({ type: "", text: "" }), 3000)
+  }
+
+  const saveRewardSettingsToAPI = async (newSettings) => {
+    setSavingSettings(true)
+    try {
+      const result = await settingsAPI.updateSettings({ rewards: newSettings })
+      
+      if (result.success) {
+        showTemporaryMessage("success", `✅ Saved successfully!`)
+        return true
+      } else {
+        throw new Error(result.error || "Failed to save")
+      }
+    } catch (error) {
+      console.error("Save failed:", error)
+      showTemporaryMessage("error", `Failed to save: ${error.message}`)
+      return false
+    } finally {
+      setSavingSettings(false)
+    }
+  }
+
+  const handleSaveReward = async (rewardKey, newValue) => {
+    if (isNaN(newValue) || newValue < 0) {
+      showTemporaryMessage("error", "Please enter a valid positive number")
+      return false
+    }
+    
+    const updatedSettings = { ...rewardSettings, [rewardKey]: newValue }
+    setRewardSettings(updatedSettings)
+    
+    const saved = await saveRewardSettingsToAPI(updatedSettings)
+    
+    if (saved) {
+      setEditingReward(null)
+      return true
+    } else {
+      setRewardSettings(rewardSettings)
+      return false
+    }
+  }
 
   // Get user role from localStorage
   useEffect(() => {
@@ -184,11 +251,9 @@ export default function SettingPage() {
     }
   }, [])
 
-  // Check permissions
   const hasTransferAccess = userRole === "superadmin"
   const hasHistoryAccess = true
 
-  // Fetch users on component mount (only for super admin)
   useEffect(() => {
     if (hasTransferAccess) {
       fetchUsers()
@@ -223,9 +288,6 @@ export default function SettingPage() {
               priority: notification.priority,
             }))
             setSentNotifications(formattedNotifications)
-            if (formattedNotifications.length > 0) {
-              setNotificationView("list")
-            }
           }
         }
       } catch (error) {
@@ -233,9 +295,8 @@ export default function SettingPage() {
       }
     }
     fetchSentNotifications()
-  }, [])
+  }, [BASE_URL])
 
-  // Fetch admins data
   const { admins, loading: adminsLoading, error: adminsError, addAdmin, editAdmin, removeAdmin } = useAdmins()
   const [editingAdmin, setEditingAdmin] = useState(null)
   const [showAddAdminModal, setShowAddAdminModal] = useState(false)
@@ -246,13 +307,10 @@ export default function SettingPage() {
     role: "",
     password: "",
   })
-  const [showPassword, setShowPassword] = useState(false)
   const [currentAdminPassword, setCurrentAdminPassword] = useState("")
 
-  // Fetch users data for statistics
   const { users: allUsers, loading: usersLoading, error: usersError } = useUsers(1, 100)
 
-  // Calculate real statistics from users
   const stats = useMemo(() => {
     if (!allUsers || allUsers.length === 0) {
       return {
@@ -269,7 +327,6 @@ export default function SettingPage() {
     }
   }, [allUsers])
 
-  // Fetch users from API
   const fetchUsers = async () => {
     if (!hasTransferAccess) return
     try {
@@ -289,7 +346,6 @@ export default function SettingPage() {
     }
   }
 
-  // Fetch transfer history
   const fetchTransferHistory = async () => {
     try {
       setHistoryLoading(true)
@@ -310,14 +366,12 @@ export default function SettingPage() {
     }
   }
 
-  // Handle user selection
   const handleUserSelect = (user) => {
     setSelectedUser(user)
     setMessage({ type: "", text: "" })
     setIsMobileMenuOpen(false)
   }
 
-  // Handle transfer execution
   const handleTransfer = async () => {
     if (!hasTransferAccess) {
       setMessage({ type: "error", text: "You don't have permission to transfer coins" })
@@ -378,14 +432,12 @@ export default function SettingPage() {
     }
   }
 
-  // Filter users based on search term
   const filteredUsers = users.filter(
     (user) =>
       user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email?.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
-  // Filter transfer history
   const filteredHistory = transferHistory.filter((transfer) => {
     const matchesSearch =
       !historyFilters.search ||
@@ -417,7 +469,6 @@ export default function SettingPage() {
     return matchesSearch && matchesStatus && matchesDate
   })
 
-  // Export transfer history to CSV
   const exportToCSV = () => {
     const headers = ["Transaction ID", "User Name", "Email", "Amount", "Date", "Time", "Admin", "Status"]
     const csvContent = [
@@ -445,10 +496,8 @@ export default function SettingPage() {
     window.URL.revokeObjectURL(url)
   }
 
-  // Calculate transfer statistics
   const transferStats = userHelpers.calculateTransferStats(filteredHistory)
 
-  // Get role icon and color
   const getRoleDisplay = (role) => {
     switch (role) {
       case "superadmin":
@@ -465,7 +514,6 @@ export default function SettingPage() {
   const roleDisplay = getRoleDisplay(userRole)
   const RoleIcon = roleDisplay.icon
 
-  // Handle image upload
   const handleImageUpload = async (event) => {
     const file = event.target.files[0]
     if (!file) return
@@ -488,7 +536,6 @@ export default function SettingPage() {
     }
   }
 
-  // Handle notification sending
   const handleSendNotification = async () => {
     if (userRole === "viewer") {
       alert("You don't have permission to send notifications.")
@@ -559,13 +606,6 @@ export default function SettingPage() {
         body: requestBody,
       })
 
-      const contentType = response.headers.get("content-type")
-      if (!contentType || !contentType.includes("application/json")) {
-        const textResponse = await response.text()
-        console.error("Non-JSON response received:", textResponse)
-        throw new Error(`Server returned non-JSON response. Status: ${response.status}`)
-      }
-
       const result = await response.json()
 
       if (response.ok && result.success) {
@@ -581,15 +621,8 @@ export default function SettingPage() {
         }
 
         setSentNotifications((prev) => [newNotification, ...prev])
-
-        const event = new CustomEvent("newNotificationSent", {
-          detail: {
-            notification: newNotification,
-          },
-        })
-        window.dispatchEvent(event)
-
         setShowSuccessModal(true)
+        
         setTimeout(() => {
           setShowSuccessModal(false)
           setNotificationView("list")
@@ -597,12 +630,11 @@ export default function SettingPage() {
           setUploadedImageFile(null)
           setSelectedSendTo("Send to")
           setNotificationData({
-            title: "Upcoming Zero Koin",
-            description:
-              "Zero Koin mining is the process of validating transactions and securing the Zero Koin blockchain by solving complex mathematical problems, typically using computing power, to earn rewards in Zero Koin.",
+            title: "",
+            description: "",
             link: "",
           })
-        }, 3000)
+        }, 2000)
       } else {
         throw new Error(result.message || `Server error: ${response.status}`)
       }
@@ -633,19 +665,22 @@ export default function SettingPage() {
   const handleNotificationSettings = () => {
     if (userRole === "superadmin" || userRole === "editor") {
       setCurrentView("notifications")
-      setNotificationView(sentNotifications.length > 0 ? "list" : "empty")
+      setNotificationView("list")
     }
   }
 
   const handleCreateNotification = () => {
     if (userRole === "superadmin" || userRole === "editor") {
+      // Reset form
+      setNotificationData({
+        title: "",
+        description: "",
+        link: "",
+      })
+      setUploadedImage(null)
+      setUploadedImageFile(null)
+      setSelectedSendTo("Send to")
       setNotificationView("create")
-    }
-  }
-
-  const handleNext = () => {
-    if (userRole === "superadmin" || userRole === "editor") {
-      setNotificationView("send")
     }
   }
 
@@ -657,7 +692,6 @@ export default function SettingPage() {
     document.getElementById("image-upload").click()
   }
 
-  // Handle add admin form submission
   const handleAddAdminSubmit = async () => {
     if (!adminFormData.username || !adminFormData.email || !adminFormData.role || !adminFormData.password) {
       alert("Please fill in all fields")
@@ -758,9 +792,7 @@ export default function SettingPage() {
         ? "New User"
         : notification.priority === "top-rated-user"
           ? "Top rated user"
-          : notification.priority === "old-user"
-            ? "Old User"
-            : "General Users",
+          : "Old User",
     )
     setNotificationView("edit")
   }
@@ -778,9 +810,6 @@ export default function SettingPage() {
         if (response.ok) {
           setSentNotifications((prev) => prev.filter((n) => n.id !== notificationId))
           alert("Notification deleted successfully!")
-          if (sentNotifications.length <= 1) {
-            setNotificationView("empty")
-          }
         } else {
           throw new Error("Failed to delete notification")
         }
@@ -801,10 +830,9 @@ export default function SettingPage() {
       "New User": "new-user",
       "Old User": "old-user",
       "Top rated user": "top-rated-user",
-      "General Users": "general",
     }
 
-    const priority = priorityMap[selectedSendTo] || "general"
+    const priority = priorityMap[selectedSendTo] || "old-user"
 
     const updatedNotification = {
       ...editingNotification,
@@ -814,7 +842,6 @@ export default function SettingPage() {
       image: uploadedImage,
       priority: priority,
       sentTo: selectedSendTo,
-      timestamp: new Date().toISOString(),
     }
 
     try {
@@ -829,16 +856,15 @@ export default function SettingPage() {
         setSentNotifications((prev) => prev.map((n) => (n.id === editingNotification.id ? updatedNotification : n)))
         alert("Notification updated successfully!")
         setEditingNotification(null)
+        setNotificationView("list")
         setNotificationData({
-          title: "Upcoming Zero Koin",
-          description:
-            "Zero Koin mining is the process of validating transactions and securing the Zero Koin blockchain by solving complex mathematical problems, typically using computing power, to earn rewards in Zero Koin.",
+          title: "",
+          description: "",
           link: "",
         })
         setUploadedImage(null)
         setUploadedImageFile(null)
         setSelectedSendTo("Send to")
-        setNotificationView("list")
       } else {
         throw new Error("Failed to update notification")
       }
@@ -848,7 +874,119 @@ export default function SettingPage() {
     }
   }
 
-  if (loading || usersLoading) {
+  // Reward Card Component
+  const RewardCard = ({ title, value, rewardKey, icon: Icon, color, description }) => {
+    const isEditing = editingReward === rewardKey
+    const [localValue, setLocalValue] = useState(value.toString())
+    const inputRef = useRef(null)
+
+    useEffect(() => {
+      if (isEditing && inputRef.current) {
+        setTimeout(() => {
+          inputRef.current?.focus()
+          inputRef.current?.select()
+        }, 50)
+      }
+    }, [isEditing])
+
+    const handleSave = async () => {
+      const newValue = parseInt(localValue)
+      if (isNaN(newValue) || newValue < 0) {
+        showTemporaryMessage("error", "Please enter a valid positive number")
+        return
+      }
+      const saved = await handleSaveReward(rewardKey, newValue)
+      if (!saved) {
+        setLocalValue(value.toString())
+      }
+    }
+
+    const handleCancel = () => {
+      setEditingReward(null)
+      setLocalValue(value.toString())
+    }
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Enter') {
+        handleSave()
+      }
+      if (e.key === 'Escape') {
+        handleCancel()
+      }
+    }
+
+    return (
+      <Card className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start space-x-3 sm:space-x-4">
+              <div className={`w-10 sm:w-12 h-10 sm:h-12 ${color} rounded-full flex items-center justify-center flex-shrink-0`}>
+                <Icon className="h-5 sm:h-6 w-5 sm:w-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">{title}</p>
+                {description && (
+                  <p className="text-xs text-gray-400 mb-2">{description}</p>
+                )}
+                {isEditing ? (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-teal-500">
+                      <span className="px-2 text-gray-500 text-sm border-r border-gray-200">ZRK</span>
+                      <input
+                        ref={inputRef}
+                        type="text"
+                        inputMode="numeric"
+                        value={localValue}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9]/g, '');
+                          setLocalValue(value);
+                        }}
+                        onKeyDown={handleKeyDown}
+                        className="w-28 px-2 py-2 text-lg font-bold focus:outline-none rounded-r-md"
+                        disabled={savingSettings}
+                      />
+                    </div>
+                    <button
+                      onClick={handleSave}
+                      disabled={savingSettings}
+                      className="w-8 h-8 rounded-md bg-green-600 hover:bg-green-700 text-white flex items-center justify-center transition-colors"
+                      title="Save"
+                    >
+                      {savingSettings ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    </button>
+                    <button
+                      onClick={handleCancel}
+                      className="w-8 h-8 rounded-md bg-gray-300 hover:bg-gray-400 text-gray-800 flex items-center justify-center transition-colors"
+                      title="Cancel"
+                    >
+                      <XCircle className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-2xl sm:text-3xl font-bold text-gray-900">{value}</span>
+                    <span className="text-sm text-gray-400">ZRK</span>
+                    <button
+                      onClick={() => {
+                        setEditingReward(rewardKey)
+                        setLocalValue(value.toString())
+                      }}
+                      className="w-7 h-7 rounded-md hover:bg-gray-100 text-gray-400 hover:text-teal-600 flex items-center justify-center transition-colors"
+                      title="Edit Reward"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (loading || usersLoading || settingsLoading) {
     return (
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
         <div className="flex justify-center items-center h-64">
@@ -861,11 +999,10 @@ export default function SettingPage() {
     )
   }
 
-  // Main Settings View (without reward cards)
+  // Main Settings View
   if (currentView === "main") {
     return (
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
-        {/* Success/Error Message */}
         {message.text && (
           <div className={`p-3 rounded-lg ${
             message.type === "success" ? "bg-green-100 text-green-700 border border-green-300" : 
@@ -883,6 +1020,41 @@ export default function SettingPage() {
           </div>
         </div>
 
+        {/* Reward Settings Section */}
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <DollarSign className="h-5 w-5 text-teal-600" />
+            <h2 className="text-lg font-semibold text-gray-900">Reward Settings</h2>
+          </div>
+         
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            <RewardCard
+              title="Referral Rewards"
+              value={rewardSettings.referralReward}
+              rewardKey="referralReward"
+              icon={Users}
+              color="bg-purple-500"
+              description="Reward for referring a new user"
+            />
+            <RewardCard
+              title="Learning Rewards"
+              value={rewardSettings.learningReward}
+              rewardKey="learningReward"
+              icon={GraduationCap}
+              color="bg-blue-500"
+              description="Reward per learning session"
+            />
+            <RewardCard
+              title="Ad Base Rewards"
+              value={rewardSettings.adBaseReward}
+              rewardKey="adBaseReward"
+              icon={Video}
+              color="bg-orange-500"
+              description="Reward for watching video ads"
+            />
+          </div>
+        </div>
+
         {/* Expiry Dropdown */}
         {(userRole === "superadmin" || userRole === "editor") && (
           <div className="flex justify-center sm:justify-end">
@@ -897,388 +1069,4 @@ export default function SettingPage() {
               {showExpiryDropdown && (
                 <div className="absolute right-0 mt-1 w-24 bg-white border border-gray-200 rounded shadow-lg z-10">
                   <div className="py-1">
-                    {["1 Day", "2 Day", "3 Day", "4 Day", "5 Day"].map((option) => (
-                      <button
-                        key={option}
-                        onClick={() => {
-                          setSelectedExpiry(option.split(" ")[0] + ":00")
-                          setShowExpiryDropdown(false)
-                        }}
-                        className="block w-full text-left px-2 py-1 text-xs text-gray-700 hover:bg-gray-100"
-                      >
-                        {option}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Navigation Buttons */}
-        <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 pt-4 sm:pt-8">
-          <Button
-            onClick={handleViewControl}
-            className="bg-teal-600 hover:bg-teal-700 text-white px-4 sm:px-6 py-2 rounded-md text-sm font-medium w-full sm:w-auto"
-          >
-            View Admin Control
-          </Button>
-          {(userRole === "superadmin" || userRole === "editor") && (
-            <Button
-              onClick={handleNotificationSettings}
-              className="bg-teal-600 hover:bg-teal-700 text-white px-4 sm:px-6 py-2 rounded-md text-sm font-medium w-full sm:w-auto"
-            >
-              Notification Settings
-            </Button>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  // Admin Control View
-  if (currentView === "control") {
-    return (
-      <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-          <div className="flex items-center gap-3">
-            <Button onClick={() => setCurrentView("main")} variant="outline" size="sm" className="flex items-center gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Settings
-            </Button>
-            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Admin Control</h1>
-          </div>
-          {userRole === "superadmin" && (
-            <Button onClick={handleAddNewAdmin} className="bg-teal-600 hover:bg-teal-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium w-full sm:w-auto">
-              Add New Admin
-            </Button>
-          )}
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          <Card className="bg-white border border-gray-200">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center space-x-3 sm:space-x-4">
-                <div className="w-10 sm:w-12 h-10 sm:h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <GraduationCap className="h-5 sm:h-6 w-5 sm:w-6 text-blue-600" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Learning Rewards Given</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
-                    {userRole === "superadmin" ? stats.learningRewards : "***"}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-white border border-gray-200">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center space-x-3 sm:space-x-4">
-                <div className="w-10 sm:w-12 h-10 sm:h-12 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Users className="h-5 sm:h-6 w-5 sm:w-6 text-purple-600" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Referrals Rewards Given</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.referralsRewards}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-white border border-gray-200 sm:col-span-2 lg:col-span-1">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center space-x-3 sm:space-x-4">
-                <div className="w-10 sm:w-12 h-10 sm:h-12 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Video className="h-5 sm:h-6 w-5 sm:w-6 text-orange-600" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Ad Base Rewards Given</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
-                    {userRole === "superadmin" ? stats.adBaseRewards : "***"}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Admin Access Table */}
-        <Card className="bg-white border border-gray-200">
-          <CardContent className="p-3 sm:p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Admin Access Table</h3>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-b border-gray-200">
-                    <TableHead className="font-semibold text-gray-700 py-3 min-w-[200px]">Admin Email</TableHead>
-                    <TableHead className="font-semibold text-gray-700 py-3 min-w-[120px]">Role</TableHead>
-                    {userRole === "superadmin" && (
-                      <TableHead className="font-semibold text-gray-700 py-3 min-w-[160px]">Action</TableHead>
-                    )}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {adminsLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={userRole === "superadmin" ? 3 : 2} className="text-center py-8">
-                        <div className="flex justify-center">
-                          <Loader2 className="w-6 h-6 animate-spin text-teal-600" />
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ) : adminsError ? (
-                    <TableRow>
-                      <TableCell colSpan={userRole === "superadmin" ? 3 : 2} className="text-center py-8 text-red-600">
-                        Error loading admins: {adminsError}
-                      </TableCell>
-                    </TableRow>
-                  ) : admins.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={userRole === "superadmin" ? 3 : 2} className="text-center py-8 text-gray-500">
-                        No admins found
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    admins.map((admin) => (
-                      <TableRow key={admin._id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <TableCell className="py-3 text-gray-900 text-sm">{admin.email}</TableCell>
-                        <TableCell className="py-3 text-gray-900 text-sm">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            admin.role === "superadmin" ? "bg-purple-100 text-purple-800" :
-                            admin.role === "editor" ? "bg-blue-100 text-blue-800" :
-                            admin.role === "viewer" ? "bg-green-100 text-green-800" :
-                            "bg-gray-100 text-gray-800"
-                          }`}>
-                            {admin.role === "superadmin" ? "Super Admin" :
-                             admin.role === "editor" ? "Editor" :
-                             admin.role === "viewer" ? "Viewer" : admin.role}
-                          </span>
-                        </TableCell>
-                        {userRole === "superadmin" && (
-                          <TableCell className="py-3">
-                            <div className="flex flex-col sm:flex-row gap-2">
-                              <Button
-                                size="sm"
-                                onClick={() => handleRemoveAdmin(admin._id)}
-                                className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 text-xs flex items-center gap-1 justify-center"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                                <span className="hidden sm:inline">Remove</span>
-                              </Button>
-                              <Button
-                                size="sm"
-                                onClick={() => handleEditAdmin(admin)}
-                                className="bg-teal-600 hover:bg-teal-700 text-white px-2 py-1 text-xs flex items-center gap-1 justify-center"
-                              >
-                                <Edit3 className="h-3 w-3" />
-                                <span className="hidden sm:inline">Edit</span>
-                              </Button>
-                            </div>
-                          </TableCell>
-                        )}
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Add Admin Modal */}
-        <Dialog open={showAddAdminModal} onOpenChange={setShowAddAdminModal}>
-          <DialogContent className="sm:max-w-md bg-white">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-semibold text-gray-900">Add New Admin</h2>
-                <Button variant="ghost" size="sm" onClick={() => setShowAddAdminModal(false)} className="h-6 w-6 p-0">
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="add-name" className="text-sm font-medium text-gray-700">Username *</Label>
-                  <Input
-                    id="add-name"
-                    value={adminFormData.username}
-                    onChange={(e) => setAdminFormData({ ...adminFormData, username: e.target.value })}
-                    className="border-gray-200"
-                    placeholder="Enter admin username"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="add-email" className="text-sm font-medium text-gray-700">Email *</Label>
-                  <Input
-                    id="add-email"
-                    type="email"
-                    value={adminFormData.email}
-                    onChange={(e) => setAdminFormData({ ...adminFormData, email: e.target.value })}
-                    className="border-gray-200"
-                    placeholder="Enter admin email"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="add-role" className="text-sm font-medium text-gray-700">Role *</Label>
-                  <Select
-                    value={adminFormData.role}
-                    onValueChange={(value) => setAdminFormData({ ...adminFormData, role: value })}
-                  >
-                    <SelectTrigger className="border-gray-200">
-                      <SelectValue placeholder="Select role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="superadmin">Super Admin</SelectItem>
-                      <SelectItem value="editor">Editor</SelectItem>
-                      <SelectItem value="viewer">Viewer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="add-password" className="text-sm font-medium text-gray-700">Password *</Label>
-                  <Input
-                    id="add-password"
-                    type="password"
-                    value={adminFormData.password}
-                    onChange={(e) => setAdminFormData({ ...adminFormData, password: e.target.value })}
-                    className="border-gray-200"
-                    placeholder="Enter password"
-                  />
-                </div>
-                <div className="flex justify-end gap-3 pt-4">
-                  <Button variant="outline" onClick={() => setShowAddAdminModal(false)}>Cancel</Button>
-                  <Button onClick={handleAddAdminSubmit} className="bg-teal-600 hover:bg-teal-700 text-white">Add Admin</Button>
-                </div>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Edit Admin Modal */}
-        <Dialog open={showEditAdminModal} onOpenChange={setShowEditAdminModal}>
-          <DialogContent className="sm:max-w-md bg-white">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-semibold text-gray-900">Edit Admin</h2>
-                <Button variant="ghost" size="sm" onClick={() => setShowEditAdminModal(false)} className="h-6 w-6 p-0">
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-name">Username *</Label>
-                  <Input
-                    id="edit-name"
-                    value={adminFormData.username}
-                    onChange={(e) => setAdminFormData({ ...adminFormData, username: e.target.value })}
-                    disabled={userRole !== "superadmin"}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-email">Email *</Label>
-                  <Input
-                    id="edit-email"
-                    type="email"
-                    value={adminFormData.email}
-                    onChange={(e) => setAdminFormData({ ...adminFormData, email: e.target.value })}
-                    disabled={userRole !== "superadmin"}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-role">Role *</Label>
-                  <Select
-                    value={adminFormData.role}
-                    onValueChange={(value) => setAdminFormData({ ...adminFormData, role: value })}
-                    disabled={userRole !== "superadmin"}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="superadmin">Super Admin</SelectItem>
-                      <SelectItem value="editor">Editor</SelectItem>
-                      <SelectItem value="viewer">Viewer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex justify-end gap-3 pt-4">
-                  <Button variant="outline" onClick={() => setShowEditAdminModal(false)}>Cancel</Button>
-                  {userRole === "superadmin" && (
-                    <Button onClick={handleEditAdminSubmit} className="bg-teal-600 hover:bg-teal-700 text-white">Update Admin</Button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
-    )
-  }
-
-  // Notification views
-  if (currentView === "notifications") {
-    return (
-      <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-          <div className="flex items-center gap-3">
-            <Button onClick={() => setCurrentView("main")} variant="outline" size="sm" className="flex items-center gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Settings
-            </Button>
-            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Notification Settings</h1>
-          </div>
-          {(userRole === "superadmin" || userRole === "editor") && (
-            <Button onClick={handleCreateNotification} className="bg-teal-600 hover:bg-teal-700 text-white">
-              Create Notification
-            </Button>
-          )}
-        </div>
-
-        {sentNotifications.length === 0 ? (
-          <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6">
-            <div className="w-24 sm:w-32 h-24 sm:h-32 bg-teal-100 rounded-full flex items-center justify-center">
-              <Bell className="h-12 sm:h-16 w-12 sm:w-16 text-teal-600" />
-            </div>
-            <div className="text-center space-y-2">
-              <h2 className="text-lg sm:text-xl font-medium text-gray-900">No Notifications Yet!</h2>
-              <p className="text-gray-600">Create your first notification to get started.</p>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sentNotifications.map((notification) => (
-              <Card key={notification.id} className="bg-white border border-gray-200">
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-start mb-3">
-                    <h3 className="font-semibold text-gray-900">{notification.title}</h3>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      notification.priority === "new-user" ? "bg-green-100 text-green-800" :
-                      notification.priority === "top-rated-user" ? "bg-purple-100 text-purple-800" :
-                      "bg-blue-100 text-blue-800"
-                    }`}>
-                      {notification.sentTo}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-3 line-clamp-2">{notification.description}</p>
-                  <p className="text-xs text-gray-400">{new Date(notification.timestamp).toLocaleDateString()}</p>
-                  {(userRole === "superadmin" || userRole === "editor") && (
-                    <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
-                      <Button size="sm" variant="outline" onClick={() => handleEditNotification(notification)} className="flex-1">
-                        <Edit3 className="h-3 w-3 mr-1" /> Edit
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => handleDeleteNotification(notification.id)} className="flex-1 text-red-600">
-                        <Trash2 className="h-3 w-3 mr-1" /> Delete
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  return null
-}
+                    {["1 Day
