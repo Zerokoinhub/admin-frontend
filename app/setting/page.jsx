@@ -39,61 +39,6 @@ import { userAPI, userHelpers } from "../../src/lib/api"
 import { useUsers } from "../../hooks/useUsers"
 import { useAdmins } from "../../hooks/useAdmins"
 
-// API Service for Settings
-const settingsAPI = {
-  async getSettings() {
-    try {
-      const token = localStorage.getItem("token")
-      const APP_BACKEND_URL = "https://zerokoinapp-production.up.railway.app/api"
-      
-      const response = await fetch(`${APP_BACKEND_URL}/settings`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: token ? `Bearer ${token}` : "",
-        },
-      })
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-      
-      const result = await response.json()
-      return result
-    } catch (error) {
-      console.error("Error fetching settings:", error)
-      return { success: false, error: error.message }
-    }
-  },
-
-  async updateSettings(settingsData) {
-    try {
-      const token = localStorage.getItem("token")
-      const APP_BACKEND_URL = "https://zerokoinapp-production.up.railway.app/api"
-      
-      const response = await fetch(`${APP_BACKEND_URL}/settings`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: token ? `Bearer ${token}` : "",
-        },
-        body: JSON.stringify(settingsData),
-      })
-      
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
-      }
-      
-      const result = await response.json()
-      return result
-    } catch (error) {
-      console.error("Error updating settings:", error)
-      return { success: false, error: error.message }
-    }
-  },
-}
-
 export default function SettingPage() {
   // User role state
   const [userRole, setUserRole] = useState("")
@@ -117,16 +62,6 @@ export default function SettingPage() {
     status: "all",
     dateRange: "all",
   })
-
-  // Reward settings state
-  const [rewardSettings, setRewardSettings] = useState({
-    referralReward: 50,
-    learningReward: 2,
-    adBaseReward: 30,
-  })
-  const [editingReward, setEditingReward] = useState(null)
-  const [settingsLoading, setSettingsLoading] = useState(true)
-  const [savingSettings, setSavingSettings] = useState(false)
 
   // Settings specific state
   const [currentView, setCurrentView] = useState("main")
@@ -164,75 +99,6 @@ export default function SettingPage() {
   const [sentNotifications, setSentNotifications] = useState([])
   const [editingNotification, setEditingNotification] = useState(null)
 
-  // Load reward settings from API on mount
-  useEffect(() => {
-    loadSettingsFromAPI()
-  }, [])
-
-  const loadSettingsFromAPI = async () => {
-    setSettingsLoading(true)
-    try {
-      const result = await settingsAPI.getSettings()
-      
-      if (result.success && result.data && result.data.rewards) {
-        setRewardSettings({
-          referralReward: result.data.rewards.referralReward || 50,
-          learningReward: result.data.rewards.learningReward || 2,
-          adBaseReward: result.data.rewards.adBaseReward || 30,
-        })
-      }
-    } catch (error) {
-      console.error("Failed to load settings:", error)
-    } finally {
-      setSettingsLoading(false)
-    }
-  }
-
-  const showTemporaryMessage = (type, text) => {
-    setMessage({ type, text })
-    setTimeout(() => setMessage({ type: "", text: "" }), 3000)
-  }
-
-  const saveRewardSettingsToAPI = async (newSettings) => {
-    setSavingSettings(true)
-    try {
-      const result = await settingsAPI.updateSettings({ rewards: newSettings })
-      
-      if (result.success) {
-        showTemporaryMessage("success", `✅ Saved successfully!`)
-        return true
-      } else {
-        throw new Error(result.error || "Failed to save")
-      }
-    } catch (error) {
-      console.error("Save failed:", error)
-      showTemporaryMessage("error", `Failed to save: ${error.message}`)
-      return false
-    } finally {
-      setSavingSettings(false)
-    }
-  }
-
-  const handleSaveReward = async (rewardKey, newValue) => {
-    if (isNaN(newValue) || newValue < 0) {
-      showTemporaryMessage("error", "Please enter a valid positive number")
-      return false
-    }
-    
-    const updatedSettings = { ...rewardSettings, [rewardKey]: newValue }
-    setRewardSettings(updatedSettings)
-    
-    const saved = await saveRewardSettingsToAPI(updatedSettings)
-    
-    if (saved) {
-      setEditingReward(null)
-      return true
-    } else {
-      setRewardSettings(rewardSettings)
-      return false
-    }
-  }
-
   // Get user role from localStorage
   useEffect(() => {
     try {
@@ -251,9 +117,11 @@ export default function SettingPage() {
     }
   }, [])
 
+  // Check permissions
   const hasTransferAccess = userRole === "superadmin"
   const hasHistoryAccess = true
 
+  // Fetch users on component mount (only for super admin)
   useEffect(() => {
     if (hasTransferAccess) {
       fetchUsers()
@@ -297,6 +165,7 @@ export default function SettingPage() {
     fetchSentNotifications()
   }, [BASE_URL])
 
+  // Fetch admins data
   const { admins, loading: adminsLoading, error: adminsError, addAdmin, editAdmin, removeAdmin } = useAdmins()
   const [editingAdmin, setEditingAdmin] = useState(null)
   const [showAddAdminModal, setShowAddAdminModal] = useState(false)
@@ -307,10 +176,13 @@ export default function SettingPage() {
     role: "",
     password: "",
   })
+  const [showPassword, setShowPassword] = useState(false)
   const [currentAdminPassword, setCurrentAdminPassword] = useState("")
 
+  // Fetch users data for statistics
   const { users: allUsers, loading: usersLoading, error: usersError } = useUsers(1, 100)
 
+  // Calculate real statistics from users
   const stats = useMemo(() => {
     if (!allUsers || allUsers.length === 0) {
       return {
@@ -327,6 +199,7 @@ export default function SettingPage() {
     }
   }, [allUsers])
 
+  // Fetch users from API
   const fetchUsers = async () => {
     if (!hasTransferAccess) return
     try {
@@ -346,6 +219,7 @@ export default function SettingPage() {
     }
   }
 
+  // Fetch transfer history
   const fetchTransferHistory = async () => {
     try {
       setHistoryLoading(true)
@@ -366,12 +240,14 @@ export default function SettingPage() {
     }
   }
 
+  // Handle user selection
   const handleUserSelect = (user) => {
     setSelectedUser(user)
     setMessage({ type: "", text: "" })
     setIsMobileMenuOpen(false)
   }
 
+  // Handle transfer execution
   const handleTransfer = async () => {
     if (!hasTransferAccess) {
       setMessage({ type: "error", text: "You don't have permission to transfer coins" })
@@ -432,12 +308,14 @@ export default function SettingPage() {
     }
   }
 
+  // Filter users based on search term
   const filteredUsers = users.filter(
     (user) =>
       user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email?.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
+  // Filter transfer history
   const filteredHistory = transferHistory.filter((transfer) => {
     const matchesSearch =
       !historyFilters.search ||
@@ -469,6 +347,7 @@ export default function SettingPage() {
     return matchesSearch && matchesStatus && matchesDate
   })
 
+  // Export transfer history to CSV
   const exportToCSV = () => {
     const headers = ["Transaction ID", "User Name", "Email", "Amount", "Date", "Time", "Admin", "Status"]
     const csvContent = [
@@ -496,8 +375,10 @@ export default function SettingPage() {
     window.URL.revokeObjectURL(url)
   }
 
+  // Calculate transfer statistics
   const transferStats = userHelpers.calculateTransferStats(filteredHistory)
 
+  // Get role icon and color
   const getRoleDisplay = (role) => {
     switch (role) {
       case "superadmin":
@@ -514,6 +395,7 @@ export default function SettingPage() {
   const roleDisplay = getRoleDisplay(userRole)
   const RoleIcon = roleDisplay.icon
 
+  // Handle image upload
   const handleImageUpload = async (event) => {
     const file = event.target.files[0]
     if (!file) return
@@ -536,6 +418,7 @@ export default function SettingPage() {
     }
   }
 
+  // Handle notification sending
   const handleSendNotification = async () => {
     if (userRole === "viewer") {
       alert("You don't have permission to send notifications.")
@@ -671,7 +554,6 @@ export default function SettingPage() {
 
   const handleCreateNotification = () => {
     if (userRole === "superadmin" || userRole === "editor") {
-      // Reset form
       setNotificationData({
         title: "",
         description: "",
@@ -874,119 +756,7 @@ export default function SettingPage() {
     }
   }
 
-  // Reward Card Component
-  const RewardCard = ({ title, value, rewardKey, icon: Icon, color, description }) => {
-    const isEditing = editingReward === rewardKey
-    const [localValue, setLocalValue] = useState(value.toString())
-    const inputRef = useRef(null)
-
-    useEffect(() => {
-      if (isEditing && inputRef.current) {
-        setTimeout(() => {
-          inputRef.current?.focus()
-          inputRef.current?.select()
-        }, 50)
-      }
-    }, [isEditing])
-
-    const handleSave = async () => {
-      const newValue = parseInt(localValue)
-      if (isNaN(newValue) || newValue < 0) {
-        showTemporaryMessage("error", "Please enter a valid positive number")
-        return
-      }
-      const saved = await handleSaveReward(rewardKey, newValue)
-      if (!saved) {
-        setLocalValue(value.toString())
-      }
-    }
-
-    const handleCancel = () => {
-      setEditingReward(null)
-      setLocalValue(value.toString())
-    }
-
-    const handleKeyDown = (e) => {
-      if (e.key === 'Enter') {
-        handleSave()
-      }
-      if (e.key === 'Escape') {
-        handleCancel()
-      }
-    }
-
-    return (
-      <Card className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
-        <CardContent className="p-4 sm:p-6">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start space-x-3 sm:space-x-4">
-              <div className={`w-10 sm:w-12 h-10 sm:h-12 ${color} rounded-full flex items-center justify-center flex-shrink-0`}>
-                <Icon className="h-5 sm:h-6 w-5 sm:w-6 text-white" />
-              </div>
-              <div className="flex-1">
-                <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">{title}</p>
-                {description && (
-                  <p className="text-xs text-gray-400 mb-2">{description}</p>
-                )}
-                {isEditing ? (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <div className="flex items-center border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-teal-500">
-                      <span className="px-2 text-gray-500 text-sm border-r border-gray-200">ZRK</span>
-                      <input
-                        ref={inputRef}
-                        type="text"
-                        inputMode="numeric"
-                        value={localValue}
-                        onChange={(e) => {
-                          const value = e.target.value.replace(/[^0-9]/g, '');
-                          setLocalValue(value);
-                        }}
-                        onKeyDown={handleKeyDown}
-                        className="w-28 px-2 py-2 text-lg font-bold focus:outline-none rounded-r-md"
-                        disabled={savingSettings}
-                      />
-                    </div>
-                    <button
-                      onClick={handleSave}
-                      disabled={savingSettings}
-                      className="w-8 h-8 rounded-md bg-green-600 hover:bg-green-700 text-white flex items-center justify-center transition-colors"
-                      title="Save"
-                    >
-                      {savingSettings ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    </button>
-                    <button
-                      onClick={handleCancel}
-                      className="w-8 h-8 rounded-md bg-gray-300 hover:bg-gray-400 text-gray-800 flex items-center justify-center transition-colors"
-                      title="Cancel"
-                    >
-                      <XCircle className="h-4 w-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-2xl sm:text-3xl font-bold text-gray-900">{value}</span>
-                    <span className="text-sm text-gray-400">ZRK</span>
-                    <button
-                      onClick={() => {
-                        setEditingReward(rewardKey)
-                        setLocalValue(value.toString())
-                      }}
-                      className="w-7 h-7 rounded-md hover:bg-gray-100 text-gray-400 hover:text-teal-600 flex items-center justify-center transition-colors"
-                      title="Edit Reward"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (loading || usersLoading || settingsLoading) {
+  if (loading || usersLoading) {
     return (
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
         <div className="flex justify-center items-center h-64">
@@ -999,10 +769,11 @@ export default function SettingPage() {
     )
   }
 
-  // Main Settings View
+  // Main Settings View (without reward cards)
   if (currentView === "main") {
     return (
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
+        {/* Success/Error Message */}
         {message.text && (
           <div className={`p-3 rounded-lg ${
             message.type === "success" ? "bg-green-100 text-green-700 border border-green-300" : 
@@ -1017,41 +788,6 @@ export default function SettingPage() {
           <div>
             <h1 className="text-2xl font-semibold text-gray-900">Settings</h1>
             <p className="text-sm text-gray-500 mt-1">Manage admin control and notifications</p>
-          </div>
-        </div>
-
-        {/* Reward Settings Section */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <DollarSign className="h-5 w-5 text-teal-600" />
-            <h2 className="text-lg font-semibold text-gray-900">Reward Settings</h2>
-          </div>
-         
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            <RewardCard
-              title="Referral Rewards"
-              value={rewardSettings.referralReward}
-              rewardKey="referralReward"
-              icon={Users}
-              color="bg-purple-500"
-              description="Reward for referring a new user"
-            />
-            <RewardCard
-              title="Learning Rewards"
-              value={rewardSettings.learningReward}
-              rewardKey="learningReward"
-              icon={GraduationCap}
-              color="bg-blue-500"
-              description="Reward per learning session"
-            />
-            <RewardCard
-              title="Ad Base Rewards"
-              value={rewardSettings.adBaseReward}
-              rewardKey="adBaseReward"
-              icon={Video}
-              color="bg-orange-500"
-              description="Reward for watching video ads"
-            />
           </div>
         </div>
 
