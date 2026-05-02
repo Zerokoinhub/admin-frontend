@@ -159,6 +159,7 @@ export default function CourseManagementPage() {
         const data = await response.json();
         console.log("Full course details:", data);
         
+        // ✅ FIXED: Extract course from response
         let fullCourse = null;
         if (data.success && data.course) {
           fullCourse = data.course;
@@ -656,7 +657,7 @@ export default function CourseManagementPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            {/* View Button - Fetches full course details */}
+                            {/* View Button */}
                             <Button 
                               variant="ghost" 
                               size="sm"
@@ -680,41 +681,86 @@ export default function CourseManagementPage() {
                                     const data = await response.json();
                                     const fullCourse = data.course || data.data || data;
                                     
-                                    if (fullCourse && fullCourse.languages) {
-                                      const newFormData = { languages: {} };
-                                      for (const lang of availableLanguages) {
-                                        const langData = fullCourse.languages[lang.code];
-                                        if (langData) {
-                                          newFormData.languages[lang.code] = {
-                                            courseName: langData.courseName || "",
-                                            pages: (langData.pages || []).map(page => {
-                                              let timeValue = "120";
-                                              let timeUnit = "minutes";
-                                              try {
-                                                if (page.time) {
-                                                  const parsed = JSON.parse(page.time);
-                                                  timeValue = parsed?.value?.toString() || "120";
-                                                  timeUnit = parsed?.unit || "minutes";
+                                    console.log("Editing course:", fullCourse);
+                                    
+                                    // ✅ FIXED: Handle both formats
+                                    if (fullCourse) {
+                                      // Check if course has languages object or direct properties
+                                      if (fullCourse.languages) {
+                                        // Format 1: Has languages object
+                                        const newFormData = { languages: {} };
+                                        for (const lang of availableLanguages) {
+                                          const langData = fullCourse.languages[lang.code];
+                                          if (langData) {
+                                            newFormData.languages[lang.code] = {
+                                              courseName: langData.courseName || "",
+                                              pages: (langData.pages || []).map(page => {
+                                                let timeValue = "120";
+                                                let timeUnit = "minutes";
+                                                try {
+                                                  if (page.time) {
+                                                    const parsed = JSON.parse(page.time);
+                                                    timeValue = parsed?.value?.toString() || "120";
+                                                    timeUnit = parsed?.unit || "minutes";
+                                                  }
+                                                } catch (e) {
+                                                  timeValue = page.time || "120";
                                                 }
-                                              } catch (e) {
-                                                timeValue = page.time || "120";
-                                              }
-                                              return {
-                                                title: page.title || "",
-                                                content: page.content || "",
-                                                time: timeValue,
-                                                timeUnit: timeUnit,
-                                              };
-                                            }),
-                                          };
-                                        } else {
-                                          newFormData.languages[lang.code] = {
-                                            courseName: "",
-                                            pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
-                                          };
+                                                return {
+                                                  title: page.title || "",
+                                                  content: page.content || "",
+                                                  time: timeValue,
+                                                  timeUnit: timeUnit,
+                                                };
+                                              }),
+                                            };
+                                          } else {
+                                            newFormData.languages[lang.code] = {
+                                              courseName: "",
+                                              pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
+                                            };
+                                          }
                                         }
+                                        setFormData(newFormData);
+                                      } else if (fullCourse.courseName && fullCourse.pages) {
+                                        // Format 2: Direct properties (from your API)
+                                        const newFormData = { languages: {} };
+                                        // Set English content from direct properties
+                                        newFormData.languages.en = {
+                                          courseName: fullCourse.courseName || "",
+                                          pages: (fullCourse.pages || []).map(page => ({
+                                            title: page.title || "",
+                                            content: page.content || "",
+                                            time: page.time ? (() => {
+                                              try {
+                                                const parsed = JSON.parse(page.time);
+                                                return parsed?.value?.toString() || "120";
+                                              } catch (e) {
+                                                return "120";
+                                              }
+                                            })() : "120",
+                                            timeUnit: page.time ? (() => {
+                                              try {
+                                                const parsed = JSON.parse(page.time);
+                                                return parsed?.unit || "minutes";
+                                              } catch (e) {
+                                                return "minutes";
+                                              }
+                                            })() : "minutes",
+                                          })),
+                                        };
+                                        // Initialize other languages as empty
+                                        for (const lang of availableLanguages) {
+                                          if (lang.code !== 'en') {
+                                            newFormData.languages[lang.code] = {
+                                              courseName: "",
+                                              pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
+                                            };
+                                          }
+                                        }
+                                        setFormData(newFormData);
                                       }
-                                      setFormData(newFormData);
+                                      
                                       setIsEditing(true);
                                       setSelectedCourse(fullCourse);
                                       setCurrentLanguage("en");
@@ -761,17 +807,14 @@ export default function CourseManagementPage() {
         </CardContent>
       </Card>
 
-      {/* Course Viewer Modal - Now properly displays content */}
+      {/* Course Viewer Modal - FIXED for direct page format */}
       {currentView === "course" && selectedCourse && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <Card className="max-w-2xl w-full max-h-[80vh] overflow-y-auto">
             <CardContent className="p-6">
               <div className="flex justify-between items-start mb-4">
                 <h2 className="text-xl font-semibold">
-                  {selectedCourse?.languages?.en?.courseName || 
-                   selectedCourse?.englishName || 
-                   selectedCourse?.courseName || 
-                   "Course Details"}
+                  {selectedCourse?.courseName || selectedCourse?.englishName || "Course Details"}
                 </h2>
                 <Button variant="ghost" size="sm" onClick={() => {
                   setSelectedCourse(null);
@@ -782,16 +825,31 @@ export default function CourseManagementPage() {
               </div>
               
               <div className="space-y-4">
-                {selectedCourse?.languages?.en?.pages && selectedCourse.languages.en.pages.length > 0 ? (
-                  selectedCourse.languages.en.pages.map((page, idx) => (
+                {/* ✅ FIXED: Check both direct pages and nested languages */}
+                {selectedCourse?.pages && selectedCourse.pages.length > 0 ? (
+                  selectedCourse.pages.map((page, idx) => (
                     <div key={idx} className="border rounded-lg p-4">
                       <h3 className="font-semibold text-lg">{page.title || `Page ${idx + 1}`}</h3>
                       <p className="text-gray-600 mt-2 whitespace-pre-wrap">{page.content || "No content"}</p>
                       {page.time && (
                         <p className="text-sm text-gray-400 mt-2">
-                          Duration: {typeof page.time === 'string' ? page.time : JSON.stringify(page.time)}
+                          Duration: {(() => {
+                            try {
+                              const parsed = JSON.parse(page.time);
+                              return `${parsed.value} ${parsed.unit}`;
+                            } catch (e) {
+                              return page.time;
+                            }
+                          })()}
                         </p>
                       )}
+                    </div>
+                  ))
+                ) : selectedCourse?.languages?.en?.pages && selectedCourse.languages.en.pages.length > 0 ? (
+                  selectedCourse.languages.en.pages.map((page, idx) => (
+                    <div key={idx} className="border rounded-lg p-4">
+                      <h3 className="font-semibold text-lg">{page.title || `Page ${idx + 1}`}</h3>
+                      <p className="text-gray-600 mt-2 whitespace-pre-wrap">{page.content || "No content"}</p>
                     </div>
                   ))
                 ) : (
