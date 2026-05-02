@@ -20,7 +20,6 @@ import {
   Edit,
   Trash2,
   Plus,
-  Eye,
   AlertCircle,
   Loader2,
 } from "lucide-react";
@@ -145,45 +144,6 @@ export default function CourseManagementPage() {
     }
   }, []);
 
-  // Fetch full course details by ID (for view modal)
-  const fetchFullCourseDetails = async (courseId) => {
-    setLoading(true);
-    try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(`${API_BASE_URL}/${courseId}`, {
-        method: "GET",
-        headers: getAuthHeaders(),
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log("Full course details:", data);
-        
-        // ✅ FIXED: Extract course from response
-        let fullCourse = null;
-        if (data.success && data.course) {
-          fullCourse = data.course;
-        } else if (data.course) {
-          fullCourse = data.course;
-        } else if (data.data) {
-          fullCourse = data.data;
-        } else {
-          fullCourse = data;
-        }
-        
-        setSelectedCourse(fullCourse);
-        setCurrentView("course");
-      } else {
-        alert("Failed to load course details");
-      }
-    } catch (err) {
-      console.error("Error fetching course details:", err);
-      alert("Error loading course: " + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Create a new course
   const createCourse = async (courseData) => {
     setIsSubmitting(true);
@@ -221,6 +181,11 @@ export default function CourseManagementPage() {
 
   // Update an existing course
   const updateCourse = async (courseId, courseData) => {
+    if (!courseId) {
+      console.error("Cannot update course: No course ID provided");
+      return { success: false, error: "Course ID is required" };
+    }
+    
     setIsSubmitting(true);
     try {
       const token = localStorage.getItem("token");
@@ -229,9 +194,11 @@ export default function CourseManagementPage() {
         throw new Error("Not authenticated");
       }
 
-      console.log("Updating course at:", `${API_BASE_URL}/${courseId}`);
+      const url = `${API_BASE_URL}/${courseId}`;
+      console.log("Updating course at:", url);
+      console.log("Update payload:", JSON.stringify(courseData, null, 2));
       
-      const response = await fetch(`${API_BASE_URL}/${courseId}`, {
+      const response = await fetch(url, {
         method: "PUT",
         headers: getAuthHeaders(),
         body: JSON.stringify(courseData),
@@ -549,7 +516,13 @@ export default function CourseManagementPage() {
                   
                   let result;
                   if (isEditing && selectedCourse) {
-                    result = await updateCourse(selectedCourse.id, payload);
+                    // ✅ FIXED: Use selectedCourse.id (not _id)
+                    const courseId = selectedCourse.id || selectedCourse._id;
+                    if (!courseId) {
+                      alert("Course ID not found");
+                      return;
+                    }
+                    result = await updateCourse(courseId, payload);
                   } else {
                     result = await createCourse(payload);
                   }
@@ -657,15 +630,6 @@ export default function CourseManagementPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            {/* View Button */}
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => fetchFullCourseDetails(course.id)}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            
                             {/* Edit Button */}
                             {hasPermission("edit") && (
                               <Button 
@@ -683,11 +647,9 @@ export default function CourseManagementPage() {
                                     
                                     console.log("Editing course:", fullCourse);
                                     
-                                    // ✅ FIXED: Handle both formats
                                     if (fullCourse) {
                                       // Check if course has languages object or direct properties
                                       if (fullCourse.languages) {
-                                        // Format 1: Has languages object
                                         const newFormData = { languages: {} };
                                         for (const lang of availableLanguages) {
                                           const langData = fullCourse.languages[lang.code];
@@ -723,9 +685,7 @@ export default function CourseManagementPage() {
                                         }
                                         setFormData(newFormData);
                                       } else if (fullCourse.courseName && fullCourse.pages) {
-                                        // Format 2: Direct properties (from your API)
                                         const newFormData = { languages: {} };
-                                        // Set English content from direct properties
                                         newFormData.languages.en = {
                                           courseName: fullCourse.courseName || "",
                                           pages: (fullCourse.pages || []).map(page => ({
@@ -749,7 +709,6 @@ export default function CourseManagementPage() {
                                             })() : "minutes",
                                           })),
                                         };
-                                        // Initialize other languages as empty
                                         for (const lang of availableLanguages) {
                                           if (lang.code !== 'en') {
                                             newFormData.languages[lang.code] = {
@@ -806,72 +765,6 @@ export default function CourseManagementPage() {
           )}
         </CardContent>
       </Card>
-
-      {/* Course Viewer Modal - FIXED for direct page format */}
-      {currentView === "course" && selectedCourse && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <Card className="max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-            <CardContent className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <h2 className="text-xl font-semibold">
-                  {selectedCourse?.courseName || selectedCourse?.englishName || "Course Details"}
-                </h2>
-                <Button variant="ghost" size="sm" onClick={() => {
-                  setSelectedCourse(null);
-                  setCurrentView("main");
-                }}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-              
-              <div className="space-y-4">
-                {/* ✅ FIXED: Check both direct pages and nested languages */}
-                {selectedCourse?.pages && selectedCourse.pages.length > 0 ? (
-                  selectedCourse.pages.map((page, idx) => (
-                    <div key={idx} className="border rounded-lg p-4">
-                      <h3 className="font-semibold text-lg">{page.title || `Page ${idx + 1}`}</h3>
-                      <p className="text-gray-600 mt-2 whitespace-pre-wrap">{page.content || "No content"}</p>
-                      {page.time && (
-                        <p className="text-sm text-gray-400 mt-2">
-                          Duration: {(() => {
-                            try {
-                              const parsed = JSON.parse(page.time);
-                              return `${parsed.value} ${parsed.unit}`;
-                            } catch (e) {
-                              return page.time;
-                            }
-                          })()}
-                        </p>
-                      )}
-                    </div>
-                  ))
-                ) : selectedCourse?.languages?.en?.pages && selectedCourse.languages.en.pages.length > 0 ? (
-                  selectedCourse.languages.en.pages.map((page, idx) => (
-                    <div key={idx} className="border rounded-lg p-4">
-                      <h3 className="font-semibold text-lg">{page.title || `Page ${idx + 1}`}</h3>
-                      <p className="text-gray-600 mt-2 whitespace-pre-wrap">{page.content || "No content"}</p>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    <p>No page content available for this course.</p>
-                    <p className="text-sm mt-2">Click Edit to add content.</p>
-                  </div>
-                )}
-                
-                {/* Show available languages */}
-                {selectedCourse?.availableLanguages && selectedCourse.availableLanguages.length > 0 && (
-                  <div className="mt-4 pt-4 border-t">
-                    <p className="text-sm text-gray-500">
-                      Available Languages: {selectedCourse.availableLanguages.join(', ')}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
     </div>
   );
 }
