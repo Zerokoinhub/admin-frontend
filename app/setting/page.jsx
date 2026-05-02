@@ -39,61 +39,6 @@ import { userAPI, userHelpers } from "../../src/lib/api";
 import { useUsers } from "../../hooks/useUsers";
 import { useAdmins } from "../../hooks/useAdmins";
 
-// API Service for Settings
-const settingsAPI = {
-  async getSettings() {
-    try {
-      const token = localStorage.getItem("token");
-      const APP_BACKEND_URL = "https://zerokoinapp-production.up.railway.app/api";
-      
-      const response = await fetch(`${APP_BACKEND_URL}/settings`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: token ? `Bearer ${token}` : "",
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const result = await response.json();
-      return result;
-    } catch (error) {
-      console.error("Error fetching settings:", error);
-      return { success: false, error: error.message };
-    }
-  },
-
-  async updateSettings(settingsData) {
-    try {
-      const token = localStorage.getItem("token");
-      const APP_BACKEND_URL = "https://zerokoinapp-production.up.railway.app/api";
-      
-      const response = await fetch(`${APP_BACKEND_URL}/settings`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: token ? `Bearer ${token}` : "",
-        },
-        body: JSON.stringify(settingsData),
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
-      
-      const result = await response.json();
-      return result;
-    } catch (error) {
-      console.error("Error updating settings:", error);
-      return { success: false, error: error.message };
-    }
-  },
-};
-
 export default function SettingPage() {
   // User role state
   const [userRole, setUserRole] = useState("");
@@ -117,16 +62,6 @@ export default function SettingPage() {
     status: "all",
     dateRange: "all",
   });
-
-  // Reward settings state
-  const [rewardSettings, setRewardSettings] = useState({
-    referralReward: 50,
-    learningReward: 2,
-    adBaseReward: 30,
-  });
-  const [editingReward, setEditingReward] = useState(null);
-  const [settingsLoading, setSettingsLoading] = useState(true);
-  const [savingSettings, setSavingSettings] = useState(false);
 
   // Settings specific state
   const [currentView, setCurrentView] = useState("main");
@@ -164,75 +99,6 @@ export default function SettingPage() {
   const [sentNotifications, setSentNotifications] = useState([]);
   const [editingNotification, setEditingNotification] = useState(null);
 
-  // Load reward settings from API on mount
-  useEffect(() => {
-    loadSettingsFromAPI();
-  }, []);
-
-  const loadSettingsFromAPI = async () => {
-    setSettingsLoading(true);
-    try {
-      const result = await settingsAPI.getSettings();
-      
-      if (result.success && result.data && result.data.rewards) {
-        setRewardSettings({
-          referralReward: result.data.rewards.referralReward || 50,
-          learningReward: result.data.rewards.learningReward || 2,
-          adBaseReward: result.data.rewards.adBaseReward || 30,
-        });
-      }
-    } catch (error) {
-      console.error("Failed to load settings:", error);
-    } finally {
-      setSettingsLoading(false);
-    }
-  };
-
-  const showTemporaryMessage = (type, text) => {
-    setMessage({ type, text });
-    setTimeout(() => setMessage({ type: "", text: "" }), 3000);
-  };
-
-  const saveRewardSettingsToAPI = async (newSettings) => {
-    setSavingSettings(true);
-    try {
-      const result = await settingsAPI.updateSettings({ rewards: newSettings });
-      
-      if (result.success) {
-        showTemporaryMessage("success", `✅ Saved successfully!`);
-        return true;
-      } else {
-        throw new Error(result.error || "Failed to save");
-      }
-    } catch (error) {
-      console.error("Save failed:", error);
-      showTemporaryMessage("error", `Failed to save: ${error.message}`);
-      return false;
-    } finally {
-      setSavingSettings(false);
-    }
-  };
-
-  const handleSaveReward = async (rewardKey, newValue) => {
-    if (isNaN(newValue) || newValue < 0) {
-      showTemporaryMessage("error", "Please enter a valid positive number");
-      return false;
-    }
-    
-    const updatedSettings = { ...rewardSettings, [rewardKey]: newValue };
-    setRewardSettings(updatedSettings);
-    
-    const saved = await saveRewardSettingsToAPI(updatedSettings);
-    
-    if (saved) {
-      setEditingReward(null);
-      return true;
-    } else {
-      setRewardSettings(rewardSettings);
-      return false;
-    }
-  };
-
   // Get user role from localStorage
   useEffect(() => {
     try {
@@ -251,9 +117,11 @@ export default function SettingPage() {
     }
   }, []);
 
+  // Check permissions
   const hasTransferAccess = userRole === "superadmin";
   const hasHistoryAccess = true;
 
+  // Fetch users on component mount (only for super admin)
   useEffect(() => {
     if (hasTransferAccess) {
       fetchUsers();
@@ -267,9 +135,9 @@ export default function SettingPage() {
   useEffect(() => {
     const fetchSentNotifications = async () => {
       try {
-        const response = await fetch(`${BASE_URL}/notifications`)
+        const response = await fetch(`${BASE_URL}/notifications`);
         if (response.ok) {
-          const result = await response.json()
+          const result = await response.json();
           if (result.success && result.data) {
             const formattedNotifications = result.data.map((notification) => ({
               id: notification._id,
@@ -286,191 +154,202 @@ export default function SettingPage() {
                     : "Old User",
               type: notification.type,
               priority: notification.priority,
-            }))
-            setSentNotifications(formattedNotifications)
+            }));
+            setSentNotifications(formattedNotifications);
           }
         }
       } catch (error) {
-        console.error("Failed to fetch notifications:", error)
+        console.error("Failed to fetch notifications:", error);
       }
-    }
-    fetchSentNotifications()
-  }, [BASE_URL])
+    };
+    fetchSentNotifications();
+  }, [BASE_URL]);
 
-  const { admins, loading: adminsLoading, error: adminsError, addAdmin, editAdmin, removeAdmin } = useAdmins()
-  const [editingAdmin, setEditingAdmin] = useState(null)
-  const [showAddAdminModal, setShowAddAdminModal] = useState(false)
-  const [showEditAdminModal, setShowEditAdminModal] = useState(false)
+  // Fetch admins data
+  const { admins, loading: adminsLoading, error: adminsError, addAdmin, editAdmin, removeAdmin } = useAdmins();
+  const [editingAdmin, setEditingAdmin] = useState(null);
+  const [showAddAdminModal, setShowAddAdminModal] = useState(false);
+  const [showEditAdminModal, setShowEditAdminModal] = useState(false);
   const [adminFormData, setAdminFormData] = useState({
     username: "",
     email: "",
     role: "",
     password: "",
-  })
-  const [currentAdminPassword, setCurrentAdminPassword] = useState("")
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [currentAdminPassword, setCurrentAdminPassword] = useState("");
 
-  const { users: allUsers, loading: usersLoading, error: usersError } = useUsers(1, 100)
+  // Fetch users data for statistics
+  const { users: allUsers, loading: usersLoading, error: usersError } = useUsers(1, 100);
 
+  // Calculate real statistics from users
   const stats = useMemo(() => {
     if (!allUsers || allUsers.length === 0) {
       return {
         learningRewards: 0,
         referralsRewards: 0,
         adBaseRewards: 0,
-      }
+      };
     }
-    const userStats = userHelpers.calculateStats(allUsers)
+    const userStats = userHelpers.calculateStats(allUsers);
     return {
       learningRewards: allUsers.length,
       referralsRewards: userStats.totalReferrals,
       adBaseRewards: Math.floor(allUsers.length * 0.3),
-    }
-  }, [allUsers])
+    };
+  }, [allUsers]);
 
+  // Fetch users from API
   const fetchUsers = async () => {
-    if (!hasTransferAccess) return
+    if (!hasTransferAccess) return;
     try {
-      setLoading(true)
-      const response = await userAPI.getUsers(currentPage, 10)
+      setLoading(true);
+      const response = await userAPI.getUsers(currentPage, 10);
       if (response.success) {
-        setUsers(response.users || response.data || [])
-        setTotalPages(response.pagination?.totalPages || 1)
+        setUsers(response.users || response.data || []);
+        setTotalPages(response.pagination?.totalPages || 1);
       } else {
-        setMessage({ type: "error", text: "Failed to fetch users" })
+        setMessage({ type: "error", text: "Failed to fetch users" });
       }
     } catch (error) {
-      console.error("Error fetching users:", error)
-      setMessage({ type: "error", text: "Error fetching users" })
+      console.error("Error fetching users:", error);
+      setMessage({ type: "error", text: "Error fetching users" });
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
+  // Fetch transfer history
   const fetchTransferHistory = async () => {
     try {
-      setHistoryLoading(true)
-      const response = await userAPI.getTransferHistory(historyFilters)
+      setHistoryLoading(true);
+      const response = await userAPI.getTransferHistory(historyFilters);
       if (response.success) {
-        const transfers = response.data || []
-        const formattedTransfers = transfers.map((transfer) => userHelpers.formatTransferData(transfer))
-        setTransferHistory(formattedTransfers)
+        const transfers = response.data || [];
+        const formattedTransfers = transfers.map((transfer) => userHelpers.formatTransferData(transfer));
+        setTransferHistory(formattedTransfers);
       } else {
-        setMessage({ type: "error", text: response.message || "Failed to fetch transfer history" })
+        setMessage({ type: "error", text: response.message || "Failed to fetch transfer history" });
       }
     } catch (error) {
-      console.error("Error fetching transfer history:", error)
-      setMessage({ type: "error", text: "Error fetching transfer history" })
-      setTransferHistory([])
+      console.error("Error fetching transfer history:", error);
+      setMessage({ type: "error", text: "Error fetching transfer history" });
+      setTransferHistory([]);
     } finally {
-      setHistoryLoading(false)
+      setHistoryLoading(false);
     }
-  }
+  };
 
+  // Handle user selection
   const handleUserSelect = (user) => {
-    setSelectedUser(user)
-    setMessage({ type: "", text: "" })
-    setIsMobileMenuOpen(false)
-  }
+    setSelectedUser(user);
+    setMessage({ type: "", text: "" });
+    setIsMobileMenuOpen(false);
+  };
 
+  // Handle transfer execution
   const handleTransfer = async () => {
     if (!hasTransferAccess) {
-      setMessage({ type: "error", text: "You don't have permission to transfer coins" })
-      return
+      setMessage({ type: "error", text: "You don't have permission to transfer coins" });
+      return;
     }
     if (!selectedUser || !transferAmount || !selectedUser.email) {
       setMessage({
         type: "error",
         text: "Please select a user with email and enter transfer amount",
-      })
-      return
+      });
+      return;
     }
 
-    const amount = Number.parseInt(transferAmount)
+    const amount = Number.parseInt(transferAmount);
     if (isNaN(amount) || amount <= 0) {
-      setMessage({ type: "error", text: "Please enter a valid amount" })
-      return
+      setMessage({ type: "error", text: "Please enter a valid amount" });
+      return;
     }
 
     try {
-      setLoading(true)
-      const adminUser = localStorage.getItem("user")
-      const adminUserStr = JSON.parse(adminUser)
-      const admin = adminUserStr.username
+      setLoading(true);
+      const adminUser = localStorage.getItem("user");
+      const adminUserStr = JSON.parse(adminUser);
+      const admin = adminUserStr.username;
 
-      const response = await userAPI.editUserBalance(selectedUser.email, amount, admin)
+      const response = await userAPI.editUserBalance(selectedUser.email, amount, admin);
       if (response.success) {
         setMessage({
           type: "success",
           text: `Successfully transferred ${amount} coins to ${selectedUser.name}. New balance: ${response.data.newBalance}`,
-        })
+        });
         setSelectedUser((prev) => ({
           ...prev,
           balance: response.data.newBalance,
-        }))
+        }));
         setUsers((prev) =>
           prev.map((user) =>
             user.email === selectedUser.email ? { ...user, balance: response.data.newBalance } : user,
           ),
-        )
-        setTransferAmount("")
-        setTransferReason("")
-        fetchTransferHistory()
+        );
+        setTransferAmount("");
+        setTransferReason("");
+        fetchTransferHistory();
       } else {
         setMessage({
           type: "error",
           text: response.message || "Transfer failed",
-        })
+        });
       }
     } catch (error) {
-      console.error("Transfer error:", error)
+      console.error("Transfer error:", error);
       setMessage({
         type: "error",
         text: error.message || "Transfer failed",
-      })
+      });
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
+  // Filter users based on search term
   const filteredUsers = users.filter(
     (user) =>
       user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email?.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  );
 
+  // Filter transfer history
   const filteredHistory = transferHistory.filter((transfer) => {
     const matchesSearch =
       !historyFilters.search ||
       transfer.userName?.toLowerCase().includes(historyFilters.search.toLowerCase()) ||
       transfer.userEmail?.toLowerCase().includes(historyFilters.search.toLowerCase()) ||
-      transfer.transactionId?.toLowerCase().includes(historyFilters.search.toLowerCase())
+      transfer.transactionId?.toLowerCase().includes(historyFilters.search.toLowerCase());
 
-    const matchesStatus = historyFilters.status === "all" || transfer.status === historyFilters.status
+    const matchesStatus = historyFilters.status === "all" || transfer.status === historyFilters.status;
 
-    let matchesDate = true
+    let matchesDate = true;
     if (historyFilters.dateRange !== "all") {
-      const transferDate = new Date(transfer.dateTime || transfer.createdAt)
-      const now = new Date()
+      const transferDate = new Date(transfer.dateTime || transfer.createdAt);
+      const now = new Date();
       switch (historyFilters.dateRange) {
         case "today":
-          matchesDate = transferDate.toDateString() === now.toDateString()
-          break
+          matchesDate = transferDate.toDateString() === now.toDateString();
+          break;
         case "week":
-          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-          matchesDate = transferDate >= weekAgo
-          break
+          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          matchesDate = transferDate >= weekAgo;
+          break;
         case "month":
-          const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-          matchesDate = transferDate >= monthAgo
-          break
+          const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          matchesDate = transferDate >= monthAgo;
+          break;
       }
     }
 
-    return matchesSearch && matchesStatus && matchesDate
-  })
+    return matchesSearch && matchesStatus && matchesDate;
+  });
 
+  // Export transfer history to CSV
   const exportToCSV = () => {
-    const headers = ["Transaction ID", "User Name", "Email", "Amount", "Date", "Time", "Admin", "Status"]
+    const headers = ["Transaction ID", "User Name", "Email", "Amount", "Date", "Time", "Admin", "Status"];
     const csvContent = [
       headers.join(","),
       ...filteredHistory.map((transfer) =>
@@ -485,99 +364,103 @@ export default function SettingPage() {
           transfer.status,
         ].join(","),
       ),
-    ].join("\n")
+    ].join("\n");
 
-    const blob = new Blob([csvContent], { type: "text/csv" })
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `transfer-history-${new Date().toISOString().split("T")[0]}.csv`
-    a.click()
-    window.URL.revokeObjectURL(url)
-  }
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `transfer-history-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
 
-  const transferStats = userHelpers.calculateTransferStats(filteredHistory)
+  // Calculate transfer statistics
+  const transferStats = userHelpers.calculateTransferStats(filteredHistory);
 
+  // Get role icon and color
   const getRoleDisplay = (role) => {
     switch (role) {
       case "superadmin":
-        return { icon: Shield, color: "text-red-600", bg: "bg-red-50", label: "Super Admin" }
+        return { icon: Shield, color: "text-red-600", bg: "bg-red-50", label: "Super Admin" };
       case "editor":
-        return { icon: Edit, color: "text-blue-600", bg: "bg-blue-50", label: "Editor" }
+        return { icon: Edit, color: "text-blue-600", bg: "bg-blue-50", label: "Editor" };
       case "viewer":
-        return { icon: Eye, color: "text-green-600", bg: "bg-green-50", label: "Viewer" }
+        return { icon: Eye, color: "text-green-600", bg: "bg-green-50", label: "Viewer" };
       default:
-        return { icon: User, color: "text-gray-600", bg: "bg-gray-50", label: "User" }
+        return { icon: User, color: "text-gray-600", bg: "bg-gray-50", label: "User" };
     }
-  }
+  };
 
-  const roleDisplay = getRoleDisplay(userRole)
-  const RoleIcon = roleDisplay.icon
+  const roleDisplay = getRoleDisplay(userRole);
+  const RoleIcon = roleDisplay.icon;
 
+  // Handle image upload
   const handleImageUpload = async (event) => {
-    const file = event.target.files[0]
-    if (!file) return
+    const file = event.target.files[0];
+    if (!file) return;
 
     if (userRole === "viewer") {
-      alert("You don't have permission to upload images.")
-      return
+      alert("You don't have permission to upload images.");
+      return;
     }
 
-    setIsUploading(true)
+    setIsUploading(true);
     try {
-      setUploadedImageFile(file)
-      const imageUrl = URL.createObjectURL(file)
-      setUploadedImage(imageUrl)
+      setUploadedImageFile(file);
+      const imageUrl = URL.createObjectURL(file);
+      setUploadedImage(imageUrl);
     } catch (error) {
-      console.error("Failed to upload image:", error)
-      alert("Failed to upload image. Please try again.")
+      console.error("Failed to upload image:", error);
+      alert("Failed to upload image. Please try again.");
     } finally {
-      setIsUploading(false)
+      setIsUploading(false);
     }
-  }
+  };
 
+  // Handle notification sending
   const handleSendNotification = async () => {
     if (userRole === "viewer") {
-      alert("You don't have permission to send notifications.")
-      return
+      alert("You don't have permission to send notifications.");
+      return;
     }
 
     if (!notificationData.title.trim() || !notificationData.description.trim()) {
-      alert("Please fill in both title and description.")
-      return
+      alert("Please fill in both title and description.");
+      return;
     }
 
     if (selectedSendTo === "Send to") {
-      alert("Please select who to send the notification to.")
-      return
+      alert("Please select who to send the notification to.");
+      return;
     }
 
-    setIsSending(true)
+    setIsSending(true);
     try {
-      let endpoint = ""
-      let requestBody = null
-      const headers = {}
+      let endpoint = "";
+      let requestBody = null;
+      const headers = {};
 
-      let priority = "old-user"
+      let priority = "old-user";
       switch (selectedSendTo) {
         case "New User":
-          priority = "new-user"
-          endpoint = `${BASE_URL}/notifications/general-with-image`
-          break
+          priority = "new-user";
+          endpoint = `${BASE_URL}/notifications/general-with-image`;
+          break;
         case "Old User":
-          priority = "old-user"
-          endpoint = `${BASE_URL}/notifications/general-with-image`
-          break
+          priority = "old-user";
+          endpoint = `${BASE_URL}/notifications/general-with-image`;
+          break;
         case "Top rated user":
-          priority = "top-rated-user"
-          endpoint = `${BASE_URL}/notifications/top-users`
-          break
+          priority = "top-rated-user";
+          endpoint = `${BASE_URL}/notifications/top-users`;
+          break;
         default:
-          throw new Error("Invalid recipient selection")
+          throw new Error("Invalid recipient selection");
       }
 
       if (selectedSendTo === "Top rated user") {
-        headers["Content-Type"] = "application/json"
+        headers["Content-Type"] = "application/json";
         requestBody = JSON.stringify({
           title: notificationData.title,
           message: notificationData.description,
@@ -585,28 +468,28 @@ export default function SettingPage() {
           link: notificationData.link || null,
           priority: priority,
           limit: 10,
-        })
+        });
       } else {
-        const formData = new FormData()
-        formData.append("title", notificationData.title)
-        formData.append("message", notificationData.description)
-        formData.append("priority", priority)
+        const formData = new FormData();
+        formData.append("title", notificationData.title);
+        formData.append("message", notificationData.description);
+        formData.append("priority", priority);
         if (notificationData.link) {
-          formData.append("link", notificationData.link)
+          formData.append("link", notificationData.link);
         }
         if (uploadedImageFile) {
-          formData.append("image", uploadedImageFile)
+          formData.append("image", uploadedImageFile);
         }
-        requestBody = formData
+        requestBody = formData;
       }
 
       const response = await fetch(endpoint, {
         method: "POST",
         headers: headers,
         body: requestBody,
-      })
+      });
 
-      const result = await response.json()
+      const result = await response.json();
 
       if (response.ok && result.success) {
         const newNotification = {
@@ -618,33 +501,33 @@ export default function SettingPage() {
           timestamp: new Date().toISOString(),
           sentTo: selectedSendTo,
           priority: priority,
-        }
+        };
 
-        setSentNotifications((prev) => [newNotification, ...prev])
-        setShowSuccessModal(true)
+        setSentNotifications((prev) => [newNotification, ...prev]);
+        setShowSuccessModal(true);
         
         setTimeout(() => {
-          setShowSuccessModal(false)
-          setNotificationView("list")
-          setUploadedImage(null)
-          setUploadedImageFile(null)
-          setSelectedSendTo("Send to")
+          setShowSuccessModal(false);
+          setNotificationView("list");
+          setUploadedImage(null);
+          setUploadedImageFile(null);
+          setSelectedSendTo("Send to");
           setNotificationData({
             title: "",
             description: "",
             link: "",
-          })
-        }, 2000)
+          });
+        }, 2000);
       } else {
-        throw new Error(result.message || `Server error: ${response.status}`)
+        throw new Error(result.message || `Server error: ${response.status}`);
       }
     } catch (error) {
-      console.error("Failed to send notification:", error)
-      alert(`Failed to send notification: ${error.message}`)
+      console.error("Failed to send notification:", error);
+      alert(`Failed to send notification: ${error.message}`);
     } finally {
-      setIsSending(false)
+      setIsSending(false);
     }
-  }
+  };
 
   const handleAddNewAdmin = () => {
     if (userRole === "superadmin") {
@@ -653,21 +536,21 @@ export default function SettingPage() {
         email: "",
         role: "",
         password: "",
-      })
-      setShowAddAdminModal(true)
+      });
+      setShowAddAdminModal(true);
     }
-  }
+  };
 
   const handleViewControl = () => {
-    setCurrentView("control")
-  }
+    setCurrentView("control");
+  };
 
   const handleNotificationSettings = () => {
     if (userRole === "superadmin" || userRole === "editor") {
-      setCurrentView("notifications")
-      setNotificationView("list")
+      setCurrentView("notifications");
+      setNotificationView("list");
     }
-  }
+  };
 
   const handleCreateNotification = () => {
     if (userRole === "superadmin" || userRole === "editor") {
@@ -675,163 +558,163 @@ export default function SettingPage() {
         title: "",
         description: "",
         link: "",
-      })
-      setUploadedImage(null)
-      setUploadedImageFile(null)
-      setSelectedSendTo("Send to")
-      setNotificationView("create")
+      });
+      setUploadedImage(null);
+      setUploadedImageFile(null);
+      setSelectedSendTo("Send to");
+      setNotificationView("create");
     }
-  }
+  };
 
   const handleUploadClick = () => {
     if (userRole === "viewer") {
-      alert("You don't have permission to upload images.")
-      return
+      alert("You don't have permission to upload images.");
+      return;
     }
-    document.getElementById("image-upload").click()
-  }
+    document.getElementById("image-upload").click();
+  };
 
   const handleAddAdminSubmit = async () => {
     if (!adminFormData.username || !adminFormData.email || !adminFormData.role || !adminFormData.password) {
-      alert("Please fill in all fields")
-      return
+      alert("Please fill in all fields");
+      return;
     }
 
     try {
-      const result = await addAdmin(adminFormData)
+      const result = await addAdmin(adminFormData);
       if (result.success) {
-        alert("Admin added successfully!")
-        setShowAddAdminModal(false)
-        setAdminFormData({ username: "", email: "", role: "", password: "" })
+        alert("Admin added successfully!");
+        setShowAddAdminModal(false);
+        setAdminFormData({ username: "", email: "", role: "", password: "" });
       } else {
-        alert(`Failed to add admin: ${result.error}`)
+        alert(`Failed to add admin: ${result.error}`);
       }
     } catch (error) {
-      alert(`Error: ${error.message}`)
+      alert(`Error: ${error.message}`);
     }
-  }
+  };
 
   const handleEditAdmin = (admin) => {
     if (userRole === "superadmin") {
-      setEditingAdmin(admin)
+      setEditingAdmin(admin);
       setAdminFormData({
         username: admin.username || "",
         email: admin.email || "",
         role: admin.role || "",
         password: "",
-      })
-      setCurrentAdminPassword(admin.password || "")
-      setShowEditAdminModal(true)
+      });
+      setCurrentAdminPassword(admin.password || "");
+      setShowEditAdminModal(true);
     } else {
-      alert("You don't have permission to edit admins.")
+      alert("You don't have permission to edit admins.");
     }
-  }
+  };
 
   const handleEditAdminSubmit = async () => {
     if (!adminFormData.username || !adminFormData.email || !adminFormData.role) {
-      alert("Please fill in required fields")
-      return
+      alert("Please fill in required fields");
+      return;
     }
 
     const updateData = {
       username: adminFormData.username,
       email: adminFormData.email,
       role: adminFormData.role,
-    }
+    };
 
     if (adminFormData.password?.trim()) {
-      updateData.password = adminFormData.password.trim()
+      updateData.password = adminFormData.password.trim();
     }
 
     try {
-      const result = await editAdmin(editingAdmin._id, updateData)
+      const result = await editAdmin(editingAdmin._id, updateData);
       if (result && result.success) {
-        alert("Admin updated successfully!")
-        setShowEditAdminModal(false)
-        setEditingAdmin(null)
-        setAdminFormData({ username: "", email: "", role: "", password: "" })
+        alert("Admin updated successfully!");
+        setShowEditAdminModal(false);
+        setEditingAdmin(null);
+        setAdminFormData({ username: "", email: "", role: "", password: "" });
       } else {
-        throw new Error(result?.error || "Unknown error")
+        throw new Error(result?.error || "Unknown error");
       }
     } catch (error) {
-      console.error("Update failed:", error)
-      alert(`Failed to update admin: ${error.message}`)
+      console.error("Update failed:", error);
+      alert(`Failed to update admin: ${error.message}`);
     }
-  }
+  };
 
   const handleRemoveAdmin = async (adminId) => {
     if (userRole === "superadmin") {
       if (confirm("Are you sure you want to remove this admin?")) {
-        const result = await removeAdmin(adminId)
+        const result = await removeAdmin(adminId);
         if (result.success) {
-          alert("Admin removed successfully!")
+          alert("Admin removed successfully!");
         } else {
-          alert(`Failed to remove admin: ${result.error}`)
+          alert(`Failed to remove admin: ${result.error}`);
         }
       }
     } else {
-      alert("You don't have permission to remove admins.")
+      alert("You don't have permission to remove admins.");
     }
-  }
+  };
 
   const handleEditNotification = (notification) => {
     if (userRole === "viewer") {
-      alert("You don't have permission to edit notifications.")
-      return
+      alert("You don't have permission to edit notifications.");
+      return;
     }
-    setEditingNotification(notification)
+    setEditingNotification(notification);
     setNotificationData({
       title: notification.title,
       description: notification.description,
       link: notification.link || "",
-    })
-    setUploadedImage(notification.image)
+    });
+    setUploadedImage(notification.image);
     setSelectedSendTo(
       notification.priority === "new-user"
         ? "New User"
         : notification.priority === "top-rated-user"
           ? "Top rated user"
           : "Old User",
-    )
-    setNotificationView("edit")
-  }
+    );
+    setNotificationView("edit");
+  };
 
   const handleDeleteNotification = async (notificationId) => {
     if (userRole === "viewer") {
-      alert("You don't have permission to delete notifications.")
-      return
+      alert("You don't have permission to delete notifications.");
+      return;
     }
     if (confirm("Are you sure you want to delete this notification?")) {
       try {
         const response = await fetch(`${BASE_URL}/notifications/${notificationId}`, {
           method: "DELETE",
-        })
+        });
         if (response.ok) {
-          setSentNotifications((prev) => prev.filter((n) => n.id !== notificationId))
-          alert("Notification deleted successfully!")
+          setSentNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+          alert("Notification deleted successfully!");
         } else {
-          throw new Error("Failed to delete notification")
+          throw new Error("Failed to delete notification");
         }
       } catch (error) {
-        console.error("Delete failed:", error)
-        alert("Failed to delete notification. Please try again.")
+        console.error("Delete failed:", error);
+        alert("Failed to delete notification. Please try again.");
       }
     }
-  }
+  };
 
   const handleUpdateNotification = async () => {
     if (userRole === "viewer") {
-      alert("You don't have permission to update notifications.")
-      return
+      alert("You don't have permission to update notifications.");
+      return;
     }
 
     const priorityMap = {
       "New User": "new-user",
       "Old User": "old-user",
       "Top rated user": "top-rated-user",
-    }
+    };
 
-    const priority = priorityMap[selectedSendTo] || "old-user"
+    const priority = priorityMap[selectedSendTo] || "old-user";
 
     const updatedNotification = {
       ...editingNotification,
@@ -841,7 +724,7 @@ export default function SettingPage() {
       image: uploadedImage,
       priority: priority,
       sentTo: selectedSendTo,
-    }
+    };
 
     try {
       const response = await fetch(`${BASE_URL}/notifications/${editingNotification.id}`, {
@@ -850,142 +733,30 @@ export default function SettingPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(updatedNotification),
-      })
+      });
       if (response.ok) {
-        setSentNotifications((prev) => prev.map((n) => (n.id === editingNotification.id ? updatedNotification : n)))
-        alert("Notification updated successfully!")
-        setEditingNotification(null)
-        setNotificationView("list")
+        setSentNotifications((prev) => prev.map((n) => (n.id === editingNotification.id ? updatedNotification : n)));
+        alert("Notification updated successfully!");
+        setEditingNotification(null);
+        setNotificationView("list");
         setNotificationData({
           title: "",
           description: "",
           link: "",
-        })
-        setUploadedImage(null)
-        setUploadedImageFile(null)
-        setSelectedSendTo("Send to")
+        });
+        setUploadedImage(null);
+        setUploadedImageFile(null);
+        setSelectedSendTo("Send to");
       } else {
-        throw new Error("Failed to update notification")
+        throw new Error("Failed to update notification");
       }
     } catch (error) {
-      console.error("Update failed:", error)
-      alert("Failed to update notification. Please try again.")
+      console.error("Update failed:", error);
+      alert("Failed to update notification. Please try again.");
     }
-  }
+  };
 
-  // Reward Card Component
-  const RewardCard = ({ title, value, rewardKey, icon: Icon, color, description }) => {
-    const isEditing = editingReward === rewardKey
-    const [localValue, setLocalValue] = useState(value.toString())
-    const inputRef = useRef(null)
-
-    useEffect(() => {
-      if (isEditing && inputRef.current) {
-        setTimeout(() => {
-          inputRef.current?.focus()
-          inputRef.current?.select()
-        }, 50)
-      }
-    }, [isEditing])
-
-    const handleSave = async () => {
-      const newValue = parseInt(localValue)
-      if (isNaN(newValue) || newValue < 0) {
-        showTemporaryMessage("error", "Please enter a valid positive number")
-        return
-      }
-      const saved = await handleSaveReward(rewardKey, newValue)
-      if (!saved) {
-        setLocalValue(value.toString())
-      }
-    }
-
-    const handleCancel = () => {
-      setEditingReward(null)
-      setLocalValue(value.toString())
-    }
-
-    const handleKeyDown = (e) => {
-      if (e.key === 'Enter') {
-        handleSave()
-      }
-      if (e.key === 'Escape') {
-        handleCancel()
-      }
-    }
-
-    return (
-      <Card className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
-        <CardContent className="p-4 sm:p-6">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start space-x-3 sm:space-x-4">
-              <div className={`w-10 sm:w-12 h-10 sm:h-12 ${color} rounded-full flex items-center justify-center flex-shrink-0`}>
-                <Icon className="h-5 sm:h-6 w-5 sm:w-6 text-white" />
-              </div>
-              <div className="flex-1">
-                <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">{title}</p>
-                {description && (
-                  <p className="text-xs text-gray-400 mb-2">{description}</p>
-                )}
-                {isEditing ? (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <div className="flex items-center border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-teal-500">
-                      <span className="px-2 text-gray-500 text-sm border-r border-gray-200">ZRK</span>
-                      <input
-                        ref={inputRef}
-                        type="text"
-                        inputMode="numeric"
-                        value={localValue}
-                        onChange={(e) => {
-                          const value = e.target.value.replace(/[^0-9]/g, '');
-                          setLocalValue(value);
-                        }}
-                        onKeyDown={handleKeyDown}
-                        className="w-28 px-2 py-2 text-lg font-bold focus:outline-none rounded-r-md"
-                        disabled={savingSettings}
-                      />
-                    </div>
-                    <button
-                      onClick={handleSave}
-                      disabled={savingSettings}
-                      className="w-8 h-8 rounded-md bg-green-600 hover:bg-green-700 text-white flex items-center justify-center transition-colors"
-                      title="Save"
-                    >
-                      {savingSettings ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    </button>
-                    <button
-                      onClick={handleCancel}
-                      className="w-8 h-8 rounded-md bg-gray-300 hover:bg-gray-400 text-gray-800 flex items-center justify-center transition-colors"
-                      title="Cancel"
-                    >
-                      <XCircle className="h-4 w-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-2xl sm:text-3xl font-bold text-gray-900">{value}</span>
-                    <span className="text-sm text-gray-400">ZRK</span>
-                    <button
-                      onClick={() => {
-                        setEditingReward(rewardKey)
-                        setLocalValue(value.toString())
-                      }}
-                      className="w-7 h-7 rounded-md hover:bg-gray-100 text-gray-400 hover:text-teal-600 flex items-center justify-center transition-colors"
-                      title="Edit Reward"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (loading || usersLoading || settingsLoading) {
+  if (loading || usersLoading) {
     return (
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
         <div className="flex justify-center items-center h-64">
@@ -995,13 +766,14 @@ export default function SettingPage() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
-  // Main Settings View
+  // Main Settings View (without reward cards)
   if (currentView === "main") {
     return (
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
+        {/* Success/Error Message */}
         {message.text && (
           <div className={`p-3 rounded-lg ${
             message.type === "success" ? "bg-green-100 text-green-700 border border-green-300" : 
@@ -1016,41 +788,6 @@ export default function SettingPage() {
           <div>
             <h1 className="text-2xl font-semibold text-gray-900">Settings</h1>
             <p className="text-sm text-gray-500 mt-1">Manage admin control and notifications</p>
-          </div>
-        </div>
-
-        {/* Reward Settings Section */}
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <DollarSign className="h-5 w-5 text-teal-600" />
-            <h2 className="text-lg font-semibold text-gray-900">Reward Settings</h2>
-          </div>
-         
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            <RewardCard
-              title="Referral Rewards"
-              value={rewardSettings.referralReward}
-              rewardKey="referralReward"
-              icon={Users}
-              color="bg-purple-500"
-              description="Reward for referring a new user"
-            />
-            <RewardCard
-              title="Learning Rewards"
-              value={rewardSettings.learningReward}
-              rewardKey="learningReward"
-              icon={GraduationCap}
-              color="bg-blue-500"
-              description="Reward per learning session"
-            />
-            <RewardCard
-              title="Ad Base Rewards"
-              value={rewardSettings.adBaseReward}
-              rewardKey="adBaseReward"
-              icon={Video}
-              color="bg-orange-500"
-              description="Reward for watching video ads"
-            />
           </div>
         </div>
 
@@ -1072,8 +809,8 @@ export default function SettingPage() {
                       <button
                         key={option}
                         onClick={() => {
-                          setSelectedExpiry(option.split(" ")[0] + ":00")
-                          setShowExpiryDropdown(false)
+                          setSelectedExpiry(option.split(" ")[0] + ":00");
+                          setShowExpiryDropdown(false);
                         }}
                         className="block w-full text-left px-2 py-1 text-xs text-gray-700 hover:bg-gray-100"
                       >
@@ -1105,7 +842,7 @@ export default function SettingPage() {
           )}
         </div>
       </div>
-    )
+    );
   }
 
   // Admin Control View
@@ -1383,7 +1120,7 @@ export default function SettingPage() {
           </DialogContent>
         </Dialog>
       </div>
-    )
+    );
   }
 
   // Notification List View
@@ -1448,7 +1185,7 @@ export default function SettingPage() {
           </div>
         )}
       </div>
-    )
+    );
   }
 
   // Create Notification View
@@ -1485,8 +1222,8 @@ export default function SettingPage() {
                         <button
                           key={option}
                           onClick={() => {
-                            setSelectedSendTo(option)
-                            setShowSendToDropdown(false)
+                            setSelectedSendTo(option);
+                            setShowSendToDropdown(false);
                           }}
                           className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
                         >
@@ -1568,8 +1305,8 @@ export default function SettingPage() {
                       />
                       <button
                         onClick={() => {
-                          setUploadedImage(null)
-                          setUploadedImageFile(null)
+                          setUploadedImage(null);
+                          setUploadedImageFile(null);
                         }}
                         className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5"
                       >
@@ -1647,7 +1384,7 @@ export default function SettingPage() {
           </div>
         )}
       </div>
-    )
+    );
   }
 
   // Edit Notification View
@@ -1684,8 +1421,8 @@ export default function SettingPage() {
                         <button
                           key={option}
                           onClick={() => {
-                            setSelectedSendTo(option)
-                            setShowSendToDropdown(false)
+                            setSelectedSendTo(option);
+                            setShowSendToDropdown(false);
                           }}
                           className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
                         >
@@ -1764,8 +1501,8 @@ export default function SettingPage() {
                       />
                       <button
                         onClick={() => {
-                          setUploadedImage(null)
-                          setUploadedImageFile(null)
+                          setUploadedImage(null);
+                          setUploadedImageFile(null);
                         }}
                         className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5"
                       >
@@ -1792,7 +1529,7 @@ export default function SettingPage() {
           </CardContent>
         </Card>
       </div>
-    )
+    );
   }
 
   return null;
