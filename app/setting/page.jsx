@@ -99,6 +99,37 @@ export default function SettingPage() {
   const [sentNotifications, setSentNotifications] = useState([]);
   const [editingNotification, setEditingNotification] = useState(null);
 
+  // Fetch sent notifications from backend
+  const fetchSentNotifications = async () => {
+    try {
+      const response = await fetch(`${BASE_URL}/notifications`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data) {
+          const formattedNotifications = result.data.map((notification) => ({
+            id: notification._id,
+            title: notification.title,
+            description: notification.message,
+            image: notification.imageUrl,
+            link: notification.link || "",
+            timestamp: notification.createdAt,
+            sentTo:
+              notification.priority === "new-user"
+                ? "New User"
+                : notification.priority === "top-rated-user"
+                  ? "Top rated user"
+                  : "Old User",
+            type: notification.type,
+            priority: notification.priority,
+          }));
+          setSentNotifications(formattedNotifications);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch notifications:", error);
+    }
+  };
+
   // Get user role from localStorage
   useEffect(() => {
     try {
@@ -133,35 +164,6 @@ export default function SettingPage() {
 
   // Fetch sent notifications from backend
   useEffect(() => {
-    const fetchSentNotifications = async () => {
-      try {
-        const response = await fetch(`${BASE_URL}/notifications`);
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success && result.data) {
-            const formattedNotifications = result.data.map((notification) => ({
-              id: notification._id,
-              title: notification.title,
-              description: notification.message,
-              image: notification.imageUrl,
-              link: notification.link || "",
-              timestamp: notification.createdAt,
-              sentTo:
-                notification.priority === "new-user"
-                  ? "New User"
-                  : notification.priority === "top-rated-user"
-                    ? "Top rated user"
-                    : "Old User",
-              type: notification.type,
-              priority: notification.priority,
-            }));
-            setSentNotifications(formattedNotifications);
-          }
-        }
-      } catch (error) {
-        console.error("Failed to fetch notifications:", error);
-      }
-    };
     fetchSentNotifications();
   }, [BASE_URL]);
 
@@ -492,18 +494,9 @@ export default function SettingPage() {
       const result = await response.json();
 
       if (response.ok && result.success) {
-        const newNotification = {
-          id: Date.now(),
-          title: notificationData.title,
-          description: notificationData.description,
-          image: uploadedImage,
-          link: notificationData.link,
-          timestamp: new Date().toISOString(),
-          sentTo: selectedSendTo,
-          priority: priority,
-        };
-
-        setSentNotifications((prev) => [newNotification, ...prev]);
+        // ✅ FIXED: Refresh notifications list to get actual backend IDs
+        await fetchSentNotifications();
+        
         setShowSuccessModal(true);
         
         setTimeout(() => {
@@ -679,25 +672,53 @@ export default function SettingPage() {
     setNotificationView("edit");
   };
 
+  // ✅ FIXED: Delete notification with proper error handling
   const handleDeleteNotification = async (notificationId) => {
     if (userRole === "viewer") {
       alert("You don't have permission to delete notifications.");
       return;
     }
+    
+    if (!notificationId) {
+      console.error("No notification ID provided");
+      alert("Cannot delete notification: Invalid ID");
+      return;
+    }
+    
     if (confirm("Are you sure you want to delete this notification?")) {
       try {
+        const token = localStorage.getItem("token");
         const response = await fetch(`${BASE_URL}/notifications/${notificationId}`, {
           method: "DELETE",
+          headers: {
+            "Authorization": token ? `Bearer ${token}` : "",
+          },
         });
+        
         if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            setSentNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+            alert("Notification deleted successfully!");
+          } else {
+            throw new Error(result.message || "Failed to delete notification");
+          }
+        } else if (response.status === 404) {
+          // If notification not found, remove it from local state anyway
           setSentNotifications((prev) => prev.filter((n) => n.id !== notificationId));
-          alert("Notification deleted successfully!");
+          alert("Notification removed from list (already deleted on server)");
         } else {
-          throw new Error("Failed to delete notification");
+          throw new Error(`HTTP ${response.status}`);
         }
       } catch (error) {
         console.error("Delete failed:", error);
-        alert("Failed to delete notification. Please try again.");
+        // Still remove from local state if it's a frontend fake ID
+        if (notificationId && notificationId.toString().length !== 24) {
+          setSentNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+          alert("Notification removed from list (invalid ID format)");
+        } else {
+          alert("Failed to delete notification. Please try again.");
+        }
       }
     }
   };
@@ -727,28 +748,35 @@ export default function SettingPage() {
     };
 
     try {
+      const token = localStorage.getItem("token");
       const response = await fetch(`${BASE_URL}/notifications/${editingNotification.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": token ? `Bearer ${token}` : "",
         },
         body: JSON.stringify(updatedNotification),
       });
       if (response.ok) {
-        setSentNotifications((prev) => prev.map((n) => (n.id === editingNotification.id ? updatedNotification : n)));
-        alert("Notification updated successfully!");
-        setEditingNotification(null);
-        setNotificationView("list");
-        setNotificationData({
-          title: "",
-          description: "",
-          link: "",
-        });
-        setUploadedImage(null);
-        setUploadedImageFile(null);
-        setSelectedSendTo("Send to");
+        const result = await response.json();
+        if (result.success) {
+          await fetchSentNotifications(); // Refresh the list
+          alert("Notification updated successfully!");
+          setEditingNotification(null);
+          setNotificationView("list");
+          setNotificationData({
+            title: "",
+            description: "",
+            link: "",
+          });
+          setUploadedImage(null);
+          setUploadedImageFile(null);
+          setSelectedSendTo("Send to");
+        } else {
+          throw new Error(result.message || "Failed to update notification");
+        }
       } else {
-        throw new Error("Failed to update notification");
+        throw new Error(`HTTP ${response.status}`);
       }
     } catch (error) {
       console.error("Update failed:", error);
