@@ -1,1536 +1,877 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useMemo, useRef } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { useState, useEffect, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
-  User,
-  Shield,
-  Eye,
-  Edit,
-  GraduationCap,
-  Target,
-  Bell,
-  ChevronDown,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import {
   X,
-  Upload,
-  ArrowLeft,
-  Edit3,
+  Edit,
   Trash2,
-  ExternalLink,
-  Save,
-  XCircle,
-  Pencil,
+  Plus,
+  Eye,
+  AlertCircle,
   Loader2,
-  DollarSign,
-  Gift,
-  Users,
-  Video,
-  Calendar,
-  Trophy,
-} from "lucide-react"
-import Image from "next/image"
-import { userAPI, userHelpers } from "../../src/lib/api"
-import { useUsers } from "../../hooks/useUsers"
-import { useAdmins } from "../../hooks/useAdmins"
+} from "lucide-react";
 
-export default function SettingPage() {
-  // User role state
-  const [userRole, setUserRole] = useState("")
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+const API_BASE_URL = "https://admin-backend-production-4ff2.up.railway.app/api/courses";
 
-  // State management
-  const [users, setUsers] = useState([])
-  const [selectedUser, setSelectedUser] = useState(null)
-  const [transferAmount, setTransferAmount] = useState("")
-  const [transferReason, setTransferReason] = useState("")
-  const [searchTerm, setSearchTerm] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [transferHistory, setTransferHistory] = useState([])
-  const [historyLoading, setHistoryLoading] = useState(false)
-  const [message, setMessage] = useState({ type: "", text: "" })
-  const [currentPage, setCurrentPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const [activeTab, setActiveTab] = useState("history")
-  const [historyFilters, setHistoryFilters] = useState({
-    search: "",
-    status: "all",
-    dateRange: "all",
-  })
+const LoadingSpinner = () => (
+  <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="text-center">
+      <Loader2 className="inline-block animate-spin rounded-full h-12 w-12 text-teal-600" />
+      <p className="mt-4 text-gray-600">Loading courses...</p>
+    </div>
+  </div>
+);
 
-  // Settings specific state
-  const [currentView, setCurrentView] = useState("main")
-  const [showExpiryDropdown, setShowExpiryDropdown] = useState(false)
-  const [selectedExpiry, setSelectedExpiry] = useState("02:00")
-  const [showNotificationPanel, setShowNotificationPanel] = useState(false)
-  const [showNotificationList, setShowNotificationList] = useState(false)
-  const [showSuccessModal, setShowSuccessModal] = useState(false)
-  const [showSendToDropdown, setShowSendToDropdown] = useState(false)
-  const [selectedSendTo, setSelectedSendTo] = useState("Send to")
-  const [uploadedImage, setUploadedImage] = useState(null)
-  const [uploadedImageFile, setUploadedImageFile] = useState(null)
-  const [showChangePassword, setShowChangePassword] = useState(false)
-  const [newPassword, setNewPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [notificationView, setNotificationView] = useState("list")
+const ErrorDisplay = ({ error, onRetry }) => (
+  <div className="min-h-screen bg-gray-50 p-4">
+    <Card className="bg-white border border-red-200 max-w-md mx-auto mt-8">
+      <CardContent className="p-6 text-center">
+        <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+        <h2 className="text-xl font-semibold text-red-600 mb-2">Error Loading Courses</h2>
+        <p className="text-gray-600 mb-4">{error}</p>
+        <Button onClick={onRetry} className="bg-teal-600 hover:bg-teal-700 text-white">
+          Retry
+        </Button>
+      </CardContent>
+    </Card>
+  </div>
+);
 
-  const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL
+export default function CourseManagementPage() {
+  const [courses, setCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [currentView, setCurrentView] = useState("main");
+  const [selectedCourse, setSelectedCourse] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentLanguage, setCurrentLanguage] = useState("en");
+  const [userData, setUserData] = useState(null);
+  const [userRole, setUserRole] = useState("");
 
-  const [notificationData, setNotificationData] = useState({
-    title: "",
-    description: "",
-    link: "",
-  })
+  const availableLanguages = [
+    { code: "en", name: "English" },
+    { code: "hi", name: "हिंदी" },
+    { code: "ar", name: "العربية" },
+    { code: "ur", name: "اردو" },
+    { code: "es", name: "Español" },
+  ];
 
-  const [isUploading, setIsUploading] = useState(false)
-  const [isSending, setIsSending] = useState(false)
   const [formData, setFormData] = useState({
-    name: "Fayhan",
-    email: "Menog",
-    role: "Super Admin",
-    time: "1 Month",
-  })
+    languages: {
+      en: { courseName: "", pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }] },
+      hi: { courseName: "", pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }] },
+      ar: { courseName: "", pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }] },
+      ur: { courseName: "", pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }] },
+      es: { courseName: "", pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }] },
+    },
+  });
 
-  const [sentNotifications, setSentNotifications] = useState([])
-  const [editingNotification, setEditingNotification] = useState(null)
-
-  // Get user role from localStorage
-  useEffect(() => {
-    try {
-      const user = localStorage.getItem("user")
-      if (user) {
-        const userData = JSON.parse(user)
-        setUserRole(userData.role || "")
-        if (userData.role === "superadmin") {
-          setActiveTab("transfer")
-        } else {
-          setActiveTab("history")
-        }
-      }
-    } catch (error) {
-      console.error("Error parsing user data:", error)
-    }
-  }, [])
-
-  // Check permissions
-  const hasTransferAccess = userRole === "superadmin"
-  const hasHistoryAccess = true
-
-  // Fetch users on component mount (only for super admin)
-  useEffect(() => {
-    if (hasTransferAccess) {
-      fetchUsers()
-    }
-    if (activeTab === "history") {
-      fetchTransferHistory()
-    }
-  }, [currentPage, activeTab, hasTransferAccess])
-
-  // Fetch sent notifications from backend
-  useEffect(() => {
-    const fetchSentNotifications = async () => {
-      try {
-        const response = await fetch(`${BASE_URL}/notifications`)
-        if (response.ok) {
-          const result = await response.json()
-          if (result.success && result.data) {
-            const formattedNotifications = result.data.map((notification) => ({
-              id: notification._id,
-              title: notification.title,
-              description: notification.message,
-              image: notification.imageUrl,
-              link: notification.link || "",
-              timestamp: notification.createdAt,
-              sentTo:
-                notification.priority === "new-user"
-                  ? "New User"
-                  : notification.priority === "top-rated-user"
-                    ? "Top rated user"
-                    : "Old User",
-              type: notification.type,
-              priority: notification.priority,
-            }))
-            setSentNotifications(formattedNotifications)
-          }
-        }
-      } catch (error) {
-        console.error("Failed to fetch notifications:", error)
-      }
-    }
-    fetchSentNotifications()
-  }, [BASE_URL])
-
-  // Fetch admins data
-  const { admins, loading: adminsLoading, error: adminsError, addAdmin, editAdmin, removeAdmin } = useAdmins()
-  const [editingAdmin, setEditingAdmin] = useState(null)
-  const [showAddAdminModal, setShowAddAdminModal] = useState(false)
-  const [showEditAdminModal, setShowEditAdminModal] = useState(false)
-  const [adminFormData, setAdminFormData] = useState({
-    username: "",
-    email: "",
-    role: "",
-    password: "",
-  })
-  const [showPassword, setShowPassword] = useState(false)
-  const [currentAdminPassword, setCurrentAdminPassword] = useState("")
-
-  // Fetch users data for statistics
-  const { users: allUsers, loading: usersLoading, error: usersError } = useUsers(1, 100)
-
-  // Calculate real statistics from users
-  const stats = useMemo(() => {
-    if (!allUsers || allUsers.length === 0) {
-      return {
-        learningRewards: 0,
-        referralsRewards: 0,
-        adBaseRewards: 0,
-      }
-    }
-    const userStats = userHelpers.calculateStats(allUsers)
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem("token");
     return {
-      learningRewards: allUsers.length,
-      referralsRewards: userStats.totalReferrals,
-      adBaseRewards: Math.floor(allUsers.length * 0.3),
-    }
-  }, [allUsers])
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
+    };
+  };
 
-  // Fetch users from API
-  const fetchUsers = async () => {
-    if (!hasTransferAccess) return
+  useEffect(() => {
     try {
-      setLoading(true)
-      const response = await userAPI.getUsers(currentPage, 10)
-      if (response.success) {
-        setUsers(response.users || response.data || [])
-        setTotalPages(response.pagination?.totalPages || 1)
-      } else {
-        setMessage({ type: "error", text: "Failed to fetch users" })
+      const userStr = localStorage.getItem("user");
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        setUserData(user);
+        setUserRole(user.role || "");
       }
-    } catch (error) {
-      console.error("Error fetching users:", error)
-      setMessage({ type: "error", text: "Error fetching users" })
-    } finally {
-      setLoading(false)
+    } catch (err) {
+      console.error("Error getting user data:", err);
     }
-  }
+  }, []);
 
-  // Fetch transfer history
-  const fetchTransferHistory = async () => {
+  // Fetch courses from API
+  const fetchCourses = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    
     try {
-      setHistoryLoading(true)
-      const response = await userAPI.getTransferHistory(historyFilters)
-      if (response.success) {
-        const transfers = response.data || []
-        const formattedTransfers = transfers.map((transfer) => userHelpers.formatTransferData(transfer))
-        setTransferHistory(formattedTransfers)
-      } else {
-        setMessage({ type: "error", text: response.message || "Failed to fetch transfer history" })
-      }
-    } catch (error) {
-      console.error("Error fetching transfer history:", error)
-      setMessage({ type: "error", text: "Error fetching transfer history" })
-      setTransferHistory([])
-    } finally {
-      setHistoryLoading(false)
-    }
-  }
-
-  // Handle user selection
-  const handleUserSelect = (user) => {
-    setSelectedUser(user)
-    setMessage({ type: "", text: "" })
-    setIsMobileMenuOpen(false)
-  }
-
-  // Handle transfer execution
-  const handleTransfer = async () => {
-    if (!hasTransferAccess) {
-      setMessage({ type: "error", text: "You don't have permission to transfer coins" })
-      return
-    }
-    if (!selectedUser || !transferAmount || !selectedUser.email) {
-      setMessage({
-        type: "error",
-        text: "Please select a user with email and enter transfer amount",
-      })
-      return
-    }
-
-    const amount = Number.parseInt(transferAmount)
-    if (isNaN(amount) || amount <= 0) {
-      setMessage({ type: "error", text: "Please enter a valid amount" })
-      return
-    }
-
-    try {
-      setLoading(true)
-      const adminUser = localStorage.getItem("user")
-      const adminUserStr = JSON.parse(adminUser)
-      const admin = adminUserStr.username
-
-      const response = await userAPI.editUserBalance(selectedUser.email, amount, admin)
-      if (response.success) {
-        setMessage({
-          type: "success",
-          text: `Successfully transferred ${amount} coins to ${selectedUser.name}. New balance: ${response.data.newBalance}`,
-        })
-        setSelectedUser((prev) => ({
-          ...prev,
-          balance: response.data.newBalance,
-        }))
-        setUsers((prev) =>
-          prev.map((user) =>
-            user.email === selectedUser.email ? { ...user, balance: response.data.newBalance } : user,
-          ),
-        )
-        setTransferAmount("")
-        setTransferReason("")
-        fetchTransferHistory()
-      } else {
-        setMessage({
-          type: "error",
-          text: response.message || "Transfer failed",
-        })
-      }
-    } catch (error) {
-      console.error("Transfer error:", error)
-      setMessage({
-        type: "error",
-        text: error.message || "Transfer failed",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Filter users based on search term
-  const filteredUsers = users.filter(
-    (user) =>
-      user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email?.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
-
-  // Filter transfer history
-  const filteredHistory = transferHistory.filter((transfer) => {
-    const matchesSearch =
-      !historyFilters.search ||
-      transfer.userName?.toLowerCase().includes(historyFilters.search.toLowerCase()) ||
-      transfer.userEmail?.toLowerCase().includes(historyFilters.search.toLowerCase()) ||
-      transfer.transactionId?.toLowerCase().includes(historyFilters.search.toLowerCase())
-
-    const matchesStatus = historyFilters.status === "all" || transfer.status === historyFilters.status
-
-    let matchesDate = true
-    if (historyFilters.dateRange !== "all") {
-      const transferDate = new Date(transfer.dateTime || transfer.createdAt)
-      const now = new Date()
-      switch (historyFilters.dateRange) {
-        case "today":
-          matchesDate = transferDate.toDateString() === now.toDateString()
-          break
-        case "week":
-          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-          matchesDate = transferDate >= weekAgo
-          break
-        case "month":
-          const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-          matchesDate = transferDate >= monthAgo
-          break
-      }
-    }
-
-    return matchesSearch && matchesStatus && matchesDate
-  })
-
-  // Export transfer history to CSV
-  const exportToCSV = () => {
-    const headers = ["Transaction ID", "User Name", "Email", "Amount", "Date", "Time", "Admin", "Status"]
-    const csvContent = [
-      headers.join(","),
-      ...filteredHistory.map((transfer) =>
-        [
-          transfer.transactionId,
-          `"${transfer.userName}"`,
-          transfer.userEmail,
-          transfer.amount,
-          transfer.date,
-          transfer.time,
-          `"${transfer.transferredBy}"`,
-          transfer.status,
-        ].join(","),
-      ),
-    ].join("\n")
-
-    const blob = new Blob([csvContent], { type: "text/csv" })
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `transfer-history-${new Date().toISOString().split("T")[0]}.csv`
-    a.click()
-    window.URL.revokeObjectURL(url)
-  }
-
-  // Calculate transfer statistics
-  const transferStats = userHelpers.calculateTransferStats(filteredHistory)
-
-  // Get role icon and color
-  const getRoleDisplay = (role) => {
-    switch (role) {
-      case "superadmin":
-        return { icon: Shield, color: "text-red-600", bg: "bg-red-50", label: "Super Admin" }
-      case "editor":
-        return { icon: Edit, color: "text-blue-600", bg: "bg-blue-50", label: "Editor" }
-      case "viewer":
-        return { icon: Eye, color: "text-green-600", bg: "bg-green-50", label: "Viewer" }
-      default:
-        return { icon: User, color: "text-gray-600", bg: "bg-gray-50", label: "User" }
-    }
-  }
-
-  const roleDisplay = getRoleDisplay(userRole)
-  const RoleIcon = roleDisplay.icon
-
-  // Handle image upload
-  const handleImageUpload = async (event) => {
-    const file = event.target.files[0]
-    if (!file) return
-
-    if (userRole === "viewer") {
-      alert("You don't have permission to upload images.")
-      return
-    }
-
-    setIsUploading(true)
-    try {
-      setUploadedImageFile(file)
-      const imageUrl = URL.createObjectURL(file)
-      setUploadedImage(imageUrl)
-    } catch (error) {
-      console.error("Failed to upload image:", error)
-      alert("Failed to upload image. Please try again.")
-    } finally {
-      setIsUploading(false)
-    }
-  }
-
-  // Handle notification sending
-  const handleSendNotification = async () => {
-    if (userRole === "viewer") {
-      alert("You don't have permission to send notifications.")
-      return
-    }
-
-    if (!notificationData.title.trim() || !notificationData.description.trim()) {
-      alert("Please fill in both title and description.")
-      return
-    }
-
-    if (selectedSendTo === "Send to") {
-      alert("Please select who to send the notification to.")
-      return
-    }
-
-    setIsSending(true)
-    try {
-      let endpoint = ""
-      let requestBody = null
-      const headers = {}
-
-      let priority = "old-user"
-      switch (selectedSendTo) {
-        case "New User":
-          priority = "new-user"
-          endpoint = `${BASE_URL}/notifications/general-with-image`
-          break
-        case "Old User":
-          priority = "old-user"
-          endpoint = `${BASE_URL}/notifications/general-with-image`
-          break
-        case "Top rated user":
-          priority = "top-rated-user"
-          endpoint = `${BASE_URL}/notifications/top-users`
-          break
-        default:
-          throw new Error("Invalid recipient selection")
+      const token = localStorage.getItem("token");
+      
+      if (!token) {
+        console.warn("No token found");
+        setCourses([]);
+        setLoading(false);
+        return;
       }
 
-      if (selectedSendTo === "Top rated user") {
-        headers["Content-Type"] = "application/json"
-        requestBody = JSON.stringify({
-          title: notificationData.title,
-          message: notificationData.description,
-          imageUrl: uploadedImage || null,
-          link: notificationData.link || null,
-          priority: priority,
-          limit: 10,
-        })
-      } else {
-        const formData = new FormData()
-        formData.append("title", notificationData.title)
-        formData.append("message", notificationData.description)
-        formData.append("priority", priority)
-        if (notificationData.link) {
-          formData.append("link", notificationData.link)
-        }
-        if (uploadedImageFile) {
-          formData.append("image", uploadedImageFile)
-        }
-        requestBody = formData
-      }
-
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: headers,
-        body: requestBody,
-      })
-
-      const result = await response.json()
-
-      if (response.ok && result.success) {
-        const newNotification = {
-          id: Date.now(),
-          title: notificationData.title,
-          description: notificationData.description,
-          image: uploadedImage,
-          link: notificationData.link,
-          timestamp: new Date().toISOString(),
-          sentTo: selectedSendTo,
-          priority: priority,
-        }
-
-        setSentNotifications((prev) => [newNotification, ...prev])
-        setShowSuccessModal(true)
-        
-        setTimeout(() => {
-          setShowSuccessModal(false)
-          setNotificationView("list")
-          setUploadedImage(null)
-          setUploadedImageFile(null)
-          setSelectedSendTo("Send to")
-          setNotificationData({
-            title: "",
-            description: "",
-            link: "",
-          })
-        }, 2000)
-      } else {
-        throw new Error(result.message || `Server error: ${response.status}`)
-      }
-    } catch (error) {
-      console.error("Failed to send notification:", error)
-      alert(`Failed to send notification: ${error.message}`)
-    } finally {
-      setIsSending(false)
-    }
-  }
-
-  const handleAddNewAdmin = () => {
-    if (userRole === "superadmin") {
-      setAdminFormData({
-        username: "",
-        email: "",
-        role: "",
-        password: "",
-      })
-      setShowAddAdminModal(true)
-    }
-  }
-
-  const handleViewControl = () => {
-    setCurrentView("control")
-  }
-
-  const handleNotificationSettings = () => {
-    if (userRole === "superadmin" || userRole === "editor") {
-      setCurrentView("notifications")
-      setNotificationView("list")
-    }
-  }
-
-  const handleCreateNotification = () => {
-    if (userRole === "superadmin" || userRole === "editor") {
-      setNotificationData({
-        title: "",
-        description: "",
-        link: "",
-      })
-      setUploadedImage(null)
-      setUploadedImageFile(null)
-      setSelectedSendTo("Send to")
-      setNotificationView("create")
-    }
-  }
-
-  const handleUploadClick = () => {
-    if (userRole === "viewer") {
-      alert("You don't have permission to upload images.")
-      return
-    }
-    document.getElementById("image-upload").click()
-  }
-
-  const handleAddAdminSubmit = async () => {
-    if (!adminFormData.username || !adminFormData.email || !adminFormData.role || !adminFormData.password) {
-      alert("Please fill in all fields")
-      return
-    }
-
-    try {
-      const result = await addAdmin(adminFormData)
-      if (result.success) {
-        alert("Admin added successfully!")
-        setShowAddAdminModal(false)
-        setAdminFormData({ username: "", email: "", role: "", password: "" })
-      } else {
-        alert(`Failed to add admin: ${result.error}`)
-      }
-    } catch (error) {
-      alert(`Error: ${error.message}`)
-    }
-  }
-
-  const handleEditAdmin = (admin) => {
-    if (userRole === "superadmin") {
-      setEditingAdmin(admin)
-      setAdminFormData({
-        username: admin.username || "",
-        email: admin.email || "",
-        role: admin.role || "",
-        password: "",
-      })
-      setCurrentAdminPassword(admin.password || "")
-      setShowEditAdminModal(true)
-    } else {
-      alert("You don't have permission to edit admins.")
-    }
-  }
-
-  const handleEditAdminSubmit = async () => {
-    if (!adminFormData.username || !adminFormData.email || !adminFormData.role) {
-      alert("Please fill in required fields")
-      return
-    }
-
-    const updateData = {
-      username: adminFormData.username,
-      email: adminFormData.email,
-      role: adminFormData.role,
-    }
-
-    if (adminFormData.password?.trim()) {
-      updateData.password = adminFormData.password.trim()
-    }
-
-    try {
-      const result = await editAdmin(editingAdmin._id, updateData)
-      if (result && result.success) {
-        alert("Admin updated successfully!")
-        setShowEditAdminModal(false)
-        setEditingAdmin(null)
-        setAdminFormData({ username: "", email: "", role: "", password: "" })
-      } else {
-        throw new Error(result?.error || "Unknown error")
-      }
-    } catch (error) {
-      console.error("Update failed:", error)
-      alert(`Failed to update admin: ${error.message}`)
-    }
-  }
-
-  const handleRemoveAdmin = async (adminId) => {
-    if (userRole === "superadmin") {
-      if (confirm("Are you sure you want to remove this admin?")) {
-        const result = await removeAdmin(adminId)
-        if (result.success) {
-          alert("Admin removed successfully!")
-        } else {
-          alert(`Failed to remove admin: ${result.error}`)
-        }
-      }
-    } else {
-      alert("You don't have permission to remove admins.")
-    }
-  }
-
-  const handleEditNotification = (notification) => {
-    if (userRole === "viewer") {
-      alert("You don't have permission to edit notifications.")
-      return
-    }
-    setEditingNotification(notification)
-    setNotificationData({
-      title: notification.title,
-      description: notification.description,
-      link: notification.link || "",
-    })
-    setUploadedImage(notification.image)
-    setSelectedSendTo(
-      notification.priority === "new-user"
-        ? "New User"
-        : notification.priority === "top-rated-user"
-          ? "Top rated user"
-          : "Old User",
-    )
-    setNotificationView("edit")
-  }
-
-  const handleDeleteNotification = async (notificationId) => {
-    if (userRole === "viewer") {
-      alert("You don't have permission to delete notifications.")
-      return
-    }
-    if (confirm("Are you sure you want to delete this notification?")) {
-      try {
-        const response = await fetch(`${BASE_URL}/notifications/${notificationId}`, {
-          method: "DELETE",
-        })
-        if (response.ok) {
-          setSentNotifications((prev) => prev.filter((n) => n.id !== notificationId))
-          alert("Notification deleted successfully!")
-        } else {
-          throw new Error("Failed to delete notification")
-        }
-      } catch (error) {
-        console.error("Delete failed:", error)
-        alert("Failed to delete notification. Please try again.")
-      }
-    }
-  }
-
-  const handleUpdateNotification = async () => {
-    if (userRole === "viewer") {
-      alert("You don't have permission to update notifications.")
-      return
-    }
-
-    const priorityMap = {
-      "New User": "new-user",
-      "Old User": "old-user",
-      "Top rated user": "top-rated-user",
-    }
-
-    const priority = priorityMap[selectedSendTo] || "old-user"
-
-    const updatedNotification = {
-      ...editingNotification,
-      title: notificationData.title,
-      description: notificationData.description,
-      link: notificationData.link,
-      image: uploadedImage,
-      priority: priority,
-      sentTo: selectedSendTo,
-    }
-
-    try {
-      const response = await fetch(`${BASE_URL}/notifications/${editingNotification.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updatedNotification),
-      })
+      const response = await fetch(`${API_BASE_URL}/list-active`, {
+        method: "GET",
+        headers: getAuthHeaders(),
+      });
+      
       if (response.ok) {
-        setSentNotifications((prev) => prev.map((n) => (n.id === editingNotification.id ? updatedNotification : n)))
-        alert("Notification updated successfully!")
-        setEditingNotification(null)
-        setNotificationView("list")
-        setNotificationData({
-          title: "",
-          description: "",
-          link: "",
-        })
-        setUploadedImage(null)
-        setUploadedImageFile(null)
-        setSelectedSendTo("Send to")
+        const data = await response.json();
+        console.log("Courses data:", data);
+        
+        if (data && data.success && Array.isArray(data.courses)) {
+          setCourses(data.courses);
+          console.log(`Loaded ${data.courses.length} courses`);
+        } else {
+          setCourses([]);
+        }
       } else {
-        throw new Error("Failed to update notification")
+        throw new Error(`HTTP ${response.status}`);
       }
-    } catch (error) {
-      console.error("Update failed:", error)
-      alert("Failed to update notification. Please try again.")
+      
+    } catch (err) {
+      console.error("Error fetching courses:", err);
+      setError(err.message);
+      setCourses([]);
+    } finally {
+      setLoading(false);
     }
+  }, []);
+
+  // Fetch full course details by ID (for view modal)
+  const fetchFullCourseDetails = async (courseId) => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_BASE_URL}/${courseId}`, {
+        method: "GET",
+        headers: getAuthHeaders(),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Full course details:", data);
+        
+        // ✅ FIXED: Extract course from response
+        let fullCourse = null;
+        if (data.success && data.course) {
+          fullCourse = data.course;
+        } else if (data.course) {
+          fullCourse = data.course;
+        } else if (data.data) {
+          fullCourse = data.data;
+        } else {
+          fullCourse = data;
+        }
+        
+        setSelectedCourse(fullCourse);
+        setCurrentView("course");
+      } else {
+        alert("Failed to load course details");
+      }
+    } catch (err) {
+      console.error("Error fetching course details:", err);
+      alert("Error loading course: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Create a new course
+  const createCourse = async (courseData) => {
+    setIsSubmitting(true);
+    try {
+      const token = localStorage.getItem("token");
+      
+      if (!token) {
+        throw new Error("Not authenticated");
+      }
+
+      console.log("Creating course at:", API_BASE_URL);
+      
+      const response = await fetch(API_BASE_URL, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(courseData),
+      });
+
+      const data = await response.json();
+      console.log("Create response:", data);
+
+      if (response.ok && data.success) {
+        await fetchCourses();
+        return { success: true };
+      } else {
+        throw new Error(data.message || "Failed to create course");
+      }
+    } catch (err) {
+      console.error("Error creating course:", err);
+      return { success: false, error: err.message };
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Update an existing course
+  const updateCourse = async (courseId, courseData) => {
+    setIsSubmitting(true);
+    try {
+      const token = localStorage.getItem("token");
+      
+      if (!token) {
+        throw new Error("Not authenticated");
+      }
+
+      console.log("Updating course at:", `${API_BASE_URL}/${courseId}`);
+      
+      const response = await fetch(`${API_BASE_URL}/${courseId}`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(courseData),
+      });
+
+      const data = await response.json();
+      console.log("Update response:", data);
+
+      if (response.ok && data.success) {
+        await fetchCourses();
+        return { success: true };
+      } else {
+        throw new Error(data.message || "Failed to update course");
+      }
+    } catch (err) {
+      console.error("Error updating course:", err);
+      return { success: false, error: err.message };
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Delete a course
+  const deleteCourse = async (courseId) => {
+    try {
+      const token = localStorage.getItem("token");
+      
+      if (!token) {
+        throw new Error("Not authenticated");
+      }
+
+      if (!confirm("Are you sure you want to delete this course?")) {
+        return { success: false };
+      }
+
+      console.log("Deleting course at:", `${API_BASE_URL}/${courseId}`);
+      
+      const response = await fetch(`${API_BASE_URL}/${courseId}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+
+      const data = await response.json();
+      console.log("Delete response:", data);
+
+      if (response.ok && data.success) {
+        setCourses(prev => prev.filter(course => course.id !== courseId));
+        return { success: true };
+      } else {
+        throw new Error(data.message || "Failed to delete course");
+      }
+    } catch (err) {
+      console.error("Error deleting course:", err);
+      alert("Error: " + err.message);
+      return { success: false, error: err.message };
+    }
+  };
+
+  const hasPermission = (action) => {
+    switch (userRole?.toLowerCase()) {
+      case "superadmin":
+        return true;
+      case "editor":
+        return ["view", "create", "edit"].includes(action);
+      case "viewer":
+        return action === "view";
+      default:
+        return false;
+    }
+  };
+
+  useEffect(() => {
+    fetchCourses();
+  }, [fetchCourses]);
+
+  const getRoleDisplayName = () => {
+    switch (userRole?.toLowerCase()) {
+      case "superadmin": return "Super Admin";
+      case "editor": return "Editor";
+      case "viewer": return "Viewer";
+      default: return "User";
+    }
+  };
+
+  if (loading) {
+    return <LoadingSpinner />;
   }
 
-  if (loading || usersLoading) {
+  if (error && courses.length === 0) {
+    return <ErrorDisplay error={error} onRetry={fetchCourses} />;
+  }
+
+  // Create/Edit View
+  if (currentView === "upload") {
     return (
-      <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
-        <div className="flex justify-center items-center h-64">
-          <div className="text-center">
-            <Loader2 className="w-8 h-8 animate-spin text-teal-600 mx-auto mb-2" />
-            <p className="text-gray-500">Loading...</p>
-          </div>
+      <div className="min-h-screen bg-gray-50 p-4">
+        <Button variant="ghost" onClick={() => setCurrentView("main")} className="mb-4">
+          ← Back to Courses
+        </Button>
+        
+        <Card className="max-w-4xl mx-auto">
+          <CardContent className="p-6">
+            <h1 className="text-2xl font-semibold mb-4">
+              {isEditing ? "Edit Course" : "Create New Course"}
+            </h1>
+            
+            <div className="mb-6 border-b border-gray-200">
+              <div className="flex flex-wrap gap-2">
+                {availableLanguages.map((lang) => (
+                  <button
+                    key={lang.code}
+                    onClick={() => setCurrentLanguage(lang.code)}
+                    className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                      currentLanguage === lang.code
+                        ? "bg-teal-600 text-white"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    {lang.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <Label>Course Name *</Label>
+                <Input
+                  value={formData.languages[currentLanguage]?.courseName || ""}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    languages: {
+                      ...prev.languages,
+                      [currentLanguage]: {
+                        ...prev.languages[currentLanguage],
+                        courseName: e.target.value,
+                      },
+                    },
+                  }))}
+                  placeholder="Enter course name..."
+                />
+              </div>
+              
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <Label>Course Pages</Label>
+                  <Button size="sm" onClick={() => {
+                    setFormData(prev => ({
+                      ...prev,
+                      languages: {
+                        ...prev.languages,
+                        [currentLanguage]: {
+                          ...prev.languages[currentLanguage],
+                          pages: [
+                            ...prev.languages[currentLanguage].pages,
+                            { title: "", content: "", time: "120", timeUnit: "minutes" },
+                          ],
+                        },
+                      },
+                    }));
+                  }}>
+                    <Plus className="h-4 w-4 mr-1" /> Add Page
+                  </Button>
+                </div>
+                
+                {(formData.languages[currentLanguage]?.pages || []).map((page, index) => (
+                  <Card key={index} className="mb-3">
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-center mb-3">
+                        <h4 className="font-medium">Page {index + 1}</h4>
+                        {(formData.languages[currentLanguage]?.pages?.length || 0) > 1 && (
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            setFormData(prev => ({
+                              ...prev,
+                              languages: {
+                                ...prev.languages,
+                                [currentLanguage]: {
+                                  ...prev.languages[currentLanguage],
+                                  pages: prev.languages[currentLanguage].pages.filter((_, i) => i !== index),
+                                },
+                              },
+                            }));
+                          }}>
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        )}
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <Input
+                          placeholder="Page Title"
+                          value={page.title}
+                          onChange={(e) => {
+                            const updatedPages = [...formData.languages[currentLanguage].pages];
+                            updatedPages[index] = { ...updatedPages[index], title: e.target.value };
+                            setFormData(prev => ({
+                              ...prev,
+                              languages: {
+                                ...prev.languages,
+                                [currentLanguage]: {
+                                  ...prev.languages[currentLanguage],
+                                  pages: updatedPages,
+                                },
+                              },
+                            }));
+                          }}
+                        />
+                        <Textarea
+                          placeholder="Page Content"
+                          value={page.content}
+                          onChange={(e) => {
+                            const updatedPages = [...formData.languages[currentLanguage].pages];
+                            updatedPages[index] = { ...updatedPages[index], content: e.target.value };
+                            setFormData(prev => ({
+                              ...prev,
+                              languages: {
+                                ...prev.languages,
+                                [currentLanguage]: {
+                                  ...prev.languages[currentLanguage],
+                                  pages: updatedPages,
+                                },
+                              },
+                            }));
+                          }}
+                          rows={4}
+                        />
+                        <div className="flex gap-2">
+                          <Input
+                            type="number"
+                            placeholder="Duration"
+                            value={page.time}
+                            onChange={(e) => {
+                              const updatedPages = [...formData.languages[currentLanguage].pages];
+                              updatedPages[index] = { ...updatedPages[index], time: e.target.value };
+                              setFormData(prev => ({
+                                ...prev,
+                                languages: {
+                                  ...prev.languages,
+                                  [currentLanguage]: {
+                                    ...prev.languages[currentLanguage],
+                                    pages: updatedPages,
+                                  },
+                                },
+                              }));
+                            }}
+                            className="flex-1"
+                          />
+                          <select
+                            value={page.timeUnit || "minutes"}
+                            onChange={(e) => {
+                              const updatedPages = [...formData.languages[currentLanguage].pages];
+                              updatedPages[index] = { ...updatedPages[index], timeUnit: e.target.value };
+                              setFormData(prev => ({
+                                ...prev,
+                                languages: {
+                                  ...prev.languages,
+                                  [currentLanguage]: {
+                                    ...prev.languages[currentLanguage],
+                                    pages: updatedPages,
+                                  },
+                                },
+                              }));
+                            }}
+                            className="border border-gray-200 rounded-md px-3 py-2 text-sm bg-white"
+                          >
+                            <option value="seconds">Seconds</option>
+                            <option value="minutes">Minutes</option>
+                          </select>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              
+              <Button 
+                className="w-full bg-teal-600 hover:bg-teal-700"
+                disabled={isSubmitting}
+                onClick={async () => {
+                  const currentLangData = formData.languages[currentLanguage];
+                  
+                  if (!currentLangData?.courseName) {
+                    alert(`Please enter a course name in ${currentLanguage.toUpperCase()}`);
+                    return;
+                  }
+                  
+                  for (let i = 0; i < currentLangData.pages.length; i++) {
+                    const page = currentLangData.pages[i];
+                    if (!page.title) {
+                      alert(`Page ${i + 1} is missing a title`);
+                      return;
+                    }
+                    if (!page.content) {
+                      alert(`Page ${i + 1} is missing content`);
+                      return;
+                    }
+                  }
+                  
+                  const languages = {};
+                  for (const lang of availableLanguages) {
+                    const langData = formData.languages[lang.code];
+                    if (langData && langData.courseName && langData.courseName.trim()) {
+                      languages[lang.code] = {
+                        courseName: langData.courseName.trim(),
+                        pages: langData.pages.map(p => ({
+                          title: p.title.trim(),
+                          content: p.content.trim(),
+                          time: JSON.stringify({ value: parseInt(p.time) || 60, unit: p.timeUnit || "minutes" }),
+                        })),
+                      };
+                    }
+                  }
+                  
+                  const payload = { languages };
+                  
+                  let result;
+                  if (isEditing && selectedCourse) {
+                    result = await updateCourse(selectedCourse.id, payload);
+                  } else {
+                    result = await createCourse(payload);
+                  }
+                  
+                  if (result?.success) {
+                    alert(`Course ${isEditing ? "updated" : "created"} successfully!`);
+                    setCurrentView("main");
+                  } else {
+                    alert("Failed to save course: " + (result?.error || "Unknown error"));
+                  }
+                }}
+              >
+                {isSubmitting ? "Saving..." : (isEditing ? "Update Course" : "Create Course")}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Main Courses List View
+  return (
+    <div className="min-h-screen bg-gray-50 p-4">
+      <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-2 rounded-lg text-sm text-center mb-4">
+        ✅ Courses Loaded: {courses.length} | Role: {getRoleDisplayName()}
+      </div>
+
+      <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">Course Management</h1>
+          <p className="text-sm text-gray-600">{userData?.email} • {getRoleDisplayName()}</p>
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={fetchCourses} variant="outline">
+            Refresh
+          </Button>
+          {hasPermission("create") && (
+            <Button onClick={() => {
+              setFormData({
+                languages: {
+                  en: { courseName: "", pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }] },
+                  hi: { courseName: "", pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }] },
+                  ar: { courseName: "", pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }] },
+                  ur: { courseName: "", pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }] },
+                  es: { courseName: "", pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }] },
+                },
+              });
+              setIsEditing(false);
+              setCurrentLanguage("en");
+              setCurrentView("upload");
+            }}>
+              <Plus className="h-4 w-4 mr-2" /> Create Course
+            </Button>
+          )}
         </div>
       </div>
-    )
-  }
 
-  // Main Settings View (without reward cards)
-  if (currentView === "main") {
-    return (
-      <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
-        {/* Success/Error Message */}
-        {message.text && (
-          <div className={`p-3 rounded-lg ${
-            message.type === "success" ? "bg-green-100 text-green-700 border border-green-300" : 
-            message.type === "error" ? "bg-red-100 text-red-700 border border-red-300" :
-            "bg-yellow-100 text-yellow-700 border border-yellow-300"
-          }`}>
-            {message.text}
-          </div>
-        )}
+      <Card>
+        <CardContent className="p-6">
+          <h2 className="text-lg font-semibold mb-4">All Courses ({courses.length})</h2>
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Settings</h1>
-            <p className="text-sm text-gray-500 mt-1">Manage admin control and notifications</p>
-          </div>
-        </div>
-
-        {/* Expiry Dropdown */}
-        {(userRole === "superadmin" || userRole === "editor") && (
-          <div className="flex justify-center sm:justify-end">
-            <div className="relative">
-              <Button
-                onClick={() => setShowExpiryDropdown(!showExpiryDropdown)}
-                className="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded text-xs font-medium flex items-center gap-1 h-8"
-              >
-                Expiry {selectedExpiry}
-                <ChevronDown className="h-3 w-3" />
-              </Button>
-              {showExpiryDropdown && (
-                <div className="absolute right-0 mt-1 w-24 bg-white border border-gray-200 rounded shadow-lg z-10">
-                  <div className="py-1">
-                    {["1 Day", "2 Day", "3 Day", "4 Day", "5 Day"].map((option) => (
-                      <button
-                        key={option}
-                        onClick={() => {
-                          setSelectedExpiry(option.split(" ")[0] + ":00")
-                          setShowExpiryDropdown(false)
-                        }}
-                        className="block w-full text-left px-2 py-1 text-xs text-gray-700 hover:bg-gray-100"
-                      >
-                        {option}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+          {courses.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <p>No courses found.</p>
+              {hasPermission("create") && (
+                <p className="text-sm mt-2">Click "Create Course" to add your first course.</p>
               )}
             </div>
-          </div>
-        )}
-
-        {/* Navigation Buttons */}
-        <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 pt-4 sm:pt-8">
-          <Button
-            onClick={handleViewControl}
-            className="bg-teal-600 hover:bg-teal-700 text-white px-4 sm:px-6 py-2 rounded-md text-sm font-medium w-full sm:w-auto"
-          >
-            View Admin Control
-          </Button>
-          {(userRole === "superadmin" || userRole === "editor") && (
-            <Button
-              onClick={handleNotificationSettings}
-              className="bg-teal-600 hover:bg-teal-700 text-white px-4 sm:px-6 py-2 rounded-md text-sm font-medium w-full sm:w-auto"
-            >
-              Notification Settings
-            </Button>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  // Admin Control View
-  if (currentView === "control") {
-    return (
-      <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-          <div className="flex items-center gap-3">
-            <Button onClick={() => setCurrentView("main")} variant="outline" size="sm" className="flex items-center gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Settings
-            </Button>
-            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Admin Control</h1>
-          </div>
-          {userRole === "superadmin" && (
-            <Button onClick={handleAddNewAdmin} className="bg-teal-600 hover:bg-teal-700 text-white px-3 sm:px-4 py-2 rounded-md text-sm font-medium w-full sm:w-auto">
-              Add New Admin
-            </Button>
-          )}
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          <Card className="bg-white border border-gray-200">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center space-x-3 sm:space-x-4">
-                <div className="w-10 sm:w-12 h-10 sm:h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <GraduationCap className="h-5 sm:h-6 w-5 sm:w-6 text-blue-600" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Learning Rewards Given</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
-                    {userRole === "superadmin" ? stats.learningRewards : "***"}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-white border border-gray-200">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center space-x-3 sm:space-x-4">
-                <div className="w-10 sm:w-12 h-10 sm:h-12 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Users className="h-5 sm:h-6 w-5 sm:w-6 text-purple-600" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Referrals Rewards Given</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.referralsRewards}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-white border border-gray-200 sm:col-span-2 lg:col-span-1">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center space-x-3 sm:space-x-4">
-                <div className="w-10 sm:w-12 h-10 sm:h-12 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Video className="h-5 sm:h-6 w-5 sm:w-6 text-orange-600" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Ad Base Rewards Given</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
-                    {userRole === "superadmin" ? stats.adBaseRewards : "***"}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Admin Access Table */}
-        <Card className="bg-white border border-gray-200">
-          <CardContent className="p-3 sm:p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Admin Access Table</h3>
+          ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-b border-gray-200">
-                    <TableHead className="font-semibold text-gray-700 py-3 min-w-[200px]">Admin Email</TableHead>
-                    <TableHead className="font-semibold text-gray-700 py-3 min-w-[120px]">Role</TableHead>
-                    {userRole === "superadmin" && (
-                      <TableHead className="font-semibold text-gray-700 py-3 min-w-[160px]">Action</TableHead>
-                    )}
+                  <TableRow>
+                    <TableHead>Course Name</TableHead>
+                    <TableHead>Languages</TableHead>
+                    <TableHead>Pages</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {adminsLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={userRole === "superadmin" ? 3 : 2} className="text-center py-8">
-                        <div className="flex justify-center">
-                          <Loader2 className="w-6 h-6 animate-spin text-teal-600" />
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ) : adminsError ? (
-                    <TableRow>
-                      <TableCell colSpan={userRole === "superadmin" ? 3 : 2} className="text-center py-8 text-red-600">
-                        Error loading admins: {adminsError}
-                      </TableCell>
-                    </TableRow>
-                  ) : admins.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={userRole === "superadmin" ? 3 : 2} className="text-center py-8 text-gray-500">
-                        No admins found
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    admins.map((admin) => (
-                      <TableRow key={admin._id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <TableCell className="py-3 text-gray-900 text-sm">{admin.email}</TableCell>
-                        <TableCell className="py-3 text-gray-900 text-sm">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            admin.role === "superadmin" ? "bg-purple-100 text-purple-800" :
-                            admin.role === "editor" ? "bg-blue-100 text-blue-800" :
-                            admin.role === "viewer" ? "bg-green-100 text-green-800" :
-                            "bg-gray-100 text-gray-800"
-                          }`}>
-                            {admin.role === "superadmin" ? "Super Admin" :
-                             admin.role === "editor" ? "Editor" :
-                             admin.role === "viewer" ? "Viewer" : admin.role}
-                          </span>
+                  {courses.map((course) => {
+                    const courseName = course.englishName || course.courseName || "Untitled";
+                    const pageCount = course.pagesCount?.en || 0;
+                    const languages = course.availableLanguages || [];
+                    
+                    return (
+                      <TableRow key={course.id}>
+                        <TableCell className="font-medium">{courseName}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-1 flex-wrap">
+                            {languages.length > 0 ? languages.map(lang => (
+                              <Badge key={lang} variant="outline" className="text-xs">
+                                {lang.toUpperCase()}
+                              </Badge>
+                            )) : (
+                              <Badge variant="outline" className="text-xs">EN</Badge>
+                            )}
+                          </div>
                         </TableCell>
-                        {userRole === "superadmin" && (
-                          <TableCell className="py-3">
-                            <div className="flex flex-col sm:flex-row gap-2">
-                              <Button
+                        <TableCell>{pageCount}</TableCell>
+                        <TableCell>
+                          <Badge className="bg-green-100 text-green-800">Active</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            {/* View Button */}
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => fetchFullCourseDetails(course.id)}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            
+                            {/* Edit Button */}
+                            {hasPermission("edit") && (
+                              <Button 
+                                variant="ghost" 
                                 size="sm"
-                                onClick={() => handleRemoveAdmin(admin._id)}
-                                className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 text-xs flex items-center gap-1 justify-center"
+                                onClick={async () => {
+                                  // Fetch full course data for editing
+                                  try {
+                                    const token = localStorage.getItem("token");
+                                    const response = await fetch(`${API_BASE_URL}/${course.id}`, {
+                                      headers: getAuthHeaders(),
+                                    });
+                                    const data = await response.json();
+                                    const fullCourse = data.course || data.data || data;
+                                    
+                                    console.log("Editing course:", fullCourse);
+                                    
+                                    // ✅ FIXED: Handle both formats
+                                    if (fullCourse) {
+                                      // Check if course has languages object or direct properties
+                                      if (fullCourse.languages) {
+                                        // Format 1: Has languages object
+                                        const newFormData = { languages: {} };
+                                        for (const lang of availableLanguages) {
+                                          const langData = fullCourse.languages[lang.code];
+                                          if (langData) {
+                                            newFormData.languages[lang.code] = {
+                                              courseName: langData.courseName || "",
+                                              pages: (langData.pages || []).map(page => {
+                                                let timeValue = "120";
+                                                let timeUnit = "minutes";
+                                                try {
+                                                  if (page.time) {
+                                                    const parsed = JSON.parse(page.time);
+                                                    timeValue = parsed?.value?.toString() || "120";
+                                                    timeUnit = parsed?.unit || "minutes";
+                                                  }
+                                                } catch (e) {
+                                                  timeValue = page.time || "120";
+                                                }
+                                                return {
+                                                  title: page.title || "",
+                                                  content: page.content || "",
+                                                  time: timeValue,
+                                                  timeUnit: timeUnit,
+                                                };
+                                              }),
+                                            };
+                                          } else {
+                                            newFormData.languages[lang.code] = {
+                                              courseName: "",
+                                              pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
+                                            };
+                                          }
+                                        }
+                                        setFormData(newFormData);
+                                      } else if (fullCourse.courseName && fullCourse.pages) {
+                                        // Format 2: Direct properties (from your API)
+                                        const newFormData = { languages: {} };
+                                        // Set English content from direct properties
+                                        newFormData.languages.en = {
+                                          courseName: fullCourse.courseName || "",
+                                          pages: (fullCourse.pages || []).map(page => ({
+                                            title: page.title || "",
+                                            content: page.content || "",
+                                            time: page.time ? (() => {
+                                              try {
+                                                const parsed = JSON.parse(page.time);
+                                                return parsed?.value?.toString() || "120";
+                                              } catch (e) {
+                                                return "120";
+                                              }
+                                            })() : "120",
+                                            timeUnit: page.time ? (() => {
+                                              try {
+                                                const parsed = JSON.parse(page.time);
+                                                return parsed?.unit || "minutes";
+                                              } catch (e) {
+                                                return "minutes";
+                                              }
+                                            })() : "minutes",
+                                          })),
+                                        };
+                                        // Initialize other languages as empty
+                                        for (const lang of availableLanguages) {
+                                          if (lang.code !== 'en') {
+                                            newFormData.languages[lang.code] = {
+                                              courseName: "",
+                                              pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
+                                            };
+                                          }
+                                        }
+                                        setFormData(newFormData);
+                                      }
+                                      
+                                      setIsEditing(true);
+                                      setSelectedCourse(fullCourse);
+                                      setCurrentLanguage("en");
+                                      setCurrentView("upload");
+                                    } else {
+                                      alert("Could not load course data for editing");
+                                    }
+                                  } catch (err) {
+                                    console.error("Error loading course for edit:", err);
+                                    alert("Failed to load course data");
+                                  }
+                                }}
                               >
-                                <Trash2 className="h-3 w-3" />
-                                <span className="hidden sm:inline">Remove</span>
+                                <Edit className="h-4 w-4" />
                               </Button>
-                              <Button
+                            )}
+                            
+                            {/* Delete Button */}
+                            {hasPermission("delete") && (
+                              <Button 
+                                variant="ghost" 
                                 size="sm"
-                                onClick={() => handleEditAdmin(admin)}
-                                className="bg-teal-600 hover:bg-teal-700 text-white px-2 py-1 text-xs flex items-center gap-1 justify-center"
+                                className="text-red-600"
+                                onClick={async () => {
+                                  const result = await deleteCourse(course.id);
+                                  if (result.success) {
+                                    alert("Course deleted successfully!");
+                                    fetchCourses();
+                                  }
+                                }}
                               >
-                                <Edit3 className="h-3 w-3" />
-                                <span className="hidden sm:inline">Edit</span>
+                                <Trash2 className="h-4 w-4" />
                               </Button>
-                            </div>
-                          </TableCell>
-                        )}
+                            )}
+                          </div>
+                        </TableCell>
                       </TableRow>
-                    ))
-                  )}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Add Admin Modal */}
-        <Dialog open={showAddAdminModal} onOpenChange={setShowAddAdminModal}>
-          <DialogContent className="sm:max-w-md bg-white">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-semibold text-gray-900">Add New Admin</h2>
-                <Button variant="ghost" size="sm" onClick={() => setShowAddAdminModal(false)} className="h-6 w-6 p-0">
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="add-name" className="text-sm font-medium text-gray-700">Username *</Label>
-                  <Input
-                    id="add-name"
-                    value={adminFormData.username}
-                    onChange={(e) => setAdminFormData({ ...adminFormData, username: e.target.value })}
-                    className="border-gray-200"
-                    placeholder="Enter admin username"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="add-email" className="text-sm font-medium text-gray-700">Email *</Label>
-                  <Input
-                    id="add-email"
-                    type="email"
-                    value={adminFormData.email}
-                    onChange={(e) => setAdminFormData({ ...adminFormData, email: e.target.value })}
-                    className="border-gray-200"
-                    placeholder="Enter admin email"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="add-role" className="text-sm font-medium text-gray-700">Role *</Label>
-                  <Select
-                    value={adminFormData.role}
-                    onValueChange={(value) => setAdminFormData({ ...adminFormData, role: value })}
-                  >
-                    <SelectTrigger className="border-gray-200">
-                      <SelectValue placeholder="Select role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="superadmin">Super Admin</SelectItem>
-                      <SelectItem value="editor">Editor</SelectItem>
-                      <SelectItem value="viewer">Viewer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="add-password" className="text-sm font-medium text-gray-700">Password *</Label>
-                  <Input
-                    id="add-password"
-                    type="password"
-                    value={adminFormData.password}
-                    onChange={(e) => setAdminFormData({ ...adminFormData, password: e.target.value })}
-                    className="border-gray-200"
-                    placeholder="Enter password"
-                  />
-                </div>
-                <div className="flex justify-end gap-3 pt-4">
-                  <Button variant="outline" onClick={() => setShowAddAdminModal(false)}>Cancel</Button>
-                  <Button onClick={handleAddAdminSubmit} className="bg-teal-600 hover:bg-teal-700 text-white">Add Admin</Button>
-                </div>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Edit Admin Modal */}
-        <Dialog open={showEditAdminModal} onOpenChange={setShowEditAdminModal}>
-          <DialogContent className="sm:max-w-md bg-white">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-semibold text-gray-900">Edit Admin</h2>
-                <Button variant="ghost" size="sm" onClick={() => setShowEditAdminModal(false)} className="h-6 w-6 p-0">
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-name">Username *</Label>
-                  <Input
-                    id="edit-name"
-                    value={adminFormData.username}
-                    onChange={(e) => setAdminFormData({ ...adminFormData, username: e.target.value })}
-                    disabled={userRole !== "superadmin"}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-email">Email *</Label>
-                  <Input
-                    id="edit-email"
-                    type="email"
-                    value={adminFormData.email}
-                    onChange={(e) => setAdminFormData({ ...adminFormData, email: e.target.value })}
-                    disabled={userRole !== "superadmin"}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-role">Role *</Label>
-                  <Select
-                    value={adminFormData.role}
-                    onValueChange={(value) => setAdminFormData({ ...adminFormData, role: value })}
-                    disabled={userRole !== "superadmin"}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="superadmin">Super Admin</SelectItem>
-                      <SelectItem value="editor">Editor</SelectItem>
-                      <SelectItem value="viewer">Viewer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex justify-end gap-3 pt-4">
-                  <Button variant="outline" onClick={() => setShowEditAdminModal(false)}>Cancel</Button>
-                  {userRole === "superadmin" && (
-                    <Button onClick={handleEditAdminSubmit} className="bg-teal-600 hover:bg-teal-700 text-white">Update Admin</Button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
-    )
-  }
-
-  // Notification List View
-  if (currentView === "notifications" && notificationView === "list") {
-    return (
-      <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-          <div className="flex items-center gap-3">
-            <Button onClick={() => setCurrentView("main")} variant="outline" size="sm" className="flex items-center gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Settings
-            </Button>
-            <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Notification Settings</h1>
-          </div>
-          {(userRole === "superadmin" || userRole === "editor") && (
-            <Button onClick={handleCreateNotification} className="bg-teal-600 hover:bg-teal-700 text-white">
-              Create Notification
-            </Button>
           )}
-        </div>
+        </CardContent>
+      </Card>
 
-        {sentNotifications.length === 0 ? (
-          <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6">
-            <div className="w-24 sm:w-32 h-24 sm:h-32 bg-teal-100 rounded-full flex items-center justify-center">
-              <Bell className="h-12 sm:h-16 w-12 sm:w-16 text-teal-600" />
-            </div>
-            <div className="text-center space-y-2">
-              <h2 className="text-lg sm:text-xl font-medium text-gray-900">No Notifications Yet!</h2>
-              <p className="text-gray-600">Click "Create Notification" to get started.</p>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sentNotifications.map((notification) => (
-              <Card key={notification.id} className="bg-white border border-gray-200">
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-start mb-3">
-                    <h3 className="font-semibold text-gray-900 line-clamp-1">{notification.title}</h3>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ml-2 ${
-                      notification.priority === "new-user" ? "bg-green-100 text-green-800" :
-                      notification.priority === "top-rated-user" ? "bg-purple-100 text-purple-800" :
-                      "bg-blue-100 text-blue-800"
-                    }`}>
-                      {notification.sentTo}
-                    </span>
+      {/* Course Viewer Modal - FIXED for direct page format */}
+      {currentView === "course" && selectedCourse && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <Card className="max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <CardContent className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <h2 className="text-xl font-semibold">
+                  {selectedCourse?.courseName || selectedCourse?.englishName || "Course Details"}
+                </h2>
+                <Button variant="ghost" size="sm" onClick={() => {
+                  setSelectedCourse(null);
+                  setCurrentView("main");
+                }}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              <div className="space-y-4">
+                {/* ✅ FIXED: Check both direct pages and nested languages */}
+                {selectedCourse?.pages && selectedCourse.pages.length > 0 ? (
+                  selectedCourse.pages.map((page, idx) => (
+                    <div key={idx} className="border rounded-lg p-4">
+                      <h3 className="font-semibold text-lg">{page.title || `Page ${idx + 1}`}</h3>
+                      <p className="text-gray-600 mt-2 whitespace-pre-wrap">{page.content || "No content"}</p>
+                      {page.time && (
+                        <p className="text-sm text-gray-400 mt-2">
+                          Duration: {(() => {
+                            try {
+                              const parsed = JSON.parse(page.time);
+                              return `${parsed.value} ${parsed.unit}`;
+                            } catch (e) {
+                              return page.time;
+                            }
+                          })()}
+                        </p>
+                      )}
+                    </div>
+                  ))
+                ) : selectedCourse?.languages?.en?.pages && selectedCourse.languages.en.pages.length > 0 ? (
+                  selectedCourse.languages.en.pages.map((page, idx) => (
+                    <div key={idx} className="border rounded-lg p-4">
+                      <h3 className="font-semibold text-lg">{page.title || `Page ${idx + 1}`}</h3>
+                      <p className="text-gray-600 mt-2 whitespace-pre-wrap">{page.content || "No content"}</p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>No page content available for this course.</p>
+                    <p className="text-sm mt-2">Click Edit to add content.</p>
                   </div>
-                  <p className="text-sm text-gray-600 mb-3 line-clamp-2">{notification.description}</p>
-                  <p className="text-xs text-gray-400">{new Date(notification.timestamp).toLocaleDateString()}</p>
-                  {(userRole === "superadmin" || userRole === "editor") && (
-                    <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
-                      <Button size="sm" variant="outline" onClick={() => handleEditNotification(notification)} className="flex-1">
-                        <Edit3 className="h-3 w-3 mr-1" /> Edit
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => handleDeleteNotification(notification.id)} className="flex-1 text-red-600 hover:text-red-700">
-                        <Trash2 className="h-3 w-3 mr-1" /> Delete
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  // Create Notification View
-  if (currentView === "notifications" && notificationView === "create") {
-    return (
-      <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
-        <div className="flex items-center gap-3 mb-6">
-          <Button onClick={() => setNotificationView("list")} variant="outline" size="sm" className="flex items-center gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </Button>
-          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Create Notification</h1>
-        </div>
-
-        <Card className="bg-white border border-gray-200 max-w-2xl mx-auto">
-          <CardContent className="p-6">
-            <div className="space-y-6">
-              {/* Send To Selection */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium text-gray-700">Send To *</Label>
-                <div className="relative">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowSendToDropdown(!showSendToDropdown)}
-                    className="w-full justify-between border-gray-200"
-                  >
-                    {selectedSendTo}
-                    <ChevronDown className="h-4 w-4 ml-2" />
-                  </Button>
-                  {showSendToDropdown && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10">
-                      {["Send to", "New User", "Old User", "Top rated user"].map((option) => (
-                        <button
-                          key={option}
-                          onClick={() => {
-                            setSelectedSendTo(option)
-                            setShowSendToDropdown(false)
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
-                        >
-                          {option}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Title */}
-              <div className="space-y-2">
-                <Label htmlFor="title" className="text-sm font-medium text-gray-700">Title *</Label>
-                <Input
-                  id="title"
-                  value={notificationData.title}
-                  onChange={(e) => setNotificationData({ ...notificationData, title: e.target.value })}
-                  placeholder="Enter notification title"
-                  className="border-gray-200"
-                />
-              </div>
-
-              {/* Description */}
-              <div className="space-y-2">
-                <Label htmlFor="description" className="text-sm font-medium text-gray-700">Description *</Label>
-                <textarea
-                  id="description"
-                  value={notificationData.description}
-                  onChange={(e) => setNotificationData({ ...notificationData, description: e.target.value })}
-                  placeholder="Enter notification description"
-                  className="w-full min-h-[120px] px-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-                />
-              </div>
-
-              {/* Link */}
-              <div className="space-y-2">
-                <Label htmlFor="link" className="text-sm font-medium text-gray-700">Link (Optional)</Label>
-                <Input
-                  id="link"
-                  value={notificationData.link}
-                  onChange={(e) => setNotificationData({ ...notificationData, link: e.target.value })}
-                  placeholder="https://example.com"
-                  className="border-gray-200"
-                />
-              </div>
-
-              {/* Image Upload */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium text-gray-700">Image (Optional)</Label>
-                <div className="flex items-center gap-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleUploadClick}
-                    className="border-gray-200"
-                    disabled={isUploading}
-                  >
-                    {isUploading ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <Upload className="h-4 w-4 mr-2" />
-                    )}
-                    Upload Image
-                  </Button>
-                  <input
-                    id="image-upload"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
-                  {uploadedImage && (
-                    <div className="relative w-12 h-12">
-                      <img
-                        src={uploadedImage}
-                        alt="Preview"
-                        className="w-full h-full object-cover rounded-md"
-                      />
-                      <button
-                        onClick={() => {
-                          setUploadedImage(null)
-                          setUploadedImageFile(null)
-                        }}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Preview Section */}
-              {(notificationData.title || notificationData.description || uploadedImage) && (
-                <div className="border-t border-gray-200 pt-4">
-                  <h3 className="text-sm font-medium text-gray-700 mb-3">Preview</h3>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    {uploadedImage && (
-                      <div className="relative w-full h-32 mb-3">
-                        <img
-                          src={uploadedImage}
-                          alt="Preview"
-                          className="w-full h-full object-cover rounded-lg"
-                        />
-                      </div>
-                    )}
-                    <p className="text-xs text-gray-500 mb-1">To: {selectedSendTo !== "Send to" ? selectedSendTo : "Not selected"}</p>
-                    <h4 className="font-semibold text-gray-900">{notificationData.title || "Title will appear here"}</h4>
-                    <p className="text-sm text-gray-600 mt-1">{notificationData.description || "Description will appear here"}</p>
-                    {notificationData.link && (
-                      <a href="#" className="text-teal-600 text-sm mt-2 inline-flex items-center gap-1">
-                        View Link <ExternalLink className="h-3 w-3" />
-                      </a>
-                    )}
+                )}
+                
+                {/* Show available languages */}
+                {selectedCourse?.availableLanguages && selectedCourse.availableLanguages.length > 0 && (
+                  <div className="mt-4 pt-4 border-t">
+                    <p className="text-sm text-gray-500">
+                      Available Languages: {selectedCourse.availableLanguages.join(', ')}
+                    </p>
                   </div>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="flex justify-end gap-3 pt-4">
-                <Button variant="outline" onClick={() => setNotificationView("list")}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSendNotification}
-                  disabled={isSending || selectedSendTo === "Send to" || !notificationData.title || !notificationData.description}
-                  className="bg-teal-600 hover:bg-teal-700 text-white"
-                >
-                  {isSending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      Sending...
-                    </>
-                  ) : (
-                    'Send Notification'
-                  )}
-                </Button>
+                )}
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Success Modal */}
-        {showSuccessModal && (
-          <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/50">
-            <Card className="bg-white max-w-md mx-4">
-              <CardContent className="p-6 text-center">
-                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Notification Sent!</h3>
-                <p className="text-gray-600">Your notification has been sent successfully.</p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  // Edit Notification View
-  if (currentView === "notifications" && notificationView === "edit") {
-    return (
-      <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
-        <div className="flex items-center gap-3 mb-6">
-          <Button onClick={() => setNotificationView("list")} variant="outline" size="sm" className="flex items-center gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </Button>
-          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Edit Notification</h1>
+            </CardContent>
+          </Card>
         </div>
-
-        <Card className="bg-white border border-gray-200 max-w-2xl mx-auto">
-          <CardContent className="p-6">
-            <div className="space-y-6">
-              {/* Send To Selection */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium text-gray-700">Send To *</Label>
-                <div className="relative">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowSendToDropdown(!showSendToDropdown)}
-                    className="w-full justify-between border-gray-200"
-                  >
-                    {selectedSendTo}
-                    <ChevronDown className="h-4 w-4 ml-2" />
-                  </Button>
-                  {showSendToDropdown && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10">
-                      {["New User", "Old User", "Top rated user"].map((option) => (
-                        <button
-                          key={option}
-                          onClick={() => {
-                            setSelectedSendTo(option)
-                            setShowSendToDropdown(false)
-                          }}
-                          className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
-                        >
-                          {option}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Title */}
-              <div className="space-y-2">
-                <Label htmlFor="edit-title" className="text-sm font-medium text-gray-700">Title *</Label>
-                <Input
-                  id="edit-title"
-                  value={notificationData.title}
-                  onChange={(e) => setNotificationData({ ...notificationData, title: e.target.value })}
-                  className="border-gray-200"
-                />
-              </div>
-
-              {/* Description */}
-              <div className="space-y-2">
-                <Label htmlFor="edit-description" className="text-sm font-medium text-gray-700">Description *</Label>
-                <textarea
-                  id="edit-description"
-                  value={notificationData.description}
-                  onChange={(e) => setNotificationData({ ...notificationData, description: e.target.value })}
-                  className="w-full min-h-[120px] px-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-                />
-              </div>
-
-              {/* Link */}
-              <div className="space-y-2">
-                <Label htmlFor="edit-link" className="text-sm font-medium text-gray-700">Link (Optional)</Label>
-                <Input
-                  id="edit-link"
-                  value={notificationData.link}
-                  onChange={(e) => setNotificationData({ ...notificationData, link: e.target.value })}
-                  className="border-gray-200"
-                />
-              </div>
-
-              {/* Image Upload */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium text-gray-700">Image (Optional)</Label>
-                <div className="flex items-center gap-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleUploadClick}
-                    className="border-gray-200"
-                    disabled={isUploading}
-                  >
-                    {isUploading ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <Upload className="h-4 w-4 mr-2" />
-                    )}
-                    {uploadedImage ? "Change Image" : "Upload Image"}
-                  </Button>
-                  <input
-                    id="image-upload"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
-                  {uploadedImage && (
-                    <div className="relative w-12 h-12">
-                      <img
-                        src={uploadedImage}
-                        alt="Preview"
-                        className="w-full h-full object-cover rounded-md"
-                      />
-                      <button
-                        onClick={() => {
-                          setUploadedImage(null)
-                          setUploadedImageFile(null)
-                        }}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-0.5"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex justify-end gap-3 pt-4">
-                <Button variant="outline" onClick={() => setNotificationView("list")}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleUpdateNotification}
-                  className="bg-teal-600 hover:bg-teal-700 text-white"
-                >
-                  Update Notification
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  return null
+      )}
+    </div>
+  );
 }
