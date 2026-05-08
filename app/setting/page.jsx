@@ -494,7 +494,6 @@ export default function SettingPage() {
       const result = await response.json();
 
       if (response.ok && result.success) {
-        // ✅ FIXED: Refresh notifications list to get actual backend IDs
         await fetchSentNotifications();
         
         setShowSuccessModal(true);
@@ -672,7 +671,6 @@ export default function SettingPage() {
     setNotificationView("edit");
   };
 
-  // ✅ FIXED: Delete notification with proper error handling
   const handleDeleteNotification = async (notificationId) => {
     if (userRole === "viewer") {
       alert("You don't have permission to delete notifications.");
@@ -704,7 +702,6 @@ export default function SettingPage() {
             throw new Error(result.message || "Failed to delete notification");
           }
         } else if (response.status === 404) {
-          // If notification not found, remove it from local state anyway
           setSentNotifications((prev) => prev.filter((n) => n.id !== notificationId));
           alert("Notification removed from list (already deleted on server)");
         } else {
@@ -712,7 +709,6 @@ export default function SettingPage() {
         }
       } catch (error) {
         console.error("Delete failed:", error);
-        // Still remove from local state if it's a frontend fake ID
         if (notificationId && notificationId.toString().length !== 24) {
           setSentNotifications((prev) => prev.filter((n) => n.id !== notificationId));
           alert("Notification removed from list (invalid ID format)");
@@ -760,7 +756,7 @@ export default function SettingPage() {
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
-          await fetchSentNotifications(); // Refresh the list
+          await fetchSentNotifications();
           alert("Notification updated successfully!");
           setEditingNotification(null);
           setNotificationView("list");
@@ -797,11 +793,10 @@ export default function SettingPage() {
     );
   }
 
-  // Main Settings View (without reward cards)
+  // Main Settings View
   if (currentView === "main") {
     return (
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
-        {/* Success/Error Message */}
         {message.text && (
           <div className={`p-3 rounded-lg ${
             message.type === "success" ? "bg-green-100 text-green-700 border border-green-300" : 
@@ -873,7 +868,7 @@ export default function SettingPage() {
     );
   }
 
-  // Admin Control View
+  // Admin Control View (WITHOUT REWARD CARDS)
   if (currentView === "control") {
     return (
       <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
@@ -890,53 +885,6 @@ export default function SettingPage() {
               Add New Admin
             </Button>
           )}
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          <Card className="bg-white border border-gray-200">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center space-x-3 sm:space-x-4">
-                <div className="w-10 sm:w-12 h-10 sm:h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <GraduationCap className="h-5 sm:h-6 w-5 sm:w-6 text-blue-600" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Learning Rewards Given</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
-                    {userRole === "superadmin" ? stats.learningRewards : "***"}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-white border border-gray-200">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center space-x-3 sm:space-x-4">
-                <div className="w-10 sm:w-12 h-10 sm:h-12 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Users className="h-5 sm:h-6 w-5 sm:w-6 text-purple-600" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Referrals Rewards Given</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.referralsRewards}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-white border border-gray-200 sm:col-span-2 lg:col-span-1">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex items-center space-x-3 sm:space-x-4">
-                <div className="w-10 sm:w-12 h-10 sm:h-12 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Video className="h-5 sm:h-6 w-5 sm:w-6 text-orange-600" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Ad Base Rewards Given</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">
-                    {userRole === "superadmin" ? stats.adBaseRewards : "***"}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         {/* Admin Access Table */}
