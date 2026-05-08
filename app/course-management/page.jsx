@@ -101,7 +101,7 @@ export default function CourseManagementPage() {
     }
   }, []);
 
-  // ✅ Fetch courses from list-active endpoint (for display)
+  // Fetch courses from list-active endpoint
   const fetchCourses = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -144,36 +144,21 @@ export default function CourseManagementPage() {
     }
   }, []);
 
-  // ✅ CRITICAL: Fetch full course with ALL languages from /all endpoint
-  const fetchFullCourseWithAllLanguages = async (courseId) => {
+  // Fetch full course by ID with all languages
+  const fetchFullCourseById = async (courseId) => {
     try {
       const token = localStorage.getItem("token");
-      
-      // ✅ Use /all endpoint which returns complete language data
-      const response = await fetch(`${API_BASE_URL}/all`, {
+      const response = await fetch(`${API_BASE_URL}/${courseId}`, {
         method: "GET",
         headers: getAuthHeaders(),
       });
       
       if (response.ok) {
         const data = await response.json();
-        console.log("All courses data from /all:", data);
-        
-        // Find the specific course
-        if (data.success && Array.isArray(data.courses)) {
-          const foundCourse = data.courses.find(c => c.id === courseId || c._id === courseId);
-          console.log("Found course with all languages:", foundCourse);
-          return foundCourse;
-        }
+        console.log("Full course data from /:id:", data);
+        return data.course || data.data || data;
       }
-      
-      // Fallback: Try direct endpoint
-      const directResponse = await fetch(`${API_BASE_URL}/${courseId}`, {
-        headers: getAuthHeaders(),
-      });
-      const directData = await directResponse.json();
-      return directData.course || directData.data || directData;
-      
+      return null;
     } catch (err) {
       console.error("Error fetching full course:", err);
       return null;
@@ -641,9 +626,36 @@ export default function CourseManagementPage() {
                 </TableHeader>
                 <TableBody>
                   {courses.map((course) => {
-                    const courseName = course.englishName || course.courseName || "Untitled";
-                    const pageCount = course.pagesCount?.en || 0;
+                    // ✅ Get course name from any available language (priority order)
+                    const courseName = course.englishName || 
+                                      course.hindiName || 
+                                      course.urduName || 
+                                      course.arabicName || 
+                                      course.spanishName ||
+                                      course.courseName || 
+                                      "Untitled";
+                    
+                    // ✅ Get total pages across all languages or English pages
+                    const pageCount = course.pagesCount?.en || 
+                                     course.pagesCount?.hi || 
+                                     course.pagesCount?.ur || 
+                                     course.pagesCount?.ar || 
+                                     course.pagesCount?.es || 0;
+                    
+                    // ✅ Get all available languages with proper display names
                     const languages = course.availableLanguages || [];
+                    
+                    // ✅ Language display names mapping
+                    const getLanguageDisplayName = (langCode) => {
+                      switch(langCode) {
+                        case 'en': return 'English';
+                        case 'hi': return 'हिंदी';
+                        case 'ur': return 'اردو';
+                        case 'ar': return 'العربية';
+                        case 'es': return 'Español';
+                        default: return langCode.toUpperCase();
+                      }
+                    };
                     
                     return (
                       <TableRow key={course.id}>
@@ -652,10 +664,10 @@ export default function CourseManagementPage() {
                           <div className="flex gap-1 flex-wrap">
                             {languages.length > 0 ? languages.map(lang => (
                               <Badge key={lang} variant="outline" className="text-xs">
-                                {lang.toUpperCase()}
+                                {getLanguageDisplayName(lang)}
                               </Badge>
                             )) : (
-                              <Badge variant="outline" className="text-xs">EN</Badge>
+                              <Badge variant="outline" className="text-xs">English</Badge>
                             )}
                           </div>
                         </TableCell>
@@ -665,22 +677,22 @@ export default function CourseManagementPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            {/* ✅ FIXED: Edit Button - Uses /all endpoint to get ALL languages */}
+                            {/* ✅ FIXED: Edit Button - Fetches full course with all languages */}
                             {hasPermission("edit") && (
                               <Button 
                                 variant="ghost" 
                                 size="sm"
                                 onClick={async () => {
                                   try {
-                                    // ✅ Fetch from /all endpoint which has complete language data
-                                    const fullCourse = await fetchFullCourseWithAllLanguages(course.id);
+                                    // ✅ Fetch full course by ID (this returns ALL languages)
+                                    const fullCourse = await fetchFullCourseById(course.id);
                                     
                                     console.log("Full course with ALL languages:", fullCourse);
                                     
                                     if (fullCourse && fullCourse.languages) {
                                       const newFormData = { languages: {} };
                                       
-                                      // ✅ Load ALL languages (English, Hindi, Arabic, Urdu, Spanish)
+                                      // ✅ Load ALL languages data
                                       for (const lang of availableLanguages) {
                                         const langData = fullCourse.languages[lang.code];
                                         if (langData && langData.courseName) {
@@ -715,14 +727,14 @@ export default function CourseManagementPage() {
                                         }
                                       }
                                       
-                                      console.log("Form data prepared:", newFormData);
+                                      console.log("Form data prepared with all languages:", Object.keys(newFormData.languages));
                                       setFormData(newFormData);
                                       setIsEditing(true);
                                       setSelectedCourse(fullCourse);
                                       setCurrentLanguage("en");
                                       setCurrentView("upload");
                                     } else {
-                                      alert("Could not load course data for editing. The course may not have multi-language support.");
+                                      alert("Could not load course data for editing.");
                                     }
                                   } catch (err) {
                                     console.error("Error loading course for edit:", err);
