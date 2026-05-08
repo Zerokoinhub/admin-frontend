@@ -144,6 +144,26 @@ export default function CourseManagementPage() {
     }
   }, []);
 
+  // ✅ Fetch full course data by ID (for editing)
+  const fetchFullCourseForEdit = async (courseId) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_BASE_URL}/${courseId}`, {
+        method: "GET",
+        headers: getAuthHeaders(),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        return data.course || data.data || data;
+      }
+      return null;
+    } catch (err) {
+      console.error("Error fetching full course:", err);
+      return null;
+    }
+  };
+
   // Create a new course
   const createCourse = async (courseData) => {
     setIsSubmitting(true);
@@ -516,7 +536,6 @@ export default function CourseManagementPage() {
                   
                   let result;
                   if (isEditing && selectedCourse) {
-                    // ✅ FIXED: Use selectedCourse.id (not _id)
                     const courseId = selectedCourse.id || selectedCourse._id;
                     if (!courseId) {
                       alert("Course ID not found");
@@ -630,96 +649,96 @@ export default function CourseManagementPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            {/* Edit Button */}
+                            {/* Edit Button - ✅ FIXED: Properly loads all languages */}
                             {hasPermission("edit") && (
                               <Button 
                                 variant="ghost" 
                                 size="sm"
                                 onClick={async () => {
-                                  // Fetch full course data for editing
                                   try {
-                                    const token = localStorage.getItem("token");
-                                    const response = await fetch(`${API_BASE_URL}/${course.id}`, {
-                                      headers: getAuthHeaders(),
-                                    });
-                                    const data = await response.json();
-                                    const fullCourse = data.course || data.data || data;
+                                    // ✅ Fetch full course data from API
+                                    const fullCourse = await fetchFullCourseForEdit(course.id);
                                     
-                                    console.log("Editing course:", fullCourse);
+                                    console.log("Full course data for edit:", fullCourse);
                                     
-                                    if (fullCourse) {
-                                      // Check if course has languages object or direct properties
-                                      if (fullCourse.languages) {
-                                        const newFormData = { languages: {} };
-                                        for (const lang of availableLanguages) {
-                                          const langData = fullCourse.languages[lang.code];
-                                          if (langData) {
-                                            newFormData.languages[lang.code] = {
-                                              courseName: langData.courseName || "",
-                                              pages: (langData.pages || []).map(page => {
-                                                let timeValue = "120";
-                                                let timeUnit = "minutes";
-                                                try {
-                                                  if (page.time) {
-                                                    const parsed = JSON.parse(page.time);
-                                                    timeValue = parsed?.value?.toString() || "120";
-                                                    timeUnit = parsed?.unit || "minutes";
-                                                  }
-                                                } catch (e) {
-                                                  timeValue = page.time || "120";
+                                    if (fullCourse && fullCourse.languages) {
+                                      const newFormData = { languages: {} };
+                                      
+                                      // ✅ Load ALL languages data
+                                      for (const lang of availableLanguages) {
+                                        const langData = fullCourse.languages[lang.code];
+                                        if (langData && langData.courseName) {
+                                          newFormData.languages[lang.code] = {
+                                            courseName: langData.courseName || "",
+                                            pages: (langData.pages || []).map(page => {
+                                              let timeValue = "120";
+                                              let timeUnit = "minutes";
+                                              try {
+                                                if (page.time) {
+                                                  const parsed = JSON.parse(page.time);
+                                                  timeValue = parsed?.value?.toString() || "120";
+                                                  timeUnit = parsed?.unit || "minutes";
                                                 }
-                                                return {
-                                                  title: page.title || "",
-                                                  content: page.content || "",
-                                                  time: timeValue,
-                                                  timeUnit: timeUnit,
-                                                };
-                                              }),
-                                            };
-                                          } else {
-                                            newFormData.languages[lang.code] = {
-                                              courseName: "",
-                                              pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
-                                            };
-                                          }
-                                        }
-                                        setFormData(newFormData);
-                                      } else if (fullCourse.courseName && fullCourse.pages) {
-                                        const newFormData = { languages: {} };
-                                        newFormData.languages.en = {
-                                          courseName: fullCourse.courseName || "",
-                                          pages: (fullCourse.pages || []).map(page => ({
-                                            title: page.title || "",
-                                            content: page.content || "",
-                                            time: page.time ? (() => {
-                                              try {
-                                                const parsed = JSON.parse(page.time);
-                                                return parsed?.value?.toString() || "120";
                                               } catch (e) {
-                                                return "120";
+                                                timeValue = page.time || "120";
                                               }
-                                            })() : "120",
-                                            timeUnit: page.time ? (() => {
-                                              try {
-                                                const parsed = JSON.parse(page.time);
-                                                return parsed?.unit || "minutes";
-                                              } catch (e) {
-                                                return "minutes";
-                                              }
-                                            })() : "minutes",
-                                          })),
-                                        };
-                                        for (const lang of availableLanguages) {
-                                          if (lang.code !== 'en') {
-                                            newFormData.languages[lang.code] = {
-                                              courseName: "",
-                                              pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
-                                            };
-                                          }
+                                              return {
+                                                title: page.title || "",
+                                                content: page.content || "",
+                                                time: timeValue,
+                                                timeUnit: timeUnit,
+                                              };
+                                            }),
+                                          };
+                                        } else {
+                                          // ✅ Empty data for languages without content
+                                          newFormData.languages[lang.code] = {
+                                            courseName: "",
+                                            pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
+                                          };
                                         }
-                                        setFormData(newFormData);
                                       }
                                       
+                                      setFormData(newFormData);
+                                      setIsEditing(true);
+                                      setSelectedCourse(fullCourse);
+                                      setCurrentLanguage("en");
+                                      setCurrentView("upload");
+                                    } else if (fullCourse && fullCourse.courseName && fullCourse.pages) {
+                                      // Fallback for older format
+                                      const newFormData = { languages: {} };
+                                      newFormData.languages.en = {
+                                        courseName: fullCourse.courseName || "",
+                                        pages: (fullCourse.pages || []).map(page => ({
+                                          title: page.title || "",
+                                          content: page.content || "",
+                                          time: page.time ? (() => {
+                                            try {
+                                              const parsed = JSON.parse(page.time);
+                                              return parsed?.value?.toString() || "120";
+                                            } catch (e) {
+                                              return "120";
+                                            }
+                                          })() : "120",
+                                          timeUnit: page.time ? (() => {
+                                            try {
+                                              const parsed = JSON.parse(page.time);
+                                              return parsed?.unit || "minutes";
+                                            } catch (e) {
+                                              return "minutes";
+                                            }
+                                          })() : "minutes",
+                                        })),
+                                      };
+                                      for (const lang of availableLanguages) {
+                                        if (lang.code !== 'en') {
+                                          newFormData.languages[lang.code] = {
+                                            courseName: "",
+                                            pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
+                                          };
+                                        }
+                                      }
+                                      setFormData(newFormData);
                                       setIsEditing(true);
                                       setSelectedCourse(fullCourse);
                                       setCurrentLanguage("en");
