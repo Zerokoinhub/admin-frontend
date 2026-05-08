@@ -101,7 +101,7 @@ export default function CourseManagementPage() {
     }
   }, []);
 
-  // Fetch courses from API
+  // ✅ Fetch courses from list-active endpoint (for display)
   const fetchCourses = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -144,10 +144,12 @@ export default function CourseManagementPage() {
     }
   }, []);
 
-  // ✅ Fetch all courses with complete language data from /all endpoint
-  const fetchAllCoursesWithLanguages = async () => {
+  // ✅ CRITICAL: Fetch full course with ALL languages from /all endpoint
+  const fetchFullCourseWithAllLanguages = async (courseId) => {
     try {
       const token = localStorage.getItem("token");
+      
+      // ✅ Use /all endpoint which returns complete language data
       const response = await fetch(`${API_BASE_URL}/all`, {
         method: "GET",
         headers: getAuthHeaders(),
@@ -155,14 +157,26 @@ export default function CourseManagementPage() {
       
       if (response.ok) {
         const data = await response.json();
+        console.log("All courses data from /all:", data);
+        
+        // Find the specific course
         if (data.success && Array.isArray(data.courses)) {
-          return data.courses;
+          const foundCourse = data.courses.find(c => c.id === courseId || c._id === courseId);
+          console.log("Found course with all languages:", foundCourse);
+          return foundCourse;
         }
       }
-      return [];
+      
+      // Fallback: Try direct endpoint
+      const directResponse = await fetch(`${API_BASE_URL}/${courseId}`, {
+        headers: getAuthHeaders(),
+      });
+      const directData = await directResponse.json();
+      return directData.course || directData.data || directData;
+      
     } catch (err) {
-      console.error("Error fetching all courses:", err);
-      return [];
+      console.error("Error fetching full course:", err);
+      return null;
     }
   };
 
@@ -651,34 +665,22 @@ export default function CourseManagementPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            {/* ✅ FIXED: Edit Button - Uses /all endpoint to get all languages data */}
+                            {/* ✅ FIXED: Edit Button - Uses /all endpoint to get ALL languages */}
                             {hasPermission("edit") && (
                               <Button 
                                 variant="ghost" 
                                 size="sm"
                                 onClick={async () => {
                                   try {
-                                    // ✅ Fetch all courses with complete language data from /all endpoint
-                                    const allCourses = await fetchAllCoursesWithLanguages();
+                                    // ✅ Fetch from /all endpoint which has complete language data
+                                    const fullCourse = await fetchFullCourseWithAllLanguages(course.id);
                                     
-                                    // Find the specific course
-                                    let fullCourse = allCourses.find(c => c.id === course.id || c._id === course.id);
-                                    
-                                    // If not found in /all, try fetching directly
-                                    if (!fullCourse) {
-                                      const directResponse = await fetch(`${API_BASE_URL}/${course.id}`, {
-                                        headers: getAuthHeaders(),
-                                      });
-                                      const directData = await directResponse.json();
-                                      fullCourse = directData.course || directData.data || directData;
-                                    }
-                                    
-                                    console.log("Full course data for edit:", fullCourse);
+                                    console.log("Full course with ALL languages:", fullCourse);
                                     
                                     if (fullCourse && fullCourse.languages) {
                                       const newFormData = { languages: {} };
                                       
-                                      // ✅ Load ALL languages data from the full course
+                                      // ✅ Load ALL languages (English, Hindi, Arabic, Urdu, Spanish)
                                       for (const lang of availableLanguages) {
                                         const langData = fullCourse.languages[lang.code];
                                         if (langData && langData.courseName) {
@@ -713,38 +715,14 @@ export default function CourseManagementPage() {
                                         }
                                       }
                                       
-                                      setFormData(newFormData);
-                                      setIsEditing(true);
-                                      setSelectedCourse(fullCourse);
-                                      setCurrentLanguage("en");
-                                      setCurrentView("upload");
-                                    } else if (fullCourse) {
-                                      // Fallback - if languages object doesn't exist
-                                      const newFormData = { languages: {} };
-                                      newFormData.languages.en = {
-                                        courseName: fullCourse.courseName || fullCourse.englishName || "",
-                                        pages: (fullCourse.pages || []).map(page => ({
-                                          title: page.title || "",
-                                          content: page.content || "",
-                                          time: page.time?.value?.toString() || "120",
-                                          timeUnit: page.time?.unit || "minutes",
-                                        })),
-                                      };
-                                      for (const lang of availableLanguages) {
-                                        if (lang.code !== 'en') {
-                                          newFormData.languages[lang.code] = {
-                                            courseName: "",
-                                            pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
-                                          };
-                                        }
-                                      }
+                                      console.log("Form data prepared:", newFormData);
                                       setFormData(newFormData);
                                       setIsEditing(true);
                                       setSelectedCourse(fullCourse);
                                       setCurrentLanguage("en");
                                       setCurrentView("upload");
                                     } else {
-                                      alert("Could not load course data for editing");
+                                      alert("Could not load course data for editing. The course may not have multi-language support.");
                                     }
                                   } catch (err) {
                                     console.error("Error loading course for edit:", err);
