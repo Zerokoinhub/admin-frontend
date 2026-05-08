@@ -64,10 +64,10 @@ export default function CourseManagementPage() {
 
   const availableLanguages = [
     { code: "en", name: "English" },
-    { code: "hi", name: "हिंदी" },
-    { code: "ar", name: "العربية" },
-    { code: "ur", name: "اردو" },
-    { code: "es", name: "Español" },
+    { code: "hi", name: "Hindi" },
+    { code: "ar", name: "Arabic" },
+    { code: "ur", name: "Urdu" },
+    { code: "es", name: "Spanish" },
   ];
 
   const [formData, setFormData] = useState({
@@ -175,12 +175,21 @@ export default function CourseManagementPage() {
         throw new Error("Not authenticated");
       }
 
+      // ✅ Ensure availableLanguages is included
+      const payload = {
+        languages: courseData.languages,
+        availableLanguages: Object.keys(courseData.languages).filter(key => 
+          courseData.languages[key] && courseData.languages[key].courseName && courseData.languages[key].courseName.trim()
+        )
+      };
+
       console.log("Creating course at:", API_BASE_URL);
+      console.log("Create payload:", JSON.stringify(payload, null, 2));
       
       const response = await fetch(API_BASE_URL, {
         method: "POST",
         headers: getAuthHeaders(),
-        body: JSON.stringify(courseData),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
@@ -215,14 +224,22 @@ export default function CourseManagementPage() {
         throw new Error("Not authenticated");
       }
 
+      // ✅ Ensure availableLanguages is included
+      const payload = {
+        languages: courseData.languages,
+        availableLanguages: Object.keys(courseData.languages).filter(key => 
+          courseData.languages[key] && courseData.languages[key].courseName && courseData.languages[key].courseName.trim()
+        )
+      };
+
       const url = `${API_BASE_URL}/${courseId}`;
       console.log("Updating course at:", url);
-      console.log("Update payload:", JSON.stringify(courseData, null, 2));
+      console.log("Update payload:", JSON.stringify(payload, null, 2));
       
       const response = await fetch(url, {
         method: "PUT",
         headers: getAuthHeaders(),
-        body: JSON.stringify(courseData),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
@@ -533,7 +550,17 @@ export default function CourseManagementPage() {
                     }
                   }
                   
-                  const payload = { languages };
+                  // ✅ Calculate available languages
+                  const availableLanguagesList = Object.keys(languages).filter(key => 
+                    languages[key] && languages[key].courseName && languages[key].courseName.trim()
+                  );
+                  
+                  const payload = { 
+                    languages: languages,
+                    availableLanguages: availableLanguagesList
+                  };
+                  
+                  console.log('📤 Saving with availableLanguages:', availableLanguagesList);
                   
                   let result;
                   if (isEditing && selectedCourse) {
@@ -626,7 +653,7 @@ export default function CourseManagementPage() {
                 </TableHeader>
                 <TableBody>
                   {courses.map((course) => {
-                    // ✅ Get course name from any available language (priority order)
+                    // ✅ Get course name from any available language
                     const courseName = course.englishName || 
                                       course.hindiName || 
                                       course.urduName || 
@@ -635,24 +662,24 @@ export default function CourseManagementPage() {
                                       course.courseName || 
                                       "Untitled";
                     
-                    // ✅ Get total pages across all languages or English pages
+                    // ✅ Get total pages
                     const pageCount = course.pagesCount?.en || 
                                      course.pagesCount?.hi || 
                                      course.pagesCount?.ur || 
                                      course.pagesCount?.ar || 
                                      course.pagesCount?.es || 0;
                     
-                    // ✅ Get all available languages with proper display names
+                    // ✅ Get all available languages
                     const languages = course.availableLanguages || [];
                     
-                    // ✅ Language display names mapping
+                    // ✅ Language display names - ALWAYS IN ENGLISH
                     const getLanguageDisplayName = (langCode) => {
                       switch(langCode) {
                         case 'en': return 'English';
-                        case 'hi': return 'हिंदी';
-                        case 'ur': return 'اردو';
-                        case 'ar': return 'العربية';
-                        case 'es': return 'Español';
+                        case 'hi': return 'Hindi';
+                        case 'ur': return 'Urdu';
+                        case 'ar': return 'Arabic';
+                        case 'es': return 'Spanish';
                         default: return langCode.toUpperCase();
                       }
                     };
@@ -677,14 +704,13 @@ export default function CourseManagementPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            {/* ✅ FIXED: Edit Button - Fetches full course with all languages */}
+                            {/* Edit Button */}
                             {hasPermission("edit") && (
                               <Button 
                                 variant="ghost" 
                                 size="sm"
                                 onClick={async () => {
                                   try {
-                                    // ✅ Fetch full course by ID (this returns ALL languages)
                                     const fullCourse = await fetchFullCourseById(course.id);
                                     
                                     console.log("Full course with ALL languages:", fullCourse);
@@ -692,7 +718,6 @@ export default function CourseManagementPage() {
                                     if (fullCourse && fullCourse.languages) {
                                       const newFormData = { languages: {} };
                                       
-                                      // ✅ Load ALL languages data
                                       for (const lang of availableLanguages) {
                                         const langData = fullCourse.languages[lang.code];
                                         if (langData && langData.courseName) {
@@ -719,7 +744,6 @@ export default function CourseManagementPage() {
                                             }),
                                           };
                                         } else {
-                                          // Empty data for languages without content
                                           newFormData.languages[lang.code] = {
                                             courseName: "",
                                             pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
@@ -727,7 +751,6 @@ export default function CourseManagementPage() {
                                         }
                                       }
                                       
-                                      console.log("Form data prepared with all languages:", Object.keys(newFormData.languages));
                                       setFormData(newFormData);
                                       setIsEditing(true);
                                       setSelectedCourse(fullCourse);
