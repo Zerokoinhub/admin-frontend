@@ -144,23 +144,25 @@ export default function CourseManagementPage() {
     }
   }, []);
 
-  // ✅ Fetch full course data by ID (for editing)
-  const fetchFullCourseForEdit = async (courseId) => {
+  // ✅ Fetch all courses with complete language data from /all endpoint
+  const fetchAllCoursesWithLanguages = async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`${API_BASE_URL}/${courseId}`, {
+      const response = await fetch(`${API_BASE_URL}/all`, {
         method: "GET",
         headers: getAuthHeaders(),
       });
       
       if (response.ok) {
         const data = await response.json();
-        return data.course || data.data || data;
+        if (data.success && Array.isArray(data.courses)) {
+          return data.courses;
+        }
       }
-      return null;
+      return [];
     } catch (err) {
-      console.error("Error fetching full course:", err);
-      return null;
+      console.error("Error fetching all courses:", err);
+      return [];
     }
   };
 
@@ -649,22 +651,34 @@ export default function CourseManagementPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            {/* Edit Button - ✅ FIXED: Properly loads all languages */}
+                            {/* ✅ FIXED: Edit Button - Uses /all endpoint to get all languages data */}
                             {hasPermission("edit") && (
                               <Button 
                                 variant="ghost" 
                                 size="sm"
                                 onClick={async () => {
                                   try {
-                                    // ✅ Fetch full course data from API
-                                    const fullCourse = await fetchFullCourseForEdit(course.id);
+                                    // ✅ Fetch all courses with complete language data from /all endpoint
+                                    const allCourses = await fetchAllCoursesWithLanguages();
+                                    
+                                    // Find the specific course
+                                    let fullCourse = allCourses.find(c => c.id === course.id || c._id === course.id);
+                                    
+                                    // If not found in /all, try fetching directly
+                                    if (!fullCourse) {
+                                      const directResponse = await fetch(`${API_BASE_URL}/${course.id}`, {
+                                        headers: getAuthHeaders(),
+                                      });
+                                      const directData = await directResponse.json();
+                                      fullCourse = directData.course || directData.data || directData;
+                                    }
                                     
                                     console.log("Full course data for edit:", fullCourse);
                                     
                                     if (fullCourse && fullCourse.languages) {
                                       const newFormData = { languages: {} };
                                       
-                                      // ✅ Load ALL languages data
+                                      // ✅ Load ALL languages data from the full course
                                       for (const lang of availableLanguages) {
                                         const langData = fullCourse.languages[lang.code];
                                         if (langData && langData.courseName) {
@@ -691,7 +705,7 @@ export default function CourseManagementPage() {
                                             }),
                                           };
                                         } else {
-                                          // ✅ Empty data for languages without content
+                                          // Empty data for languages without content
                                           newFormData.languages[lang.code] = {
                                             courseName: "",
                                             pages: [{ title: "", content: "", time: "120", timeUnit: "minutes" }],
@@ -704,30 +718,16 @@ export default function CourseManagementPage() {
                                       setSelectedCourse(fullCourse);
                                       setCurrentLanguage("en");
                                       setCurrentView("upload");
-                                    } else if (fullCourse && fullCourse.courseName && fullCourse.pages) {
-                                      // Fallback for older format
+                                    } else if (fullCourse) {
+                                      // Fallback - if languages object doesn't exist
                                       const newFormData = { languages: {} };
                                       newFormData.languages.en = {
-                                        courseName: fullCourse.courseName || "",
+                                        courseName: fullCourse.courseName || fullCourse.englishName || "",
                                         pages: (fullCourse.pages || []).map(page => ({
                                           title: page.title || "",
                                           content: page.content || "",
-                                          time: page.time ? (() => {
-                                            try {
-                                              const parsed = JSON.parse(page.time);
-                                              return parsed?.value?.toString() || "120";
-                                            } catch (e) {
-                                              return "120";
-                                            }
-                                          })() : "120",
-                                          timeUnit: page.time ? (() => {
-                                            try {
-                                              const parsed = JSON.parse(page.time);
-                                              return parsed?.unit || "minutes";
-                                            } catch (e) {
-                                              return "minutes";
-                                            }
-                                          })() : "minutes",
+                                          time: page.time?.value?.toString() || "120",
+                                          timeUnit: page.time?.unit || "minutes",
                                         })),
                                       };
                                       for (const lang of availableLanguages) {
