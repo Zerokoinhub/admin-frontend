@@ -42,9 +42,26 @@ import UserAvatar from "@/components/ui/UserAvatar"
 const ScreenshotViewer = ({ screenshots, onBack, onApprove, selectedUser }) => {
   const [selectedScreenshots, setSelectedScreenshots] = useState({})
   const [imageErrors, setImageErrors] = useState({})
+  const [loadingImages, setLoadingImages] = useState({})
   
-  // Filter out null/undefined screenshots
-  const validScreenshots = (screenshots || []).filter(url => url && url !== null && url !== 'null')
+  // Better filtering - show all non-empty screenshots
+  const validScreenshots = (screenshots || []).filter(url => {
+    if (!url) return false
+    if (url === 'null' || url === 'undefined') return false
+    if (typeof url !== 'string') return false
+    if (url.trim() === '') return false
+    return true
+  })
+  
+  const handleImageLoad = (index) => {
+    setLoadingImages(prev => ({ ...prev, [index]: false }))
+  }
+  
+  const handleImageError = (index) => {
+    setLoadingImages(prev => ({ ...prev, [index]: false }))
+    setImageErrors(prev => ({ ...prev, [index]: true }))
+    console.error(`Failed to load image ${index}:`, validScreenshots[index])
+  }
   
   const handleApprove = (index) => {
     setSelectedScreenshots(prev => ({
@@ -75,6 +92,12 @@ const ScreenshotViewer = ({ screenshots, onBack, onApprove, selectedUser }) => {
     })
   }
 
+  // Debug log to see what screenshots we have
+  useEffect(() => {
+    console.log('Screenshots received:', screenshots)
+    console.log('Valid screenshots:', validScreenshots)
+  }, [screenshots])
+
   if (validScreenshots.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
@@ -82,6 +105,7 @@ const ScreenshotViewer = ({ screenshots, onBack, onApprove, selectedUser }) => {
           <CardContent className="p-8 text-center">
             <ImageIcon className="w-16 h-16 mx-auto text-gray-300 mb-4" />
             <h3 className="text-lg font-semibold mb-2">No Screenshots Available</h3>
+            <p className="text-gray-500 mb-4">Raw screenshots data: {JSON.stringify(screenshots)}</p>
             <p className="text-gray-500 mb-6">This user hasn't uploaded any screenshots yet.</p>
             <Button onClick={onBack}>Go Back</Button>
           </CardContent>
@@ -123,25 +147,48 @@ const ScreenshotViewer = ({ screenshots, onBack, onApprove, selectedUser }) => {
           {validScreenshots.map((url, index) => (
             <Card key={index} className="overflow-hidden hover:shadow-lg transition-shadow">
               <div className="relative aspect-video bg-gray-100">
+                {loadingImages[index] !== false && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+                    <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+                  </div>
+                )}
                 {!imageErrors[index] ? (
                   <img
                     src={url}
                     alt={`Screenshot ${index + 1}`}
-                    className="w-full h-full object-cover"
-                    onError={() => setImageErrors(prev => ({ ...prev, [index]: true }))}
+                    className="w-full h-full object-contain"
+                    onLoad={() => handleImageLoad(index)}
+                    onError={() => handleImageError(index)}
+                    style={{ display: loadingImages[index] === false ? 'block' : 'none' }}
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                    <div className="text-center">
+                    <div className="text-center p-4">
                       <ImageIcon className="w-12 h-12 mx-auto text-gray-400 mb-2" />
-                      <p className="text-sm text-gray-500">Image not available</p>
+                      <p className="text-sm text-gray-500 break-all">Failed to load: {url.substring(0, 50)}...</p>
+                      <Button 
+                        variant="link" 
+                        size="sm" 
+                        onClick={() => {
+                          setImageErrors(prev => ({ ...prev, [index]: false }))
+                          setLoadingImages(prev => ({ ...prev, [index]: true }))
+                        }}
+                        className="mt-2"
+                      >
+                        Retry
+                      </Button>
                     </div>
                   </div>
                 )}
               </div>
               <CardContent className="p-4">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Screenshot {index + 1}</span>
+                  <div className="flex-1">
+                    <span className="text-sm text-gray-600">Screenshot {index + 1}</span>
+                    <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 ml-2 hover:underline">
+                      Open in new tab
+                    </a>
+                  </div>
                   <Button
                     variant={selectedScreenshots[index] ? "default" : "outline"}
                     size="sm"
@@ -163,9 +210,7 @@ const ScreenshotViewer = ({ screenshots, onBack, onApprove, selectedUser }) => {
       </div>
     </div>
   )
-}
-
-// Enhanced Transfer History Component
+}// Enhanced Transfer History Component
 const TransferHistory = ({ onBack, onRefresh }) => {
   const [transfers, setTransfers] = useState([])
   const [loading, setLoading] = useState(false)
