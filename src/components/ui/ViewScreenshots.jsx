@@ -1,6 +1,6 @@
 "use client"
 
-import  React from "react"
+import React from "react"
 import { useEffect, useMemo, useState, useCallback } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -19,15 +19,12 @@ import {
   AlertTriangle,
 } from "lucide-react"
 
-
 export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
   const [screenshots, setScreenshots] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [approving, setApproving] = useState(false)
   const [selectedIds, setSelectedIds] = useState(new Set())
-
-  // Lightbox preview state
   const [previewIndex, setPreviewIndex] = useState(null)
 
   // Build screenshot items from selectedUser.screenshots links
@@ -43,18 +40,24 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
         setLoading(false)
         return
       }
-      if (!Array.isArray(links) || links.length === 0) {
+      
+      // Filter out null/undefined/invalid URLs
+      const validLinks = links.filter(url => 
+        url && typeof url === 'string' && url !== 'null' && url !== 'undefined' && url.trim() !== ''
+      )
+      
+      if (!Array.isArray(validLinks) || validLinks.length === 0) {
         setError("No screenshots found for this user")
         setScreenshots([])
         setLoading(false)
         return
       }
 
-      const items = links.map((url, idx) => ({
+      const items = validLinks.map((url, idx) => ({
         id: `${selectedUser._id || selectedUser.id || "user"}_${idx}`,
         imageUrl: url,
         description: `Screenshot ${idx + 1}`,
-        coins: 25, // default coins per screenshot
+        coins: 10,
         approved: false,
         uploadedAt: new Date().toISOString(),
         status: "pending",
@@ -78,6 +81,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
     if (!Array.isArray(screenshots)) return 0
     return screenshots.filter((s) => s.approved).reduce((sum, s) => sum + (s.coins || 0), 0)
   }, [screenshots])
+  
   const selectedCount = selectedIds?.size || 0
 
   const toggleApproval = (id) => {
@@ -138,34 +142,27 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
     setApproving(false)
   }
 
-  // Lightbox handlers
   const openPreviewAt = (idx) => setPreviewIndex(idx)
   const closePreview = () => setPreviewIndex(null)
+  
   const prevPreview = (e) => {
     e?.stopPropagation()
     if (previewIndex === null) return
-    setPreviewIndex((prev) => {
-      if (prev === null) return prev
-      return (prev - 1 + screenshots.length) % screenshots.length
-    })
+    setPreviewIndex((prev) => (prev - 1 + screenshots.length) % screenshots.length)
   }
+  
   const nextPreview = (e) => {
     e?.stopPropagation()
     if (previewIndex === null) return
-    setPreviewIndex((prev) => {
-      if (prev === null) return prev
-      return (prev + 1) % screenshots.length
-    })
+    setPreviewIndex((prev) => (prev + 1) % screenshots.length)
   }
 
-  // Keyboard support for lightbox
   const handleKey = useCallback(
     (e) => {
       if (previewIndex === null) return
       if (e.key === "Escape") closePreview()
-      if (e.key === "ArrowLeft")
-        setPreviewIndex((i) => (i === null ? i : (i - 1 + screenshots.length) % screenshots.length))
-      if (e.key === "ArrowRight") setPreviewIndex((i) => (i === null ? i : (i + 1) % screenshots.length))
+      if (e.key === "ArrowLeft") setPreviewIndex((i) => (i - 1 + screenshots.length) % screenshots.length)
+      if (e.key === "ArrowRight") setPreviewIndex((i) => (i + 1) % screenshots.length)
     },
     [previewIndex, screenshots.length],
   )
@@ -175,21 +172,12 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
     return () => window.removeEventListener("keydown", handleKey)
   }, [handleKey])
 
-  // Component for handling screenshot images with proper fallback
+  // ✅ Fixed ScreenshotImage Component
   const ScreenshotImage = ({ screenshot, index }) => {
     const [imageError, setImageError] = useState(false)
-    const [imageLoading, setImageLoading] = useState(true)
+    const [imageLoaded, setImageLoaded] = useState(false)
 
-    const handleImageError = () => {
-      setImageError(true)
-      setImageLoading(false)
-    }
-
-    const handleImageLoad = () => {
-      setImageLoading(false)
-    }
-
-    if (!screenshot.imageUrl || imageError) {
+    if (!screenshot?.imageUrl || screenshot.imageUrl === 'null' || imageError) {
       return (
         <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
           <ImageIcon className="h-8 w-8 text-gray-400" />
@@ -199,27 +187,78 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
 
     return (
       <>
-        {imageLoading && (
+        {!imageLoaded && (
           <div className="absolute inset-0 bg-gray-100 flex items-center justify-center">
             <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
           </div>
         )}
         <img
-          src={screenshot.imageUrl || "/placeholder.svg"}
+          src={screenshot.imageUrl}
           alt={`Screenshot ${index + 1}`}
           className="w-full h-full object-cover relative z-[1]"
-          onError={handleImageError}
-          onLoad={handleImageLoad}
-          style={{ display: imageLoading ? "none" : "block" }}
+          onLoad={() => setImageLoaded(true)}
+          onError={() => {
+            setImageError(true)
+            setImageLoaded(false)
+          }}
           crossOrigin="anonymous"
         />
       </>
     )
   }
 
+  // Refresh function
+  const handleRefresh = () => {
+    setLoading(true)
+    const links = selectedUser?.screenshots ?? []
+    const validLinks = links.filter(url => 
+      url && typeof url === 'string' && url !== 'null' && url !== 'undefined' && url.trim() !== ''
+    )
+    const items = validLinks.map((url, idx) => ({
+      id: `${selectedUser?._id || selectedUser?.id || "user"}_${idx}`,
+      imageUrl: url,
+      description: `Screenshot ${idx + 1}`,
+      coins: 10,
+      approved: false,
+      uploadedAt: new Date().toISOString(),
+      status: "pending",
+    }))
+    setScreenshots(items)
+    setSelectedIds(new Set())
+    setLoading(false)
+  }
+
+  if (loading) {
+    return (
+      <div className="p-4 sm:p-6">
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin mr-3 text-blue-600" />
+          <span className="text-gray-600">Loading screenshots...</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (error && screenshots.length === 0) {
+    return (
+      <div className="p-4 sm:p-6">
+        <div className="flex items-center justify-between mb-4">
+          <Button onClick={onBack} variant="outline">
+            <ArrowRight className="h-4 w-4 mr-2 rotate-180" />
+            Back
+          </Button>
+        </div>
+        <Alert className="border-amber-200 bg-amber-50">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-amber-800">{error}</AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
+
   return (
     <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <Button onClick={onBack} variant="outline" className="mb-4 bg-transparent">
             <ArrowRight className="h-4 w-4 mr-2 rotate-180" />
@@ -238,28 +277,8 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Button
-          onClick={() => {
-            // Rebuild from selectedUser again
-            if (!selectedUser) return
-            const links = selectedUser.screenshots ?? []
-            const items= links.map((url, idx) => ({
-              id: `${selectedUser._id || selectedUser.id || "user"}_${idx}`,
-              imageUrl: url,
-              description: `Screenshot ${idx + 1}`,
-              coins: 25,
-              approved: false,
-              uploadedAt: new Date().toISOString(),
-              status: "pending",
-            }))
-            setScreenshots(items)
-            setSelectedIds(new Set())
-          }}
-          variant="outline"
-          size="sm"
-          disabled={loading}
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+        <Button onClick={handleRefresh} variant="outline" size="sm">
+          <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
         </Button>
 
@@ -277,21 +296,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
         )}
       </div>
 
-      {loading && (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin mr-3 text-blue-600" />
-          <span className="text-gray-600">Loading screenshots...</span>
-        </div>
-      )}
-
-      {error && !loading && (
-        <Alert className="border-amber-200 bg-amber-50">
-          <AlertTriangle className="h-4 w-4 text-amber-600" />
-          <AlertDescription className="text-amber-800">{error}</AlertDescription>
-        </Alert>
-      )}
-
-      {!loading && !error && screenshots.length === 0 && (
+      {screenshots.length === 0 && !loading && !error && (
         <div className="text-center py-12">
           <ImageIcon className="h-16 w-16 mx-auto mb-4 text-gray-300" />
           <p className="text-lg font-medium text-gray-600 mb-2">No Screenshots Found</p>
@@ -299,7 +304,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
         </div>
       )}
 
-      {!loading && screenshots.length > 0 && (
+      {screenshots.length > 0 && (
         <>
           <div className="grid gap-4">
             {screenshots.map((s, idx) => (
@@ -319,7 +324,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
                     <div className="flex items-center gap-4 flex-1">
                       <button
                         type="button"
-                        className="relative w-20 h-20 rounded-lg overflow-hidden border bg-gray-100"
+                        className="relative w-20 h-20 rounded-lg overflow-hidden border bg-gray-100 shrink-0"
                         onClick={(e) => {
                           e.stopPropagation()
                           openPreviewAt(idx)
@@ -328,7 +333,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
                       >
                         <ScreenshotImage screenshot={s} index={idx} />
                         {selectedIds.has(s.id) && (
-                          <div className="absolute -top-2 -right-2 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
+                          <div className="absolute -top-2 -right-2 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center z-10">
                             <CheckCircle className="h-4 w-4 text-white" />
                           </div>
                         )}
@@ -386,7 +391,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
                   Processing...
                 </>
               ) : (
-                `Approve All (${screenshots.reduce((sum, s) => sum + s.coins, 0)} coins)`
+                `Approve All (${screenshots.reduce((sum, s) => sum + (s.coins || 0), 0)} coins)`
               )}
             </Button>
           </div>
@@ -424,13 +429,10 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
 
           <div className="max-w-[95vw] max-h-[85vh] relative" onClick={(e) => e.stopPropagation()}>
             <img
-              src={screenshots[previewIndex].imageUrl || "/placeholder.svg"}
+              src={screenshots[previewIndex].imageUrl}
               alt={`Screenshot preview ${previewIndex + 1}`}
               className="max-w-[95vw] max-h-[85vh] object-contain rounded-md shadow-lg"
               crossOrigin="anonymous"
-              onError={(e) => {
-                e.currentTarget.src = "/placeholder.svg?height=800&width=1200"
-              }}
             />
             <div className="absolute bottom-2 left-1/2 -translate-x-1/2 text-white/90 text-sm bg-black/50 px-2 py-1 rounded">
               {previewIndex + 1} / {screenshots.length}
