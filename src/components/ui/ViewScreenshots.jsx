@@ -20,9 +20,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
   const [processingId, setProcessingId] = useState(null)
   const [previewIndex, setPreviewIndex] = useState(null)
 
-  const getStorageKey = () => {
-    return `screenshots_approved_${selectedUser?.email}`
-  }
+  const getStorageKey = () => `screenshots_approved_${selectedUser?.email}`
 
   useEffect(() => {
     if (!selectedUser?.screenshots) {
@@ -60,7 +58,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
     localStorage.setItem(getStorageKey(), JSON.stringify(approvedStatus))
   }
 
-  // ✅ APPROVE Function
+  // ✅ APPROVE - Add coins
   const handleApprove = async (id) => {
     const screenshot = screenshots.find(s => s.id === id)
     if (!screenshot || screenshot.approved) return
@@ -112,7 +110,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
     }
   }
 
-  // ✅ FIXED UNAPPROVE Function
+  // ✅ UNAPPROVE - Deduct coins (send negative amount)
   const handleUnapprove = async (id) => {
     const screenshot = screenshots.find(s => s.id === id)
     if (!screenshot || !screenshot.approved) return
@@ -127,23 +125,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
       const admin = adminUser.username || adminUser.name || "Admin"
       const token = localStorage.getItem("token")
       
-      // Get current user balance first
-      const userResponse = await fetch(`/api/users?email=${selectedUser.email}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const userData = await userResponse.json()
-      const users = userData.users || userData.data || []
-      const currentUser = users.find(u => u.email === selectedUser.email)
-      const currentBalance = currentUser?.balance || 0
-      
-      const newBalance = currentBalance - screenshot.coins
-      
-      if (newBalance < 0) {
-        alert(`❌ Cannot unapprove! User only has ${currentBalance} coins, need to deduct ${screenshot.coins} coins.`)
-        setProcessingId(null)
-        return
-      }
-      
+      // ✅ Send negative amount for deduction
       const response = await fetch('/api/users/edit-balance', {
         method: 'POST',
         headers: {
@@ -152,7 +134,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
         },
         body: JSON.stringify({
           email: selectedUser.email,
-          newBalance: newBalance,
+          newBalance: -screenshot.coins,
           admin: admin
         })
       })
@@ -172,7 +154,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
           hasApprovedScreenshots: approvedCount - 1 > 0,
         })
         
-        alert(`✅ Unapproved! ${screenshot.coins} coins deducted from ${selectedUser.name}'s balance. New balance: ${newBalance}`)
+        alert(`✅ Unapproved! ${screenshot.coins} coins deducted from ${selectedUser.name}'s balance.`)
       } else {
         alert("❌ Failed to unapprove: " + (result.message || "Please try again"))
       }
@@ -323,7 +305,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
                         disabled={processingId === s.id}
                         variant="outline"
                         size="sm"
-                        className="bg-green-600 text-white hover:bg-green-700 border-green-600"
+                        className="bg-red-600 text-white hover:bg-red-700 border-red-600"
                       >
                         {processingId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Unapprove"}
                       </Button>
@@ -333,7 +315,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
                         disabled={processingId === s.id}
                         variant="default"
                         size="sm"
-                        className="bg-blue-600 hover:bg-blue-700"
+                        className="bg-green-600 hover:bg-green-700"
                       >
                         {processingId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Approve"}
                       </Button>
