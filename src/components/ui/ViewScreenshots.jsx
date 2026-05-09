@@ -84,6 +84,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
 
   // ✅ APPROVE - Add coins to user
   // ✅ APPROVE - Works with database
+// ✅ FULLY FIXED - APPROVE Function
 const handleApprove = async (id) => {
   const screenshot = screenshots.find(s => s.id === id)
   if (!screenshot || screenshot.approved) return
@@ -91,14 +92,27 @@ const handleApprove = async (id) => {
   setProcessingId(id)
   
   try {
-    // Get admin name
     const adminUser = JSON.parse(localStorage.getItem("user") || "{}")
     const admin = adminUser.username || adminUser.name || "Admin"
+    const token = localStorage.getItem("token")
     
-    // Call API to add coins
-    const response = await userAPI.editUserBalance(selectedUser.email, screenshot.coins, admin)
+    // ✅ DIRECT API CALL (No userAPI)
+    const response = await fetch('/api/users/edit-balance', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        email: selectedUser.email,
+        newBalance: screenshot.coins,
+        admin: admin
+      })
+    })
     
-    if (response.success) {
+    const result = await response.json()
+    
+    if (result.success) {
       // Update local state
       setScreenshots(prev => prev.map(s => 
         s.id === id ? { ...s, approved: true, status: "approved" } : s
@@ -113,7 +127,7 @@ const handleApprove = async (id) => {
       
       alert(`✅ ${screenshot.coins} coins added to ${selectedUser.name}`)
     } else {
-      alert("❌ Failed: " + (response.message || "Unknown error"))
+      alert("❌ Failed: " + (result.message || "Unknown error"))
     }
   } catch (error) {
     console.error("Approve error:", error)
@@ -122,57 +136,62 @@ const handleApprove = async (id) => {
     setProcessingId(null)
   }
 }
-  // ✅ UNAPPROVE - Deduct coins from user
-  const handleUnapprove = async (id) => {
-    const screenshot = screenshots.find(s => s.id === id)
-    if (!screenshot || !screenshot.approved || transferring) return
 
-    const confirm = window.confirm(`⚠️ Are you sure? ${screenshot.coins} coins will be deducted from ${selectedUser.name}'s balance.`)
-    if (!confirm) return
+// ✅ FULLY FIXED - UNAPPROVE Function
+const handleUnapprove = async (id) => {
+  const screenshot = screenshots.find(s => s.id === id)
+  if (!screenshot || !screenshot.approved) return
 
-    setProcessingId(id)
-    setTransferring(true)
+  const confirm = window.confirm(`⚠️ Are you sure? ${screenshot.coins} coins will be deducted from ${selectedUser.name}'s balance.`)
+  if (!confirm) return
+
+  setProcessingId(id)
+  
+  try {
+    const adminUser = JSON.parse(localStorage.getItem("user") || "{}")
+    const admin = adminUser.username || adminUser.name || "Admin"
+    const token = localStorage.getItem("token")
     
-    try {
-      const adminUser = JSON.parse(localStorage.getItem("user") || "{}")
-      const admin = adminUser.username || adminUser.name || "Admin"
+    // ✅ DIRECT API CALL with negative amount (No userAPI)
+    const response = await fetch('/api/users/edit-balance', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        email: selectedUser.email,
+        newBalance: -screenshot.coins,
+        admin: admin
+      })
+    })
+    
+    const result = await response.json()
+    
+    if (result.success) {
+      // Update local state
+      setScreenshots(prev => prev.map(s => 
+        s.id === id ? { ...s, approved: false, status: "pending" } : s
+      ))
       
-      // Deduct coins from user
-      const response = await userAPI.editUserBalance(selectedUser.email, -screenshot.coins, admin)
+      // Update parent
+      onApprove?.({
+        approvedCount: approvedCount - 1,
+        totalCoins: totalCoins - screenshot.coins,
+        hasApprovedScreenshots: approvedCount - 1 > 0,
+      })
       
-      if (response.success) {
-        // Update local state
-        const updatedScreenshots = screenshots.map((s) => 
-          s.id === id ? { ...s, approved: false, status: "pending" } : s
-        )
-        setScreenshots(updatedScreenshots)
-        
-        // Update parent
-        const newApprovedCount = approvedCount - 1
-        const newTotalCoins = totalCoins - screenshot.coins
-        onApprove?.({
-          allScreenshotsApproved: newApprovedCount === screenshots.length,
-          approvedCount: newApprovedCount,
-          totalCoins: newTotalCoins,
-          hasApprovedScreenshots: newApprovedCount > 0,
-        })
-        
-        alert(`✅ Unapproved! ${screenshot.coins} coins deducted from ${selectedUser.name}'s balance.`)
-        
-        // Reload to get fresh data
-        await loadScreenshotsFromAPI()
-      } else {
-        alert("❌ Failed to unapprove. Please try again.")
-      }
-    } catch (error) {
-      console.error("Unapprove error:", error)
-      alert("❌ Error unapproving screenshot.")
-    } finally {
-      setProcessingId(null)
-      setTransferring(false)
+      alert(`✅ Unapproved! ${screenshot.coins} coins deducted from ${selectedUser.name}'s balance.`)
+    } else {
+      alert("❌ Failed to unapprove. Please try again.")
     }
+  } catch (error) {
+    console.error("Unapprove error:", error)
+    alert("❌ Error unapproving screenshot.")
+  } finally {
+    setProcessingId(null)
   }
-
+}
   const toggleSelection = (id) => {
     const screenshot = screenshots.find(s => s.id === id)
     if (screenshot?.approved) return // Cannot select approved screenshots
