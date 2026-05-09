@@ -1,13 +1,10 @@
 "use client"
 
 import React, { useEffect, useState, useCallback } from "react"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
   ArrowRight,
-  Calendar,
-  CheckCircle,
   ChevronLeft,
   ChevronRight,
   ImageIcon,
@@ -50,7 +47,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
   const approvedCount = screenshots.filter(s => s.approved).length
   const totalCoins = screenshots.filter(s => s.approved).reduce((sum, s) => sum + s.coins, 0)
 
-  // ✅ FULLY FIXED - APPROVE Function
+  // ✅ APPROVE Function
   const handleApprove = async (id) => {
     const screenshot = screenshots.find(s => s.id === id)
     if (!screenshot || screenshot.approved) return
@@ -79,7 +76,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
       
       if (result.success) {
         setScreenshots(prev => prev.map(s => 
-          s.id === id ? { ...s, approved: true, status: "approved" } : s
+          s.id === id ? { ...s, approved: true } : s
         ))
         onApprove?.({
           approvedCount: approvedCount + 1,
@@ -98,7 +95,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
     }
   }
 
-  // ✅ FULLY FIXED - UNAPPROVE Function
+  // ✅ UNAPPROVE Function
   const handleUnapprove = async (id) => {
     const screenshot = screenshots.find(s => s.id === id)
     if (!screenshot || !screenshot.approved) return
@@ -130,7 +127,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
       
       if (result.success) {
         setScreenshots(prev => prev.map(s => 
-          s.id === id ? { ...s, approved: false, status: "pending" } : s
+          s.id === id ? { ...s, approved: false } : s
         ))
         onApprove?.({
           approvedCount: approvedCount - 1,
@@ -146,52 +143,6 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
       alert("❌ Error unapproving screenshot.")
     } finally {
       setProcessingId(null)
-    }
-  }
-
-  // ✅ APPROVE ALL
-  const approveAll = async () => {
-    const pending = screenshots.filter(s => !s.approved)
-    if (pending.length === 0) {
-      alert("All screenshots already approved!")
-      return
-    }
-
-    const totalAmount = pending.reduce((sum, s) => sum + s.coins, 0)
-    
-    try {
-      const adminUser = JSON.parse(localStorage.getItem("user") || "{}")
-      const admin = adminUser.username || adminUser.name || "Admin"
-      const token = localStorage.getItem("token")
-      
-      const response = await fetch('/api/users/edit-balance', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          email: selectedUser.email,
-          newBalance: totalAmount,
-          admin: admin
-        })
-      })
-      
-      const result = await response.json()
-      
-      if (result.success) {
-        setScreenshots(prev => prev.map(s => ({ ...s, approved: true, status: "approved" })))
-        onApprove?.({
-          approvedCount: screenshots.length,
-          totalCoins: screenshots.reduce((sum, s) => sum + s.coins, 0),
-          hasApprovedScreenshots: true,
-        })
-        alert(`✅ ${totalAmount} coins added to ${selectedUser.name}!`)
-      } else {
-        alert("❌ Failed to approve all")
-      }
-    } catch (error) {
-      alert("❌ Error approving all")
     }
   }
 
@@ -268,6 +219,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
 
   return (
     <div className="p-4 sm:p-6 space-y-4">
+      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <Button onClick={onBack} variant="outline">
@@ -275,13 +227,18 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
             Back
           </Button>
           <h2 className="text-xl font-bold mt-2">{selectedUser?.name}</h2>
+          <p className="text-sm text-gray-500">{selectedUser?.email}</p>
         </div>
         <div className="text-right">
-          <p>Approved: {approvedCount}/{screenshots.length}</p>
-          <p className="text-green-600 font-bold">{totalCoins} coins</p>
+          <p className="text-sm text-gray-600">Approved: {approvedCount}/{screenshots.length}</p>
+          <p className="text-lg font-bold text-green-600">
+            <Coins className="inline h-4 w-4 mr-1" />
+            {totalCoins} coins
+          </p>
         </div>
       </div>
 
+      {/* Only Refresh Button - No Approve Selected, No Approve All */}
       <div className="flex gap-2">
         <Button onClick={handleRefresh} variant="outline" size="sm">
           <RefreshCw className="h-4 w-4 mr-2" />
@@ -289,67 +246,70 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
         </Button>
       </div>
 
+      {/* Screenshots List */}
       {screenshots.length === 0 ? (
         <div className="text-center py-12">
           <ImageIcon className="h-16 w-16 mx-auto text-gray-300 mb-4" />
           <p>No screenshots found</p>
         </div>
       ) : (
-        <>
-          <div className="grid gap-4">
-            {screenshots.map((s, idx) => (
-              <Card key={s.id} className={s.approved ? "border-green-500 bg-green-50" : ""}>
-                <CardContent className="p-4">
-                  <div className="flex gap-4">
-                    <button
-                      className="relative w-20 h-20 rounded overflow-hidden border shrink-0"
-                      onClick={() => openPreviewAt(idx)}
-                    >
-                      <ScreenshotImage screenshot={s} index={idx} />
-                    </button>
-                    <div className="flex-1">
-                      <p className="font-medium">{s.description}</p>
-                      <p className="text-sm text-gray-600">{s.coins} coins</p>
-                      {s.uploadedAt && (
-                        <p className="text-xs text-gray-400">{new Date(s.uploadedAt).toLocaleDateString()}</p>
-                      )}
-                    </div>
-                    <div>
-                      {s.approved ? (
-                        <Button
-                          onClick={() => handleUnapprove(s.id)}
-                          disabled={processingId === s.id}
-                          variant="destructive"
-                          size="sm"
-                        >
-                          {processingId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Unapprove"}
-                        </Button>
-                      ) : (
-                        <Button
-                          onClick={() => handleApprove(s.id)}
-                          disabled={processingId === s.id}
-                          variant="default"
-                          size="sm"
-                          className="bg-green-600"
-                        >
-                          {processingId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Approve"}
-                        </Button>
-                      )}
-                    </div>
+        <div className="grid gap-4">
+          {screenshots.map((s, idx) => (
+            <Card key={s.id} className={s.approved ? "border-green-500 bg-green-50" : ""}>
+              <CardContent className="p-4">
+                <div className="flex gap-4 items-center">
+                  {/* Screenshot Thumbnail */}
+                  <button
+                    className="relative w-20 h-20 rounded overflow-hidden border shrink-0"
+                    onClick={() => openPreviewAt(idx)}
+                  >
+                    <ScreenshotImage screenshot={s} index={idx} />
+                  </button>
+                  
+                  {/* Screenshot Info */}
+                  <div className="flex-1">
+                    <p className="font-medium">{s.description}</p>
+                    <p className="text-sm text-gray-600">
+                      <Coins className="inline h-3 w-3 mr-1" />
+                      {s.coins} coins
+                    </p>
+                    {s.uploadedAt && (
+                      <p className="text-xs text-gray-400">{new Date(s.uploadedAt).toLocaleDateString()}</p>
+                    )}
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          {screenshots.some(s => !s.approved) && (
-            <Button onClick={approveAll} className="w-full bg-green-600">
-              Approve All ({screenshots.filter(s => !s.approved).reduce((sum, s) => sum + s.coins, 0)} coins)
-            </Button>
-          )}
-        </>
+                  
+                  {/* ✅ Action Button - Approve for pending, Unapprove for approved (Green) */}
+                  <div>
+                    {s.approved ? (
+                      <Button
+                        onClick={() => handleUnapprove(s.id)}
+                        disabled={processingId === s.id}
+                        variant="outline"
+                        size="sm"
+                        className="bg-green-600 text-white hover:bg-green-700 border-green-600"
+                      >
+                        {processingId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Unapprove"}
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={() => handleApprove(s.id)}
+                        disabled={processingId === s.id}
+                        variant="default"
+                        size="sm"
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        {processingId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Approve"}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       )}
 
+      {/* Lightbox Preview */}
       {previewIndex !== null && screenshots[previewIndex] && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center" onClick={closePreview}>
           <button className="absolute top-4 right-4 text-white text-2xl" onClick={closePreview}>✕</button>
