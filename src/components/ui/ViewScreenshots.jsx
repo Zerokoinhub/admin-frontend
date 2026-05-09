@@ -83,60 +83,45 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
   const selectedCount = selectedIds?.size || 0
 
   // ✅ APPROVE - Add coins to user
-  const handleApprove = async (id) => {
-    const screenshot = screenshots.find(s => s.id === id)
-    if (!screenshot || screenshot.approved || transferring) return
+  // ✅ APPROVE - Works with database
+const handleApprove = async (id) => {
+  const screenshot = screenshots.find(s => s.id === id)
+  if (!screenshot || screenshot.approved) return
 
-    setProcessingId(id)
-    setTransferring(true)
+  setProcessingId(id)
+  
+  try {
+    // Get admin name
+    const adminUser = JSON.parse(localStorage.getItem("user") || "{}")
+    const admin = adminUser.username || adminUser.name || "Admin"
     
-    try {
-      const adminUser = JSON.parse(localStorage.getItem("user") || "{}")
-      const admin = adminUser.username || adminUser.name || "Admin"
+    // Call API to add coins
+    const response = await userAPI.editUserBalance(selectedUser.email, screenshot.coins, admin)
+    
+    if (response.success) {
+      // Update local state
+      setScreenshots(prev => prev.map(s => 
+        s.id === id ? { ...s, approved: true, status: "approved" } : s
+      ))
       
-      // Transfer coins to user
-      const response = await userAPI.editUserBalance(selectedUser.email, screenshot.coins, admin)
+      // Update parent
+      onApprove?.({
+        approvedCount: approvedCount + 1,
+        totalCoins: totalCoins + screenshot.coins,
+        hasApprovedScreenshots: true,
+      })
       
-      if (response.success) {
-        // Update local state
-        const updatedScreenshots = screenshots.map((s) => 
-          s.id === id ? { ...s, approved: true, status: "approved" } : s
-        )
-        setScreenshots(updatedScreenshots)
-        
-        // Remove from selected if present
-        if (selectedIds.has(id)) {
-          const newSelected = new Set(selectedIds)
-          newSelected.delete(id)
-          setSelectedIds(newSelected)
-        }
-        
-        // Update parent
-        const newApprovedCount = approvedCount + 1
-        const newTotalCoins = totalCoins + screenshot.coins
-        onApprove?.({
-          allScreenshotsApproved: newApprovedCount === screenshots.length,
-          approvedCount: newApprovedCount,
-          totalCoins: newTotalCoins,
-          hasApprovedScreenshots: true,
-        })
-        
-        alert(`✅ Approved! ${screenshot.coins} coins added to ${selectedUser.name}'s balance.`)
-        
-        // Reload to get fresh data
-        await loadScreenshotsFromAPI()
-      } else {
-        alert("❌ Failed to approve. Please try again.")
-      }
-    } catch (error) {
-      console.error("Approve error:", error)
-      alert("❌ Error approving screenshot.")
-    } finally {
-      setProcessingId(null)
-      setTransferring(false)
+      alert(`✅ ${screenshot.coins} coins added to ${selectedUser.name}`)
+    } else {
+      alert("❌ Failed: " + (response.message || "Unknown error"))
     }
+  } catch (error) {
+    console.error("Approve error:", error)
+    alert("❌ Error approving screenshot")
+  } finally {
+    setProcessingId(null)
   }
-
+}
   // ✅ UNAPPROVE - Deduct coins from user
   const handleUnapprove = async (id) => {
     const screenshot = screenshots.find(s => s.id === id)
