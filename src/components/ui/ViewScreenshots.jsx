@@ -70,6 +70,17 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
       const admin = adminUser.username || adminUser.name || "Admin"
       const token = localStorage.getItem("token")
       
+      // Get current balance first
+      const userResponse = await fetch(`/api/users?email=${selectedUser.email}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      const userData = await userResponse.json()
+      const users = userData.users || userData.data || []
+      const currentUser = users.find(u => u.email === selectedUser.email)
+      const currentBalance = currentUser?.balance || 0
+      
+      const newBalance = currentBalance + screenshot.coins
+      
       const response = await fetch('/api/users/edit-balance', {
         method: 'POST',
         headers: {
@@ -78,7 +89,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
         },
         body: JSON.stringify({
           email: selectedUser.email,
-          newBalance: screenshot.coins,
+          newBalance: newBalance,
           admin: admin
         })
       })
@@ -98,7 +109,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
           hasApprovedScreenshots: true,
         })
         
-        alert(`✅ ${screenshot.coins} coins added to ${selectedUser.name}`)
+        alert(`✅ ${screenshot.coins} coins added to ${selectedUser.name}. New balance: ${newBalance}`)
       } else {
         alert("❌ Failed: " + (result.message || "Unknown error"))
       }
@@ -110,7 +121,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
     }
   }
 
-  // ✅ UNAPPROVE - Deduct coins (send negative amount)
+  // ✅ UNAPPROVE - Deduct coins (fetch balance, calculate new, send positive)
   const handleUnapprove = async (id) => {
     const screenshot = screenshots.find(s => s.id === id)
     if (!screenshot || !screenshot.approved) return
@@ -125,7 +136,25 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
       const admin = adminUser.username || adminUser.name || "Admin"
       const token = localStorage.getItem("token")
       
-      // ✅ Send negative amount for deduction
+      // Step 1: Get current user balance
+      const userResponse = await fetch(`/api/users?email=${selectedUser.email}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      const userData = await userResponse.json()
+      const users = userData.users || userData.data || []
+      const currentUser = users.find(u => u.email === selectedUser.email)
+      const currentBalance = currentUser?.balance || 0
+      
+      // Step 2: Calculate new balance after deduction
+      const newBalance = currentBalance - screenshot.coins
+      
+      if (newBalance < 0) {
+        alert(`❌ Cannot unapprove! User only has ${currentBalance} coins, need to deduct ${screenshot.coins} coins.`)
+        setProcessingId(null)
+        return
+      }
+      
+      // Step 3: Send positive number (new balance) to API
       const response = await fetch('/api/users/edit-balance', {
         method: 'POST',
         headers: {
@@ -134,7 +163,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
         },
         body: JSON.stringify({
           email: selectedUser.email,
-          newBalance: -screenshot.coins,
+          newBalance: newBalance,
           admin: admin
         })
       })
@@ -154,7 +183,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
           hasApprovedScreenshots: approvedCount - 1 > 0,
         })
         
-        alert(`✅ Unapproved! ${screenshot.coins} coins deducted from ${selectedUser.name}'s balance.`)
+        alert(`✅ Unapproved! ${screenshot.coins} coins deducted from ${selectedUser.name}'s balance. New balance: ${newBalance}`)
       } else {
         alert("❌ Failed to unapprove: " + (result.message || "Please try again"))
       }
