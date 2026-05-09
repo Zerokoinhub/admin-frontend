@@ -14,19 +14,22 @@ import {
   Coins,
 } from "lucide-react"
 
-export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
+export default function ViewScreenshots({ onBack, onApprove, selectedUser, onRefreshUser }) {
   const [screenshots, setScreenshots] = useState([])
   const [loading, setLoading] = useState(true)
   const [processingId, setProcessingId] = useState(null)
   const [previewIndex, setPreviewIndex] = useState(null)
 
-  // Load screenshots
+  // ✅ Load screenshots with approved status from parent (database)
   useEffect(() => {
     if (!selectedUser?.screenshots) {
       setLoading(false)
       return
     }
 
+    // Check if we have approved status from parent
+    const savedApprovedStatus = selectedUser.screenshotsApproved || {}
+    
     const validLinks = selectedUser.screenshots.filter(url => 
       url && typeof url === 'string' && url !== 'null' && url !== 'undefined' && url.trim() !== ''
     )
@@ -36,7 +39,8 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
       imageUrl: url,
       description: `Screenshot ${idx + 1}`,
       coins: 10,
-      approved: false,
+      // ✅ Load approved status from saved data
+      approved: savedApprovedStatus[idx] || false,
       uploadedAt: new Date().toISOString(),
     }))
 
@@ -46,6 +50,36 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
 
   const approvedCount = screenshots.filter(s => s.approved).length
   const totalCoins = screenshots.filter(s => s.approved).reduce((sum, s) => sum + s.coins, 0)
+
+  // ✅ Save approved status to database
+  const saveApprovedStatus = async (updatedScreenshots) => {
+    try {
+      const token = localStorage.getItem("token")
+      const approvedStatus = {}
+      updatedScreenshots.forEach((s, idx) => {
+        approvedStatus[idx] = s.approved
+      })
+      
+      await fetch('/api/users/update-screenshots-status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          email: selectedUser.email,
+          screenshotsApproved: approvedStatus
+        })
+      })
+      
+      // Refresh parent user data
+      if (onRefreshUser) {
+        onRefreshUser()
+      }
+    } catch (error) {
+      console.error("Save status error:", error)
+    }
+  }
 
   // ✅ APPROVE Function
   const handleApprove = async (id) => {
@@ -59,6 +93,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
       const admin = adminUser.username || adminUser.name || "Admin"
       const token = localStorage.getItem("token")
       
+      // Transfer coins
       const response = await fetch('/api/users/edit-balance', {
         method: 'POST',
         headers: {
@@ -75,14 +110,21 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
       const result = await response.json()
       
       if (result.success) {
-        setScreenshots(prev => prev.map(s => 
+        // Update local state
+        const updatedScreenshots = screenshots.map(s => 
           s.id === id ? { ...s, approved: true } : s
-        ))
+        )
+        setScreenshots(updatedScreenshots)
+        
+        // ✅ Save to database
+        await saveApprovedStatus(updatedScreenshots)
+        
         onApprove?.({
           approvedCount: approvedCount + 1,
           totalCoins: totalCoins + screenshot.coins,
           hasApprovedScreenshots: true,
         })
+        
         alert(`✅ ${screenshot.coins} coins added to ${selectedUser.name}`)
       } else {
         alert("❌ Failed: " + (result.message || "Unknown error"))
@@ -110,6 +152,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
       const admin = adminUser.username || adminUser.name || "Admin"
       const token = localStorage.getItem("token")
       
+      // Deduct coins
       const response = await fetch('/api/users/edit-balance', {
         method: 'POST',
         headers: {
@@ -126,14 +169,21 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
       const result = await response.json()
       
       if (result.success) {
-        setScreenshots(prev => prev.map(s => 
+        // Update local state
+        const updatedScreenshots = screenshots.map(s => 
           s.id === id ? { ...s, approved: false } : s
-        ))
+        )
+        setScreenshots(updatedScreenshots)
+        
+        // ✅ Save to database
+        await saveApprovedStatus(updatedScreenshots)
+        
         onApprove?.({
           approvedCount: approvedCount - 1,
           totalCoins: totalCoins - screenshot.coins,
           hasApprovedScreenshots: approvedCount - 1 > 0,
         })
+        
         alert(`✅ Unapproved! ${screenshot.coins} coins deducted from ${selectedUser.name}'s balance.`)
       } else {
         alert("❌ Failed to unapprove. Please try again.")
@@ -238,7 +288,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
         </div>
       </div>
 
-      {/* Only Refresh Button - No Approve Selected, No Approve All */}
+      {/* Only Refresh Button */}
       <div className="flex gap-2">
         <Button onClick={handleRefresh} variant="outline" size="sm">
           <RefreshCw className="h-4 w-4 mr-2" />
@@ -278,7 +328,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
                     )}
                   </div>
                   
-                  {/* ✅ Action Button - Approve for pending, Unapprove for approved (Green) */}
+                  {/* Action Button */}
                   <div>
                     {s.approved ? (
                       <Button
