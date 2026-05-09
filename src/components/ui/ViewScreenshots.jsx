@@ -14,38 +14,55 @@ import {
   Coins,
 } from "lucide-react"
 
-export default function ViewScreenshots({ onBack, onApprove, selectedUser, onRefreshUser }) {
+export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
   const [screenshots, setScreenshots] = useState([])
   const [loading, setLoading] = useState(true)
   const [processingId, setProcessingId] = useState(null)
   const [previewIndex, setPreviewIndex] = useState(null)
 
-  // ✅ Load screenshots with approved status from parent (database)
-  useEffect(() => {
-    if (!selectedUser?.screenshots) {
-      setLoading(false)
-      return
-    }
-
-    // Check if we have approved status from parent
-    const savedApprovedStatus = selectedUser.screenshotsApproved || {}
+  // ✅ Load screenshots from API directly (not from selectedUser)
+  const loadScreenshots = async () => {
+    if (!selectedUser?.email) return
     
-    const validLinks = selectedUser.screenshots.filter(url => 
-      url && typeof url === 'string' && url !== 'null' && url !== 'undefined' && url.trim() !== ''
-    )
+    setLoading(true)
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch(`/api/users?email=${selectedUser.email}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      const data = await response.json()
+      const users = data.users || data.data || []
+      const freshUser = users.find(u => u.email === selectedUser.email)
+      
+      if (freshUser?.screenshots) {
+        const validLinks = freshUser.screenshots.filter(url => 
+          url && typeof url === 'string' && url !== 'null' && url !== 'undefined' && url.trim() !== ''
+        )
+        
+        // ✅ Load approved status from freshUser
+        const savedApproved = freshUser.screenshotsApproved || {}
+        
+        const items = validLinks.map((url, idx) => ({
+          id: `${freshUser._id || freshUser.id || "user"}_${idx}`,
+          imageUrl: url,
+          description: `Screenshot ${idx + 1}`,
+          coins: 10,
+          approved: savedApproved[idx] || false,
+          uploadedAt: new Date().toISOString(),
+        }))
+        
+        setScreenshots(items)
+      }
+    } catch (error) {
+      console.error("Error loading screenshots:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
-    const items = validLinks.map((url, idx) => ({
-      id: `${selectedUser._id || selectedUser.id || "user"}_${idx}`,
-      imageUrl: url,
-      description: `Screenshot ${idx + 1}`,
-      coins: 10,
-      // ✅ Load approved status from saved data
-      approved: savedApprovedStatus[idx] || false,
-      uploadedAt: new Date().toISOString(),
-    }))
-
-    setScreenshots(items)
-    setLoading(false)
+  // Load on mount and when selectedUser changes
+  useEffect(() => {
+    loadScreenshots()
   }, [selectedUser])
 
   const approvedCount = screenshots.filter(s => s.approved).length
@@ -71,11 +88,6 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser, onRef
           screenshotsApproved: approvedStatus
         })
       })
-      
-      // Refresh parent user data
-      if (onRefreshUser) {
-        onRefreshUser()
-      }
     } catch (error) {
       console.error("Save status error:", error)
     }
@@ -116,7 +128,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser, onRef
         )
         setScreenshots(updatedScreenshots)
         
-        // ✅ Save to database
+        // Save to database
         await saveApprovedStatus(updatedScreenshots)
         
         onApprove?.({
@@ -175,7 +187,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser, onRef
         )
         setScreenshots(updatedScreenshots)
         
-        // ✅ Save to database
+        // Save to database
         await saveApprovedStatus(updatedScreenshots)
         
         onApprove?.({
@@ -197,7 +209,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser, onRef
   }
 
   const handleRefresh = () => {
-    window.location.reload()
+    loadScreenshots() // Reload from API instead of page reload
   }
 
   const openPreviewAt = (idx) => setPreviewIndex(idx)
@@ -288,7 +300,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser, onRef
         </div>
       </div>
 
-      {/* Only Refresh Button */}
+      {/* Refresh Button */}
       <div className="flex gap-2">
         <Button onClick={handleRefresh} variant="outline" size="sm">
           <RefreshCw className="h-4 w-4 mr-2" />
