@@ -17,7 +17,9 @@ import {
   RefreshCw,
   X,
   AlertTriangle,
+  Coins,
 } from "lucide-react"
+import { userAPI } from "../../src/lib/api"
 
 export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
   const [screenshots, setScreenshots] = useState([])
@@ -26,6 +28,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
   const [approving, setApproving] = useState(false)
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [previewIndex, setPreviewIndex] = useState(null)
+  const [transferLoading, setTransferLoading] = useState(false)
 
   // Build screenshot items from selectedUser.screenshots links
   useEffect(() => {
@@ -84,10 +87,105 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
   
   const selectedCount = selectedIds?.size || 0
 
-  const toggleApproval = (id) => {
-    setScreenshots((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, approved: !s.approved, status: s.approved ? "pending" : "approved" } : s)),
-    )
+  // ✅ ACTUALLY TRANSFER COINS TO USER
+  const transferCoinsToUser = async (amount, reason) => {
+    try {
+      setTransferLoading(true)
+      const adminUser = JSON.parse(localStorage.getItem("user") || "{}")
+      const admin = adminUser.username || adminUser.name || "Admin"
+      
+      const response = await userAPI.editUserBalance(selectedUser.email, amount, admin)
+      
+      if (response.success) {
+        console.log(`✅ Transferred ${amount} coins to ${selectedUser.email}`)
+        return true
+      } else {
+        console.error("Transfer failed:", response.message)
+        return false
+      }
+    } catch (error) {
+      console.error("Transfer error:", error)
+      return false
+    } finally {
+      setTransferLoading(false)
+    }
+  }
+
+  // ✅ WITHDRAW COINS FROM USER (for unapprove)
+  const withdrawCoinsFromUser = async (amount, reason) => {
+    try {
+      setTransferLoading(true)
+      const adminUser = JSON.parse(localStorage.getItem("user") || "{}")
+      const admin = adminUser.username || adminUser.name || "Admin"
+      
+      // Negative amount for withdrawal
+      const response = await userAPI.editUserBalance(selectedUser.email, -amount, admin)
+      
+      if (response.success) {
+        console.log(`✅ Withdrew ${amount} coins from ${selectedUser.email}`)
+        return true
+      } else {
+        console.error("Withdrawal failed:", response.message)
+        return false
+      }
+    } catch (error) {
+      console.error("Withdrawal error:", error)
+      return false
+    } finally {
+      setTransferLoading(false)
+    }
+  }
+
+  // ✅ TOGGLE APPROVAL WITH COIN TRANSFER
+  const toggleApproval = async (id) => {
+    const screenshot = screenshots.find(s => s.id === id)
+    if (!screenshot) return
+
+    const newApprovedState = !screenshot.approved
+    const coinAmount = screenshot.coins
+
+    if (newApprovedState) {
+      // Approving - give coins to user
+      const success = await transferCoinsToUser(coinAmount, `Screenshot approval reward - ${screenshot.description}`)
+      if (success) {
+        setScreenshots((prev) =>
+          prev.map((s) => (s.id === id ? { ...s, approved: true, status: "approved" } : s))
+        )
+        // Update parent component
+        const newApprovedCount = approvedCount + 1
+        const newTotalCoins = totalCoins + coinAmount
+        onApprove?.({
+          allScreenshotsApproved: newApprovedCount === screenshots.length,
+          approvedCount: newApprovedCount,
+          totalCoins: newTotalCoins,
+          hasApprovedScreenshots: true,
+        })
+      } else {
+        alert("Failed to approve screenshot. Please try again.")
+      }
+    } else {
+      // Unapproving - take coins back
+      const confirm = window.confirm(`Are you sure you want to unapprove this screenshot? ${coinAmount} coins will be deducted from user's balance.`)
+      if (confirm) {
+        const success = await withdrawCoinsFromUser(coinAmount, `Screenshot approval revoked - ${screenshot.description}`)
+        if (success) {
+          setScreenshots((prev) =>
+            prev.map((s) => (s.id === id ? { ...s, approved: false, status: "pending" } : s))
+          )
+          // Update parent component
+          const newApprovedCount = approvedCount - 1
+          const newTotalCoins = totalCoins - coinAmount
+          onApprove?.({
+            allScreenshotsApproved: newApprovedCount === screenshots.length,
+            approvedCount: newApprovedCount,
+            totalCoins: newTotalCoins,
+            hasApprovedScreenshots: newApprovedCount > 0,
+          })
+        } else {
+          alert("Failed to unapprove screenshot. Please try again.")
+        }
+      }
+    }
   }
 
   const toggleSelection = (id) => {
@@ -99,46 +197,62 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
     })
   }
 
+  // ✅ APPROVE SELECTED WITH COIN TRANSFER
   const approveSelected = async () => {
     if (!selectedIds || selectedIds.size === 0 || !Array.isArray(screenshots)) return
 
     setApproving(true)
-    await new Promise((r) => setTimeout(r, 600))
-    setScreenshots((prev) =>
-      Array.isArray(prev)
-        ? prev.map((s) => (selectedIds.has(s.id) ? { ...s, approved: true, status: "approved" } : s))
-        : [],
-    )
-    setSelectedIds(new Set())
-    const updatedApprovedCount = approvedCount + selectedIds.size
-    const updatedTotal = screenshots
-      .map((s) => (selectedIds.has(s.id) ? { ...s, approved: true } : s))
-      .filter((s) => s.approved)
-      .reduce((sum, s) => sum + s.coins, 0)
-    onApprove?.({
-      allScreenshotsApproved: updatedApprovedCount === screenshots.length,
-      approvedCount: updatedApprovedCount,
-      totalCoins: updatedTotal,
-      hasApprovedScreenshots: true,
-    })
+    const selectedScreenshots = screenshots.filter(s => selectedIds.has(s.id))
+    const totalAmount = selectedScreenshots.reduce((sum, s) => sum + s.coins, 0)
+    
+    const success = await transferCoinsToUser(totalAmount, `Bulk screenshot approval - ${selectedScreenshots.length} screenshot(s)`)
+    
+    if (success) {
+      setScreenshots((prev) =>
+        prev.map((s) => (selectedIds.has(s.id) ? { ...s, approved: true, status: "approved" } : s))
+      )
+      setSelectedIds(new Set())
+      const updatedApprovedCount = approvedCount + selectedIds.size
+      const updatedTotal = totalCoins + totalAmount
+      onApprove?.({
+        allScreenshotsApproved: updatedApprovedCount === screenshots.length,
+        approvedCount: updatedApprovedCount,
+        totalCoins: updatedTotal,
+        hasApprovedScreenshots: true,
+      })
+    } else {
+      alert("Failed to approve selected screenshots. Please try again.")
+    }
     setApproving(false)
   }
 
+  // ✅ APPROVE ALL WITH COIN TRANSFER
   const approveAll = async () => {
     if (!Array.isArray(screenshots) || screenshots.length === 0) return
 
+    const unapprovedScreenshots = screenshots.filter(s => !s.approved)
+    if (unapprovedScreenshots.length === 0) {
+      alert("All screenshots are already approved!")
+      return
+    }
+
     setApproving(true)
-    await new Promise((r) => setTimeout(r, 600))
-    const updated = screenshots.map((s) => ({ ...s, approved: true, status: "approved" }))
-    setScreenshots(updated)
-    const approvedCountAll = updated.length
-    const total = updated.reduce((sum, s) => sum + s.coins, 0)
-    onApprove?.({
-      allScreenshotsApproved: true,
-      approvedCount: approvedCountAll,
-      totalCoins: total,
-      hasApprovedScreenshots: true,
-    })
+    const totalAmount = unapprovedScreenshots.reduce((sum, s) => sum + s.coins, 0)
+    
+    const success = await transferCoinsToUser(totalAmount, `All screenshots approval - ${unapprovedScreenshots.length} screenshot(s)`)
+    
+    if (success) {
+      const updated = screenshots.map((s) => ({ ...s, approved: true, status: "approved" }))
+      setScreenshots(updated)
+      onApprove?.({
+        allScreenshotsApproved: true,
+        approvedCount: updated.length,
+        totalCoins: totalAmount + totalCoins,
+        hasApprovedScreenshots: true,
+      })
+    } else {
+      alert("Failed to approve all screenshots. Please try again.")
+    }
     setApproving(false)
   }
 
@@ -172,7 +286,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
     return () => window.removeEventListener("keydown", handleKey)
   }, [handleKey])
 
-  // ✅ Fixed ScreenshotImage Component
+  // ScreenshotImage Component
   const ScreenshotImage = ({ screenshot, index }) => {
     const [imageError, setImageError] = useState(false)
     const [imageLoaded, setImageLoaded] = useState(false)
@@ -271,20 +385,23 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
           <p className="text-sm text-gray-600">
             Approved: {approvedCount}/{screenshots.length}
           </p>
-          <p className="text-lg font-bold text-green-600">{totalCoins} coins</p>
+          <p className="text-lg font-bold text-green-600">
+            <Coins className="inline h-4 w-4 mr-1" />
+            {totalCoins} coins
+          </p>
           {selectedCount > 0 && <p className="text-sm text-blue-600">Selected: {selectedCount}</p>}
         </div>
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Button onClick={handleRefresh} variant="outline" size="sm">
+        <Button onClick={handleRefresh} variant="outline" size="sm" disabled={transferLoading}>
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
         </Button>
 
         {selectedCount > 0 && (
-          <Button onClick={approveSelected} disabled={approving} size="sm" className="bg-blue-600 hover:bg-blue-700">
-            {approving ? (
+          <Button onClick={approveSelected} disabled={approving || transferLoading} size="sm" className="bg-blue-600 hover:bg-blue-700">
+            {approving || transferLoading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 Approving...
@@ -340,7 +457,10 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
                       </button>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm sm:text-base break-words">{s.description}</p>
-                        <p className="text-sm text-gray-600">{s.coins} coins</p>
+                        <p className="text-sm text-gray-600">
+                          <Coins className="inline h-3 w-3 mr-1" />
+                          {s.coins} coins
+                        </p>
                         {s.uploadedAt && (
                           <div className="flex items-center gap-1 mt-1">
                             <Calendar className="h-3 w-3 text-gray-400" />
@@ -349,7 +469,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
                         )}
                         {s.status && (
                           <Badge variant={s.status === "approved" ? "default" : "secondary"} className="mt-1 text-xs">
-                            {s.status}
+                            {s.status === "approved" ? "✓ Approved" : "Pending"}
                           </Badge>
                         )}
                       </div>
@@ -366,7 +486,8 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
                           e.stopPropagation()
                           toggleApproval(s.id)
                         }}
-                        variant={s.approved ? "outline" : "default"}
+                        disabled={transferLoading}
+                        variant={s.approved ? "destructive" : "default"}
                         size="sm"
                         className="w-full sm:w-auto"
                       >
@@ -382,10 +503,10 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
           <div className="flex flex-col sm:flex-row justify-end gap-2">
             <Button
               onClick={approveAll}
-              disabled={approving || approvedCount === screenshots.length}
+              disabled={approving || transferLoading || approvedCount === screenshots.length}
               className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
             >
-              {approving ? (
+              {approving || transferLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Processing...
