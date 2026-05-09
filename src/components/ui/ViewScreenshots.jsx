@@ -20,12 +20,10 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
   const [processingId, setProcessingId] = useState(null)
   const [previewIndex, setPreviewIndex] = useState(null)
 
-  // ✅ Get storage key for this user
   const getStorageKey = () => {
     return `screenshots_approved_${selectedUser?.email}`
   }
 
-  // ✅ Load screenshots with approved status from localStorage
   useEffect(() => {
     if (!selectedUser?.screenshots) {
       setLoading(false)
@@ -36,7 +34,6 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
       url && typeof url === 'string' && url !== 'null' && url !== 'undefined' && url.trim() !== ''
     )
 
-    // ✅ Load approved status from localStorage
     const savedApproved = JSON.parse(localStorage.getItem(getStorageKey()) || "{}")
 
     const items = validLinks.map((url, idx) => ({
@@ -55,7 +52,6 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
   const approvedCount = screenshots.filter(s => s.approved).length
   const totalCoins = screenshots.filter(s => s.approved).reduce((sum, s) => sum + s.coins, 0)
 
-  // ✅ Save approved status to localStorage
   const saveToLocalStorage = (updatedScreenshots) => {
     const approvedStatus = {}
     updatedScreenshots.forEach((s, idx) => {
@@ -92,13 +88,10 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
       const result = await response.json()
       
       if (result.success) {
-        // Update local state
         const updatedScreenshots = screenshots.map(s => 
           s.id === id ? { ...s, approved: true } : s
         )
         setScreenshots(updatedScreenshots)
-        
-        // ✅ Save to localStorage
         saveToLocalStorage(updatedScreenshots)
         
         onApprove?.({
@@ -119,12 +112,12 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
     }
   }
 
-  // ✅ UNAPPROVE Function
+  // ✅ FIXED UNAPPROVE Function
   const handleUnapprove = async (id) => {
     const screenshot = screenshots.find(s => s.id === id)
     if (!screenshot || !screenshot.approved) return
 
-    const confirm = window.confirm(`⚠️ Are you sure? ${screenshot.coins} coins will be deducted from ${selectedUser.name}'s balance.`)
+    const confirm = window.confirm(`⚠️ Are you sure? ${screenshot.coins} coins will be DEDUCTED from ${selectedUser.name}'s balance.`)
     if (!confirm) return
 
     setProcessingId(id)
@@ -134,6 +127,23 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
       const admin = adminUser.username || adminUser.name || "Admin"
       const token = localStorage.getItem("token")
       
+      // Get current user balance first
+      const userResponse = await fetch(`/api/users?email=${selectedUser.email}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      const userData = await userResponse.json()
+      const users = userData.users || userData.data || []
+      const currentUser = users.find(u => u.email === selectedUser.email)
+      const currentBalance = currentUser?.balance || 0
+      
+      const newBalance = currentBalance - screenshot.coins
+      
+      if (newBalance < 0) {
+        alert(`❌ Cannot unapprove! User only has ${currentBalance} coins, need to deduct ${screenshot.coins} coins.`)
+        setProcessingId(null)
+        return
+      }
+      
       const response = await fetch('/api/users/edit-balance', {
         method: 'POST',
         headers: {
@@ -142,7 +152,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
         },
         body: JSON.stringify({
           email: selectedUser.email,
-          newBalance: -screenshot.coins,
+          newBalance: newBalance,
           admin: admin
         })
       })
@@ -150,13 +160,10 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
       const result = await response.json()
       
       if (result.success) {
-        // Update local state
         const updatedScreenshots = screenshots.map(s => 
           s.id === id ? { ...s, approved: false } : s
         )
         setScreenshots(updatedScreenshots)
-        
-        // ✅ Save to localStorage
         saveToLocalStorage(updatedScreenshots)
         
         onApprove?.({
@@ -165,19 +172,18 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
           hasApprovedScreenshots: approvedCount - 1 > 0,
         })
         
-        alert(`✅ Unapproved! ${screenshot.coins} coins deducted from ${selectedUser.name}'s balance.`)
+        alert(`✅ Unapproved! ${screenshot.coins} coins deducted from ${selectedUser.name}'s balance. New balance: ${newBalance}`)
       } else {
-        alert("❌ Failed to unapprove. Please try again.")
+        alert("❌ Failed to unapprove: " + (result.message || "Please try again"))
       }
     } catch (error) {
       console.error("Unapprove error:", error)
-      alert("❌ Error unapproving screenshot.")
+      alert("❌ Error unapproving screenshot")
     } finally {
       setProcessingId(null)
     }
   }
 
-  // ✅ Refresh - Reload from localStorage
   const handleRefresh = () => {
     const savedApproved = JSON.parse(localStorage.getItem(getStorageKey()) || "{}")
     const updatedScreenshots = screenshots.map((s, idx) => ({
@@ -256,7 +262,6 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
 
   return (
     <div className="p-4 sm:p-6 space-y-4">
-      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <Button onClick={onBack} variant="outline">
@@ -275,7 +280,6 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
         </div>
       </div>
 
-      {/* Refresh Button */}
       <div className="flex gap-2">
         <Button onClick={handleRefresh} variant="outline" size="sm">
           <RefreshCw className="h-4 w-4 mr-2" />
@@ -283,7 +287,6 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
         </Button>
       </div>
 
-      {/* Screenshots List */}
       {screenshots.length === 0 ? (
         <div className="text-center py-12">
           <ImageIcon className="h-16 w-16 mx-auto text-gray-300 mb-4" />
@@ -295,7 +298,6 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
             <Card key={s.id} className={s.approved ? "border-green-500 bg-green-50" : ""}>
               <CardContent className="p-4">
                 <div className="flex gap-4 items-center">
-                  {/* Screenshot Thumbnail */}
                   <button
                     className="relative w-20 h-20 rounded overflow-hidden border shrink-0"
                     onClick={() => openPreviewAt(idx)}
@@ -303,7 +305,6 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
                     <ScreenshotImage screenshot={s} index={idx} />
                   </button>
                   
-                  {/* Screenshot Info */}
                   <div className="flex-1">
                     <p className="font-medium">{s.description}</p>
                     <p className="text-sm text-gray-600">
@@ -315,7 +316,6 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
                     )}
                   </div>
                   
-                  {/* Action Button */}
                   <div>
                     {s.approved ? (
                       <Button
@@ -346,7 +346,6 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
         </div>
       )}
 
-      {/* Lightbox Preview */}
       {previewIndex !== null && screenshots[previewIndex] && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center" onClick={closePreview}>
           <button className="absolute top-4 right-4 text-white text-2xl" onClick={closePreview}>✕</button>
