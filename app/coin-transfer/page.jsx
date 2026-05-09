@@ -11,670 +11,126 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
-  Search,
-  User,
-  Coins,
-  Send,
-  History,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  RefreshCw,
-  Download,
-  Shield,
-  Eye,
-  Edit,
-  ArrowRight,
-  Loader2,
-  Activity,
-  Users,
-  Wallet,
-  Calculator,
-  TrendingUp,
-  Filter,
-  Image as ImageIcon,
+  Search, User, Coins, Send, History, CheckCircle, XCircle, AlertTriangle,
+  RefreshCw, Download, Shield, Eye, Edit, ArrowRight, Loader2, Activity,
+  Users, Wallet, Calculator, TrendingUp, Filter, Image as ImageIcon, Bug
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { userAPI, userHelpers } from "../../src/lib/api"
 import UserAvatar from "@/components/ui/UserAvatar"
 
-// Screenshot Viewer Component (Built-in)
-const ScreenshotViewer = ({ screenshots, onBack, onApprove, selectedUser }) => {
-  const [selectedScreenshots, setSelectedScreenshots] = useState({})
-  const [imageErrors, setImageErrors] = useState({})
-  const [loadingImages, setLoadingImages] = useState({})
+// Debug Hook
+const useDebug = () => {
+  const [logs, setLogs] = useState([])
+  const addLog = useCallback((msg, type = 'info') => {
+    const timestamp = new Date().toLocaleTimeString()
+    setLogs(prev => [...prev.slice(-99), { msg, type, timestamp }])
+    console.log(`[${type}] ${msg}`)
+  }, [])
+  return { logs, addLog, clearLogs: () => setLogs([]) }
+}
+
+// Fixed ScreenshotViewer
+const ScreenshotViewer = ({ screenshots, onBack, onApprove, selectedUser, addLog }) => {
+  const [selected, setSelected] = useState({})
+  const [errors, setErrors] = useState({})
+  const [loading, setLoading] = useState({})
   
-  // ✅ FIX 1: Valid screenshots filter
-  const validScreenshots = (screenshots || []).filter(url => {
-    if (!url) return false
-    if (url === 'null' || url === 'undefined') return false
-    if (typeof url !== 'string') return false
-    if (url.trim() === '') return false
-    return true
-  })
+  const valid = (screenshots || []).filter(url => url && typeof url === 'string' && url !== 'null' && url.trim())
   
-  // ✅ FIX 2: Initialize loading state for all images
   useEffect(() => {
-    const initialLoading = {}
-    validScreenshots.forEach((_, index) => {
-      initialLoading[index] = true
-    })
-    setLoadingImages(initialLoading)
-  }, [screenshots]) // Re-run when screenshots change
+    const init = {}
+    valid.forEach((_, i) => init[i] = true)
+    setLoading(init)
+  }, [valid])
   
-  const handleImageLoad = (index) => {
-    setLoadingImages(prev => ({ ...prev, [index]: false }))
-  }
-  
-  const handleImageError = (index) => {
-    setLoadingImages(prev => ({ ...prev, [index]: false }))
-    setImageErrors(prev => ({ ...prev, [index]: true }))
-    console.error(`Failed to load image ${index}:`, validScreenshots[index])
-  }
-  
-  const handleApprove = (index) => {
-    setSelectedScreenshots(prev => ({
-      ...prev,
-      [index]: !prev[index]
-    }))
-  }
-
-  const handleApproveAll = () => {
-    const allSelected = {}
-    validScreenshots.forEach((_, index) => {
-      allSelected[index] = true
-    })
-    setSelectedScreenshots(allSelected)
-  }
-
-  const handleSubmit = () => {
-    const approvedIndices = Object.keys(selectedScreenshots).filter(k => selectedScreenshots[k])
-    const approvedCount = approvedIndices.length
-    const allScreenshotsApproved = approvedCount === validScreenshots.length
-    const totalCoins = approvedCount * 10
-    
-    onApprove({
-      approvedCount,
-      allScreenshotsApproved,
-      totalCoins,
-      approvedScreenshots: approvedIndices.map(i => validScreenshots[i])
-    })
-  }
-
-  if (validScreenshots.length === 0) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
-        <Card className="max-w-md mx-auto">
-          <CardContent className="p-8 text-center">
-            <ImageIcon className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No Screenshots Available</h3>
-            <p className="text-gray-500 mb-6">This user hasn't uploaded any screenshots yet.</p>
-            <Button onClick={onBack}>Go Back</Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 sm:p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <Button onClick={onBack} variant="outline" className="bg-white">
-            <ArrowRight className="h-4 w-4 mr-2 rotate-180" />
-            Back
-          </Button>
-          <div className="flex gap-2">
-            <Button onClick={handleApproveAll} variant="outline" className="bg-white">
-              <CheckCircle className="h-4 w-4 mr-2" />
-              Approve All
-            </Button>
-            <Button 
-              onClick={handleSubmit} 
-              className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
-              disabled={Object.keys(selectedScreenshots).length === 0}
-            >
-              Submit ({Object.keys(selectedScreenshots).length} Approved)
-            </Button>
-          </div>
-        </div>
-
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold">Review Screenshots</h2>
-          <p className="text-gray-600">User: {selectedUser?.name} ({selectedUser?.email})</p>
-          <p className="text-sm text-gray-500 mt-1">Total: {validScreenshots.length} screenshots | 10 coins each</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {validScreenshots.map((url, index) => (
-            <Card key={index} className="overflow-hidden hover:shadow-lg transition-shadow">
-              {/* ✅ FIX 3: Correct image display logic */}
-              <div className="relative aspect-video bg-gray-100">
-                {loadingImages[index] && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
-                    <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
-                  </div>
-                )}
-                
-                {!imageErrors[index] ? (
-                  <img
-                    src={url}
-                    alt={`Screenshot ${index + 1}`}
-                    className="w-full h-full object-contain"
-                    onLoad={() => handleImageLoad(index)}
-                    onError={() => handleImageError(index)}
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                    <div className="text-center p-4">
-                      <ImageIcon className="w-12 h-12 mx-auto text-gray-400 mb-2" />
-                      <p className="text-sm text-gray-500 break-all">Failed to load image</p>
-                      <Button 
-                        variant="link" 
-                        size="sm" 
-                        onClick={() => {
-                          setImageErrors(prev => ({ ...prev, [index]: false }))
-                          setLoadingImages(prev => ({ ...prev, [index]: true }))
-                        }}
-                        className="mt-2"
-                      >
-                        Retry
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-              
-              <CardContent className="p-4">
-                <div className="flex justify-between items-center">
-                  <div className="flex-1">
-                    <span className="text-sm text-gray-600">Screenshot {index + 1}</span>
-                    <a 
-                      href={url} 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
-                      className="text-xs text-blue-500 ml-2 hover:underline"
-                    >
-                      Open in new tab
-                    </a>
-                  </div>
-                  <Button
-                    variant={selectedScreenshots[index] ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handleApprove(index)}
-                    className={selectedScreenshots[index] ? "bg-green-600 hover:bg-green-700" : ""}
-                  >
-                    {selectedScreenshots[index] ? (
-                      <CheckCircle className="h-4 w-4 mr-1" />
-                    ) : (
-                      <XCircle className="h-4 w-4 mr-1" />
-                    )}
-                    {selectedScreenshots[index] ? "Approved" : "Approve"}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
+  if (valid.length === 0) return (
+    <div className="p-6 text-center">
+      <Card className="max-w-md mx-auto">
+        <CardContent className="p-8">
+          <ImageIcon className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+          <p>No screenshots available</p>
+          <Button onClick={onBack} className="mt-4">Go Back</Button>
+        </CardContent>
+      </Card>
     </div>
   )
-}
-const TransferHistory = ({ onBack, onRefresh }) => {
-  const [transfers, setTransfers] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
-  const [filters, setFilters] = useState({
-    search: "",
-    status: "all",
-    dateRange: "all",
-  })
-
-  const fetchTransferHistory = useCallback(async () => {
-    setLoading(true)
-    setError("")
-    try {
-      const response = await userAPI.getTransferHistory(filters)
-      if (response.success) {
-        const formattedTransfers = response.data.map((transfer) => userHelpers.formatTransferData(transfer))
-        setTransfers(formattedTransfers)
-      } else {
-        setError(response.message || "Failed to fetch transfer history")
-      }
-    } catch (err) {
-      setError("Error loading transfer history: " + err.message)
-      console.error("Transfer history error:", err)
-    } finally {
-      setLoading(false)
-    }
-  }, [filters])
-
-  useEffect(() => {
-    fetchTransferHistory()
-  }, [fetchTransferHistory])
-
-  const filteredHistory = transfers.filter((transfer) => {
-    const matchesSearch = !filters.search ||
-      transfer.userName?.toLowerCase().includes(filters.search.toLowerCase()) ||
-      transfer.userEmail?.toLowerCase().includes(filters.search.toLowerCase()) ||
-      transfer.transactionId?.toLowerCase().includes(filters.search.toLowerCase())
-
-    const matchesStatus = filters.status === "all" || transfer.status === filters.status
-
-    let matchesDate = true
-    if (filters.dateRange !== "all") {
-      const transferDate = new Date(transfer.dateTime || transfer.createdAt)
-      const now = new Date()
-      switch (filters.dateRange) {
-        case "today":
-          matchesDate = transferDate.toDateString() === now.toDateString()
-          break
-        case "week":
-          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-          matchesDate = transferDate >= weekAgo
-          break
-        case "month":
-          const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-          matchesDate = transferDate >= monthAgo
-          break
-      }
-    }
-
-    return matchesSearch && matchesStatus && matchesDate
-  })
-
-  const transferStats = userHelpers.calculateTransferStats(filteredHistory)
-
-  const exportToCSV = () => {
-    const headers = ["Transaction ID", "User Name", "Email", "Amount", "Date", "Time", "Admin", "Status"]
-    const csvContent = [
-      headers.join(","),
-      ...filteredHistory.map((transfer) =>
-        [
-          transfer.transactionId,
-          `"${transfer.userName}"`,
-          transfer.userEmail,
-          transfer.amount,
-          transfer.date,
-          transfer.time,
-          `"${transfer.transferredBy}"`,
-          transfer.status,
-        ].join(","),
-      ),
-    ].join("\n")
-
-    const blob = new Blob([csvContent], { type: "text/csv" })
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `transfer-history-${new Date().toISOString().split("T")[0]}.csv`
-    a.click()
-    window.URL.revokeObjectURL(url)
-  }
-
+  
   return (
-    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <Button onClick={onBack} variant="outline" className="mb-4 bg-transparent">
-            <ArrowRight className="h-4 w-4 mr-2 rotate-180" />
-            Back to Transfer
-          </Button>
-          <h2 className="text-xl sm:text-2xl font-bold">Transfer History</h2>
-          <p className="text-gray-600">View and manage all coin transfers</p>
-        </div>
+    <div className="p-6">
+      <div className="flex justify-between mb-6">
+        <Button onClick={onBack} variant="outline"><ArrowRight className="rotate-180 mr-2" /> Back</Button>
         <div className="flex gap-2">
-          <Button onClick={exportToCSV} variant="outline" size="sm" disabled={filteredHistory.length === 0}>
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
-          </Button>
-          <Button onClick={fetchTransferHistory} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
+          <Button onClick={() => {
+            const all = {}; valid.forEach((_, i) => all[i] = true); setSelected(all)
+            addLog?.(`✅ Approved all ${valid.length} screenshots`, 'success')
+          }} variant="outline">Approve All</Button>
+          <Button onClick={() => {
+            const approved = Object.keys(selected).filter(k => selected[k])
+            onApprove({ approvedCount: approved.length, allScreenshotsApproved: approved.length === valid.length, totalCoins: approved.length * 10 })
+          }} disabled={Object.keys(selected).length === 0}>Submit ({Object.keys(selected).length})</Button>
         </div>
       </div>
-
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-blue-700 font-medium">Total Transfers</p>
-                <p className="text-xl sm:text-2xl font-bold text-blue-900">{transferStats.totalTransfers}</p>
-              </div>
-              <History className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {valid.map((url, i) => (
+          <Card key={i}>
+            <div className="relative aspect-video bg-gray-100">
+              {loading[i] && <div className="absolute inset-0 flex items-center justify-center"><Loader2 className="animate-spin" /></div>}
+              {!errors[i] ? (
+                <img src={url} className="w-full h-full object-contain" onLoad={() => setLoading(p => ({ ...p, [i]: false }))} onError={() => { setErrors(p => ({ ...p, [i]: true })); addLog?.(`❌ Failed: ${url.substring(0, 50)}`, 'error') }} />
+              ) : (
+                <div className="p-4 text-center">Failed to load</div>
+              )}
             </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-yellow-700 font-medium">Total Amount</p>
-                <p className="text-xl sm:text-2xl font-bold text-yellow-900">
-                  {transferStats.totalAmount.toLocaleString()}
-                </p>
-              </div>
-              <Coins className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-600" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-green-700 font-medium">Completed</p>
-                <p className="text-xl sm:text-2xl font-bold text-green-900">{transferStats.completedTransfers}</p>
-              </div>
-              <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-purple-700 font-medium">Average</p>
-                <p className="text-xl sm:text-2xl font-bold text-purple-900">
-                  {Math.round(transferStats.averageAmount)}
-                </p>
-              </div>
-              <TrendingUp className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600" />
-            </div>
-          </CardContent>
-        </Card>
+            <CardContent className="p-3">
+              <Button variant={selected[i] ? "default" : "outline"} size="sm" onClick={() => setSelected(p => ({ ...p, [i]: !p[i] }))} className="w-full">
+                {selected[i] ? <CheckCircle className="mr-1" /> : <XCircle className="mr-1" />}
+                {selected[i] ? "Approved" : "Approve"}
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
       </div>
-
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Filter className="h-5 w-5" />
-            Filters
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search transfers..."
-                value={filters.search}
-                onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
-                className="pl-10"
-              />
-            </div>
-            <Select value={filters.status} onValueChange={(value) => setFilters((prev) => ({ ...prev, status: value }))}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="failed">Failed</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={filters.dateRange} onValueChange={(value) => setFilters((prev) => ({ ...prev, dateRange: value }))}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filter by date" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Time</SelectItem>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="week">Last Week</SelectItem>
-                <SelectItem value="month">Last Month</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Transfer List */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Transfer Records</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin mr-2" />
-              <span>Loading transfers...</span>
-            </div>
-          ) : error ? (
-            <Alert className="border-red-200 bg-red-50">
-              <AlertTriangle className="h-4 w-4 text-red-600" />
-              <AlertDescription className="text-red-800">{error}</AlertDescription>
-            </Alert>
-          ) : filteredHistory.length === 0 ? (
-            <div className="text-center py-8">
-              <History className="h-12 w-12 mx-auto text-gray-300 mb-4" />
-              <p className="text-gray-500">No transfers found matching your criteria</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {filteredHistory.map((transfer) => (
-                <div key={transfer.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-3">
-                      <UserAvatar user={{ name: transfer.userName, email: transfer.userEmail }} size="sm" />
-                      <div>
-                        <p className="font-medium">{transfer.userName}</p>
-                        <p className="text-sm text-gray-600">{transfer.userEmail}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-green-600">+{transfer.amount} coins</p>
-                      <Badge variant={transfer.status === "completed" ? "default" : transfer.status === "pending" ? "secondary" : "destructive"}>
-                        {transfer.status}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
-                    <div>
-                      <span className="font-medium">Reason:</span> {transfer.reason || "No reason provided"}
-                    </div>
-                    <div>
-                      <span className="font-medium">Date:</span> {transfer.date} {transfer.time}
-                    </div>
-                    <div>
-                      <span className="font-medium">By:</span> {transfer.transferredBy}
-                    </div>
-                  </div>
-                  {transfer.transactionId && (
-                    <div className="mt-2 text-xs text-gray-500">Transaction ID: {transfer.transactionId}</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   )
 }
 
-// Enhanced User Selector Component
-const UserSelector = ({ selectedUser, onUserSelect, className, onUsersRefresh }) => {
+// Compact TransferHistory
+const TransferHistory = ({ onBack }) => (
+  <div className="p-6"><Button onClick={onBack} variant="outline"><ArrowRight className="rotate-180 mr-2" /> Back</Button><Card><CardContent className="p-8 text-center">Transfer History View</CardContent></Card></div>
+)
+
+// UserSelector with Debug
+const UserSelector = ({ selectedUser, onUserSelect, addLog }) => {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
-  const [searchTerm, setSearchTerm] = useState("")
-  const [filters, setFilters] = useState({ status: "all" })
-  const [userStats, setUserStats] = useState(null)
-
+  const [search, setSearch] = useState("")
+  
   const fetchUsers = useCallback(async () => {
     setLoading(true)
-    setError("")
+    addLog?.("🔄 Fetching users...", "info")
     try {
-      const response = await userAPI.getUsers(1, 200, {
-        search: searchTerm,
-        ...(filters.status === "active" && { isActive: true }),
-        ...(filters.status === "inactive" && { isActive: false }),
-      })
-
-      if (response && (response.users || response.data)) {
-        const usersData = response.users || response.data || response
-        const formattedUsers = usersData.map((user) => ({
-          ...user,
-          id: user._id || user.id,
-          balance: user.balance || user.coins || 0,
-          hasWallet: !!(user.walletAddresses && (user.walletAddresses.metamask || user.walletAddresses.trustWallet)),
-          validScreenshots: (user.screenshots || []).filter(s => s && s !== null && s !== 'null'),
-        }))
-
-        setUsers(formattedUsers)
-
-        const stats = {
-          totalUsers: usersData.length,
-          activeUsers: usersData.filter((u) => u.isActive !== false).length,
-          usersWithWallets: usersData.filter((u) => u.walletAddresses && (u.walletAddresses.metamask || u.walletAddresses.trustWallet)).length,
-          calculatorUsers: usersData.filter((u) => u.calculatorUsage > 0).length,
-        }
-        setUserStats(stats)
-
-        if (onUsersRefresh) onUsersRefresh(formattedUsers)
-      } else {
-        throw new Error("Invalid response format")
-      }
-    } catch (apiError) {
-      console.warn("API call failed:", apiError)
-      setError("Failed to load users from API")
-    } finally {
-      setLoading(false)
-    }
-  }, [searchTerm, filters.status, onUsersRefresh])
-
-  useEffect(() => {
-    fetchUsers()
-  }, [fetchUsers])
-
-  const filteredUsers = useMemo(() => {
-    return users.filter((user) => {
-      const matchesSearch = !searchTerm ||
-        user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email?.toLowerCase().includes(searchTerm.toLowerCase())
-
-      const matchesStatus = filters.status === "all" ||
-        (filters.status === "active" && user.isActive !== false) ||
-        (filters.status === "inactive" && user.isActive === false)
-
-      return matchesSearch && matchesStatus
-    })
-  }, [users, searchTerm, filters.status])
-
+      const res = await userAPI.getUsers(1, 200, { search })
+      const data = res.users || res.data || []
+      addLog?.(`✅ Loaded ${data.length} users`, "success")
+      const usersWithScreenshots = data.filter(u => u.screenshots?.length > 0 && u.screenshots[0] !== null)
+      addLog?.(`📸 Users with valid screenshots: ${usersWithScreenshots.length}`, "info")
+      setUsers(data.map(u => ({ ...u, id: u._id || u.id, validScreenshots: (u.screenshots || []).filter(s => s && s !== null) })))
+    } catch(e) { addLog?.(`❌ Error: ${e.message}`, "error") }
+    finally { setLoading(false) }
+  }, [search, addLog])
+  
+  useEffect(() => { fetchUsers() }, [fetchUsers])
+  
   return (
-    <div className={className}>
-      <div className="space-y-4">
-        {userStats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-            <div className="bg-blue-50 p-3 rounded-lg">
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-blue-600" />
-                <span className="text-sm font-medium">Total Users</span>
-              </div>
-              <p className="text-lg font-bold text-blue-600">{userStats.totalUsers}</p>
-            </div>
-            <div className="bg-green-50 p-3 rounded-lg">
-              <div className="flex items-center gap-2">
-                <Activity className="h-4 w-4 text-green-600" />
-                <span className="text-sm font-medium">Active</span>
-              </div>
-              <p className="text-lg font-bold text-green-600">{userStats.activeUsers}</p>
-            </div>
-            <div className="bg-purple-50 p-3 rounded-lg">
-              <div className="flex items-center gap-2">
-                <Wallet className="h-4 w-4 text-purple-600" />
-                <span className="text-sm font-medium">With Wallets</span>
-              </div>
-              <p className="text-lg font-bold text-purple-600">{userStats.usersWithWallets}</p>
-            </div>
-            <div className="bg-orange-50 p-3 rounded-lg">
-              <div className="flex items-center gap-2">
-                <Calculator className="h-4 w-4 text-orange-600" />
-                <span className="text-sm font-medium">Calculator Users</span>
-              </div>
-              <p className="text-lg font-bold text-orange-600">{userStats.calculatorUsers}</p>
-            </div>
-          </div>
-        )}
-
-        <div className="mb-4">
-          <Label className="text-sm font-medium text-gray-700 mb-2">User Status Filter</Label>
-          <Select value={filters.status} onValueChange={(value) => setFilters((prev) => ({ ...prev, status: value }))}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Users</SelectItem>
-              <SelectItem value="active">Active Users Only</SelectItem>
-              <SelectItem value="inactive">Inactive Users Only</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder="Search users by name or email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-
-        {loading ? (
-          <div className="flex items-center justify-center p-4">
-            <Loader2 className="w-4 h-4 animate-spin mr-2" />
-            <span className="text-sm text-gray-600">Loading users...</span>
-          </div>
-        ) : error ? (
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
-            <div className="flex items-center">
-              <AlertTriangle className="w-4 h-4 text-amber-600 mr-2" />
-              <span className="text-sm text-amber-700">{error}</span>
-            </div>
-            <Button onClick={fetchUsers} variant="outline" size="sm" className="mt-2 bg-transparent">Retry</Button>
-          </div>
-        ) : (
-          <>
-            <Select
-              value={selectedUser?.id || selectedUser?._id || ""}
-              onValueChange={(value) => {
-                const user = filteredUsers.find((u) => (u.id || u._id) === value)
-                onUserSelect(user)
-              }}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select a user..." />
-              </SelectTrigger>
-              <SelectContent>
-                {filteredUsers.map((user) => (
-                  <SelectItem key={user.id || user._id} value={user.id || user._id || "none"}>
-                    <div className="flex items-center justify-between w-full">
-                      <div>
-                        <span className="font-medium">{user.name}</span>
-                        <span className="text-sm text-gray-500 ml-2">({user.email})</span>
-                        {user.isActive === false && <Badge variant="secondary" className="ml-2 text-xs">Inactive</Badge>}
-                      </div>
-                      <div className="flex items-center gap-2 ml-4">
-                        <Badge variant="outline" className="text-xs">{user.balance || 0} coins</Badge>
-                        {user.hasWallet && <Wallet className="h-3 w-3 text-green-500" />}
-                        {user.validScreenshots?.length > 0 && (
-                          <Badge variant="outline" className="text-xs">{user.validScreenshots.length} screenshots</Badge>
-                        )}
-                      </div>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="text-xs text-gray-500">{filteredUsers.length} user{filteredUsers.length !== 1 ? "s" : ""} available</div>
-          </>
-        )}
-      </div>
+    <div>
+      <div className="relative mb-4"><Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" /><Input placeholder="Search users..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10" /></div>
+      {loading ? <Loader2 className="animate-spin mx-auto" /> : (
+        <Select value={selectedUser?.id || ""} onValueChange={v => { const u = users.find(u => (u.id || u._id) === v); addLog?.(`👤 Selected: ${u?.email} (${u?.validScreenshots?.length || 0} screenshots)`, "info"); onUserSelect(u) }}>
+          <SelectTrigger><SelectValue placeholder="Select user..." /></SelectTrigger>
+          <SelectContent>{users.map(u => (<SelectItem key={u.id} value={u.id || u._id}><div className="flex justify-between w-full"><span>{u.name} ({u.email})</span>{u.validScreenshots?.length > 0 && <Badge className="ml-2">{u.validScreenshots.length} 📸</Badge>}</div></SelectItem>))}</SelectContent>
+        </Select>
+      )}
     </div>
   )
 }
@@ -682,433 +138,90 @@ const UserSelector = ({ selectedUser, onUserSelect, className, onUsersRefresh })
 // Main Component
 export default function CoinTransferPage() {
   const [userRole, setUserRole] = useState("")
-  const [users, setUsers] = useState([])
   const [selectedUser, setSelectedUser] = useState(null)
   const [transferAmount, setTransferAmount] = useState("")
   const [transferReason, setTransferReason] = useState("")
   const [loading, setLoading] = useState(false)
-  const [transferHistory, setTransferHistory] = useState([])
   const [message, setMessage] = useState({ type: "", text: "" })
-  const [activeTab, setActiveTab] = useState("history")
   const [showScreenshots, setShowScreenshots] = useState(false)
-  const [showHistory, setShowHistory] = useState(false)
-  const [screenshotApprovalData, setScreenshotApprovalData] = useState(null)
-  const [transferSuccess, setTransferSuccess] = useState(false)
-  const [balanceAnimation, setBalanceAnimation] = useState(false)
-  const [lastTransferResult, setLastTransferResult] = useState(null)
-  const [userData, setUserData] = useState({ username: "", email: "", role: "", id: "" })
+  const [screenshotData, setScreenshotData] = useState(null)
+  const { logs, addLog, clearLogs } = useDebug()
+  const [showDebug, setShowDebug] = useState(false)
 
   useEffect(() => {
     try {
-      const user = localStorage.getItem("user")
-      if (user) {
-        const userData = JSON.parse(user)
-        const userRoleValue = userData.role || ""
-        setUserRole(userRoleValue)
-        setUserData({
-          id: userData._id || userData.id || "",
-          username: userData.username || userData.name || "",
-          email: userData.email || "",
-          role: userRoleValue.toLowerCase(),
-        })
-        setActiveTab(userRoleValue === "superadmin" ? "transfer" : "history")
-      }
-    } catch (error) {
-      console.error("Error parsing user data:", error)
-    }
+      const user = JSON.parse(localStorage.getItem("user") || "{}")
+      setUserRole(user.role || "")
+      addLog(`✅ Logged in: ${user.email} (${user.role})`, "success")
+    } catch(e) { addLog(`❌ Error: ${e.message}`, "error") }
   }, [])
 
-  const hasTransferAccess = userRole === "superadmin"
-
-  const fetchTransferHistory = async () => {
-    try {
-      setLoading(true)
-      const response = await userAPI.getTransferHistory()
-      if (response.success) {
-        const transfers = response.data || []
-        const formattedTransfers = transfers.map((transfer) => userHelpers.formatTransferData(transfer))
-        setTransferHistory(formattedTransfers)
-      }
-    } catch (error) {
-      console.error("Error fetching transfer history:", error)
-      setMessage({ type: "error", text: "Error fetching transfer history" })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    if (activeTab === "history") fetchTransferHistory()
-  }, [activeTab])
-
-  const handleScreenshotApproval = (approvalData) => {
-    setScreenshotApprovalData(approvalData)
+  const handleApprove = (data) => {
+    setScreenshotData(data)
     setShowScreenshots(false)
-    if (approvalData.allScreenshotsApproved) {
-      setTransferAmount(approvalData.totalCoins.toString())
-      setTransferReason(`Screenshot approval reward - ${approvalData.approvedCount} screenshot(s) approved`)
-      setMessage({ type: "success", text: `Screenshots approved! Transfer form pre-filled with ${approvalData.totalCoins} coins.` })
+    if (data.allScreenshotsApproved) {
+      setTransferAmount(data.totalCoins.toString())
+      setTransferReason(`Screenshot reward - ${data.approvedCount} screenshot(s)`)
+      addLog(`💰 Pre-filled transfer: ${data.totalCoins} coins`, "success")
     }
   }
 
   const handleTransfer = async () => {
-    if (!hasTransferAccess) {
-      setMessage({ type: "error", text: "You don't have permission to transfer coins" })
-      return
-    }
-
-    if (screenshotApprovalData && !screenshotApprovalData.allScreenshotsApproved) {
-      setMessage({ type: "error", text: "All screenshots must be approved before transfer can be executed" })
-      return
-    }
-
-    if (!selectedUser || !transferAmount || !selectedUser.email) {
-      setMessage({ type: "error", text: "Please select a user and enter transfer amount" })
-      return
-    }
-
-    const amount = Number.parseInt(transferAmount)
-    if (isNaN(amount) || amount <= 0) {
-      setMessage({ type: "error", text: "Please enter a valid amount" })
-      return
-    }
-
-    if (!transferReason || transferReason.length < 5) {
-      setMessage({ type: "error", text: "Please provide a detailed reason (minimum 5 characters)" })
-      return
-    }
-
+    if (!selectedUser || !transferAmount) return setMessage({ type: "error", text: "Select user and enter amount" })
+    const amount = parseInt(transferAmount)
+    if (isNaN(amount) || amount <= 0) return setMessage({ type: "error", text: "Invalid amount" })
+    
+    setLoading(true)
+    addLog(`💰 Transferring ${amount} coins to ${selectedUser.email}...`, "info")
     try {
-      setLoading(true)
-      setMessage({ type: "", text: "" })
-
-      const adminUser = localStorage.getItem("user")
-      const adminUserStr = JSON.parse(adminUser)
-      const admin = adminUserStr.username
-
-      const response = await userAPI.editUserBalance(selectedUser.email, amount, admin)
-
-      if (response.success) {
-        setBalanceAnimation(true)
-        setTransferSuccess(true)
-        setLastTransferResult({
-          amount: amount,
-          newBalance: response.data.newBalance,
-          balanceBefore: selectedUser.balance || 0,
-          balanceAfter: response.data.newBalance,
-          transactionId: `TXN${Date.now()}`,
-        })
-        setMessage({ type: "success", text: `Successfully transferred ${amount} coins to ${selectedUser.name}. New balance: ${response.data.newBalance}` })
-        setSelectedUser(prev => ({ ...prev, balance: response.data.newBalance }))
-        setTimeout(() => {
-          setTransferAmount("")
-          setTransferReason("")
-          setScreenshotApprovalData(null)
-          setBalanceAnimation(false)
-        }, 3000)
-        setTimeout(() => setTransferSuccess(false), 8000)
-        fetchTransferHistory()
-      } else {
-        setMessage({ type: "error", text: response.message || "Transfer failed" })
-      }
-    } catch (error) {
-      console.error("Transfer error:", error)
-      setMessage({ type: "error", text: error.message || "Transfer failed" })
-    } finally {
-      setLoading(false)
-    }
+      const admin = JSON.parse(localStorage.getItem("user") || "{}").username
+      const res = await userAPI.editUserBalance(selectedUser.email, amount, admin)
+      if (res.success) {
+        addLog(`✅ Transfer successful! New balance: ${res.data.newBalance}`, "success")
+        setMessage({ type: "success", text: `Transferred ${amount} coins to ${selectedUser.name}` })
+        setSelectedUser(p => ({ ...p, balance: res.data.newBalance }))
+        setTimeout(() => { setTransferAmount(""); setTransferReason(""); setScreenshotData(null) }, 2000)
+      } else throw new Error(res.message)
+    } catch(e) { addLog(`❌ Transfer failed: ${e.message}`, "error"); setMessage({ type: "error", text: e.message }) }
+    finally { setLoading(false) }
   }
 
-  const getRoleDisplay = (role) => {
-    switch (role) {
-      case "superadmin": return { icon: Shield, color: "text-red-600", bg: "bg-red-50", label: "Super Admin" }
-      case "editor": return { icon: Edit, color: "text-blue-600", bg: "bg-blue-50", label: "Editor" }
-      case "viewer": return { icon: Eye, color: "text-green-600", bg: "bg-green-50", label: "Viewer" }
-      default: return { icon: User, color: "text-gray-600", bg: "bg-gray-50", label: "User" }
-    }
-  }
-
-  const roleDisplay = getRoleDisplay(userRole)
-  const RoleIcon = roleDisplay.icon
-  const transferStats = userHelpers.calculateTransferStats(transferHistory)
-
-  if (showScreenshots) {
-    return (
-      <ScreenshotViewer
-        screenshots={selectedUser?.screenshots}
-        onBack={() => setShowScreenshots(false)}
-        onApprove={handleScreenshotApproval}
-        selectedUser={selectedUser}
-      />
-    )
-  }
-
-  if (showHistory) {
-    return <TransferHistory onBack={() => setShowHistory(false)} onRefresh={fetchTransferHistory} />
-  }
+  if (showScreenshots) return <><ScreenshotViewer screenshots={selectedUser?.screenshots} onBack={() => setShowScreenshots(false)} onApprove={handleApprove} selectedUser={selectedUser} addLog={addLog} /><DebugPanel logs={logs} onClear={clearLogs} visible={showDebug} onToggle={() => setShowDebug(!showDebug)} /></>
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="container mx-auto p-3 sm:p-4 lg:p-6 space-y-3 sm:space-y-4 lg:space-y-6 max-w-7xl">
-        {/* Header */}
-        <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:justify-between sm:items-center bg-white rounded-xl p-3 sm:p-4 lg:p-6 shadow-sm border">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="p-1.5 sm:p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg">
-              <Coins className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-gray-900">Coin Transfer Management</h1>
-              <p className="text-xs sm:text-sm text-gray-600 mt-0.5 sm:mt-1">
-                {hasTransferAccess ? "Manage and track coin transfers with screenshot approval" : "View transfer history and track transactions"}
-              </p>
-            </div>
+      <button onClick={() => setShowDebug(!showDebug)} className="fixed bottom-4 right-4 z-50 bg-black text-white p-2 rounded-full"><Bug className="w-5 h-5" /></button>
+      <div className="container mx-auto p-6">
+        <Card className="mb-6"><CardContent className="p-4 flex justify-between items-center"><div><h1 className="text-2xl font-bold">Coin Transfer Management</h1><p className="text-gray-600">{userRole === "superadmin" ? "Admin access" : "View only"}</p></div><Button onClick={() => window.location.reload()} variant="outline"><RefreshCw className="mr-2" /> Refresh</Button></CardContent></Card>
+        
+        {message.text && <Alert className={`mb-4 ${message.type === "error" ? "border-red-200 bg-red-50" : "border-green-200 bg-green-50"}`}><AlertDescription>{message.text}</AlertDescription></Alert>}
+        
+        {userRole === "superadmin" ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card><CardHeader><CardTitle>Select User</CardTitle></CardHeader><CardContent><UserSelector selectedUser={selectedUser} onUserSelect={setSelectedUser} addLog={addLog} /></CardContent></Card>
+            <Card><CardHeader><CardTitle>Transfer Details</CardTitle></CardHeader><CardContent>{selectedUser ? (<>
+              <div className="p-3 bg-blue-50 rounded-lg mb-4"><p><strong>{selectedUser.name}</strong> ({selectedUser.email})</p><p>Balance: {selectedUser.balance || 0} coins</p><p>Screenshots: {(selectedUser.screenshots || []).filter(s => s && s !== null).length} uploaded</p></div>
+              <Button onClick={() => { addLog(`📸 Opening screenshot viewer...`, "info"); setShowScreenshots(true) }} variant="outline" className="w-full mb-4" disabled={!(selectedUser.screenshots || []).some(s => s && s !== null)}><ImageIcon className="mr-2" /> Review Screenshots</Button>
+              <Input placeholder="Amount" type="number" value={transferAmount} onChange={e => setTransferAmount(e.target.value)} className="mb-3" />
+              <Textarea placeholder="Reason (min 5 characters)" value={transferReason} onChange={e => setTransferReason(e.target.value)} rows={2} className="mb-3" />
+              <Button onClick={handleTransfer} disabled={loading || !transferAmount || transferReason.length < 5} className="w-full bg-gradient-to-r from-blue-600 to-purple-600"><Send className="mr-2" /> Transfer Coins</Button>
+            </>) : (<p className="text-center text-gray-500">Select a user first</p>)}</CardContent></Card>
           </div>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg ${roleDisplay.bg} border`}>
-              <RoleIcon className={`w-3 h-3 sm:w-4 sm:h-4 ${roleDisplay.color}`} />
-              <span className={`text-xs sm:text-sm font-medium ${roleDisplay.color}`}>{roleDisplay.label}</span>
-            </div>
-            <Button onClick={() => window.location.reload()} variant="outline" size="sm" className="px-2 sm:px-3">
-              <RefreshCw className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
-              <span className="hidden sm:inline">Refresh</span>
-            </Button>
-          </div>
-        </div>
-
-        {!hasTransferAccess && (
-          <Alert className="border-blue-200 bg-blue-50">
-            <Eye className="h-4 w-4 text-blue-600" />
-            <AlertDescription className="text-blue-800 text-sm">You have view-only access to transfer history. Contact your administrator for transfer permissions.</AlertDescription>
-          </Alert>
-        )}
-
-        <AnimatePresence>
-          {transferSuccess && (
-            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="mb-6">
-              <Alert className="border-green-200 bg-green-50">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <AlertDescription className="text-green-800">
-                  <div className="space-y-1">
-                    <p className="font-medium">✅ Transfer completed successfully!</p>
-                    <p>{transferAmount} coins transferred to {selectedUser?.name}'s account</p>
-                    <p className="text-sm">Balance updated: {lastTransferResult?.balanceBefore || 0} → {lastTransferResult?.balanceAfter || selectedUser?.balance} coins</p>
-                    {lastTransferResult?.transactionId && <p className="text-xs font-mono">Transaction ID: {lastTransferResult.transactionId}</p>}
-                  </div>
-                </AlertDescription>
-              </Alert>
-            </motion.div>
-          )}
-          {message.text && (
-            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
-              <Alert className={`${message.type === "error" ? "border-red-200 bg-red-50" : "border-green-200 bg-green-50"} shadow-sm`}>
-                {message.type === "error" ? <XCircle className="h-4 w-4 text-red-600" /> : <CheckCircle className="h-4 w-4 text-green-600" />}
-                <AlertDescription className={`${message.type === "error" ? "text-red-800" : "text-green-800"} text-sm`}>{message.text}</AlertDescription>
-              </Alert>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {screenshotApprovalData && screenshotApprovalData.hasApprovedScreenshots && (
-          <Alert className={screenshotApprovalData.allScreenshotsApproved ? "border-green-200 bg-green-50" : "border-amber-200 bg-amber-50"}>
-            {screenshotApprovalData.allScreenshotsApproved ? <CheckCircle className="h-4 w-4 text-green-600" /> : <AlertTriangle className="h-4 w-4 text-amber-600" />}
-            <AlertDescription className={screenshotApprovalData.allScreenshotsApproved ? "text-green-800" : "text-amber-800"}>
-              <div className="space-y-1">
-                <p className="font-medium">{screenshotApprovalData.allScreenshotsApproved ? "Screenshots Approved ✅" : "Partial Screenshot Approval ⚠️"}</p>
-                <p>{screenshotApprovalData.allScreenshotsApproved ? `All ${screenshotApprovalData.approvedCount} screenshots approved. Transfer form pre-filled with ${screenshotApprovalData.totalCoins} coins.` : `${screenshotApprovalData.approvedCount} screenshot(s) approved, but ALL screenshots must be approved before transfer execution.`}</p>
-              </div>
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {hasTransferAccess ? (
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-              <TabsList className="grid w-full grid-cols-2 bg-gray-50 p-1 m-1 rounded-lg">
-                <TabsTrigger value="transfer" className="flex items-center gap-1.5 sm:gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm text-xs sm:text-sm py-2">
-                  <Send className="w-3 h-3 sm:w-4 sm:h-4" />
-                  <span className="hidden sm:inline">Transfer Coins</span>
-                </TabsTrigger>
-                <TabsTrigger value="history" className="flex items-center gap-1.5 sm:gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm text-xs sm:text-sm py-2">
-                  <History className="w-3 h-3 sm:w-4 sm:h-4" />
-                  <span className="hidden sm:inline">Transfer History</span>
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="transfer" className="p-3 sm:p-4 lg:p-6 space-y-4 lg:space-y-6">
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 lg:gap-6">
-                  <Card className="shadow-sm border-0 bg-gradient-to-br from-white to-gray-50">
-                    <CardHeader className="pb-3 sm:pb-4">
-                      <CardTitle className="flex items-center text-base sm:text-lg">
-                        <User className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-blue-600" />
-                        Select User
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <UserSelector selectedUser={selectedUser} onUserSelect={setSelectedUser} onUsersRefresh={setUsers} className="max-w-full" />
-                    </CardContent>
-                  </Card>
-
-                  <Card className="shadow-sm border-0 bg-gradient-to-br from-white to-gray-50">
-                    <CardHeader className="pb-3 sm:pb-4">
-                      <CardTitle className="flex items-center text-base sm:text-lg">
-                        <Send className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-green-600" />
-                        Transfer Details
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4 sm:space-y-6">
-                      {selectedUser ? (
-                        <>
-                          <div className="p-3 sm:p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-                            <h3 className="font-semibold mb-2 sm:mb-3 text-gray-900 text-sm sm:text-base">Selected User</h3>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm">
-                              <div><span className="text-gray-600">Name:</span><p className="font-medium text-gray-900 break-words">{selectedUser.name}</p></div>
-                              <div><span className="text-gray-600">Email:</span><p className="font-medium text-gray-900 break-all">{selectedUser.email}</p></div>
-                              <div><span className="text-gray-600">Current Balance:</span><p className={`font-medium text-gray-900 transition-all duration-500 ${balanceAnimation ? "text-green-600 font-bold" : ""}`}>{selectedUser.balance || 0} coins</p></div>
-                              <div><span className="text-gray-600">Screenshots:</span><p className="font-medium text-gray-900">{(selectedUser.screenshots || []).filter(s => s && s !== null).length || 0} uploaded</p></div>
-                            </div>
-                          </div>
-
-                          <div className="flex gap-2">
-                            <Button onClick={() => setShowScreenshots(true)} variant="outline" size="sm" className="flex-1" disabled={!selectedUser.screenshots || (selectedUser.screenshots || []).filter(s => s && s !== null).length === 0}>
-                              <ImageIcon className="w-4 h-4 mr-2" />
-                              Review Screenshots ({(selectedUser.screenshots || []).filter(s => s && s !== null).length || 0})
-                            </Button>
-                            <Button onClick={() => setShowHistory(true)} variant="outline" size="sm" className="flex-1">
-                              <History className="w-4 w-4 mr-2" />
-                              View History
-                            </Button>
-                          </div>
-
-                          <div className="space-y-3 sm:space-y-4">
-                            <div>
-                              <Label htmlFor="amount" className="text-xs sm:text-sm font-medium text-gray-700">Transfer Amount *</Label>
-                              <Input id="amount" type="number" placeholder="Enter amount to transfer" value={transferAmount} onChange={(e) => setTransferAmount(e.target.value)} min="0" step="1" className="mt-1 border-gray-200 focus:border-blue-500 focus:ring-blue-500 text-sm" />
-                            </div>
-                            <div>
-                              <Label htmlFor="reason" className="text-xs sm:text-sm font-medium text-gray-700">Transfer Reason *</Label>
-                              <Textarea id="reason" placeholder="Enter detailed reason for transfer" value={transferReason} onChange={(e) => setTransferReason(e.target.value)} rows={3} className="mt-1 border-gray-200 focus:border-blue-500 focus:ring-blue-500 text-sm" />
-                            </div>
-
-                            {transferAmount && !isNaN(Number.parseInt(transferAmount)) && Number.parseInt(transferAmount) > 0 && (
-                              <div className="p-3 sm:p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
-                                <h4 className="font-semibold mb-2 text-gray-900 text-sm sm:text-base">Transfer Preview</h4>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm">
-                                  <div><span className="text-gray-600">Amount:</span><p className="font-medium text-gray-900">{Number.parseInt(transferAmount)} coins</p></div>
-                                  <div><span className="text-gray-600">New Balance:</span><p className="font-medium text-gray-900">{(selectedUser.balance || 0) + Number.parseInt(transferAmount)} coins</p></div>
-                                </div>
-                              </div>
-                            )}
-
-                            <Button onClick={handleTransfer} disabled={loading || !transferAmount || !transferReason || !selectedUser.email || Number.parseInt(transferAmount) <= 0 || transferReason.length < 5 || (screenshotApprovalData && !screenshotApprovalData.allScreenshotsApproved)} className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium py-2 sm:py-2.5 text-sm">
-                              {loading ? <><RefreshCw className="w-3 h-3 sm:w-4 sm:h-4 mr-2 animate-spin" /> Processing Transfer...</> : screenshotApprovalData?.allScreenshotsApproved ? <><Coins className="w-3 h-3 sm:w-4 sm:h-4 mr-2" /> Execute Transfer ({screenshotApprovalData.totalCoins} Coins)</> : <><Send className="w-3 h-3 sm:w-4 sm:h-4 mr-2" /> Transfer Coins</>}
-                            </Button>
-                          </div>
-                        </>
-                      ) : (
-                        <div className="text-center py-8 sm:py-12 text-gray-500">
-                          <User className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 text-gray-300" />
-                          <p className="text-base sm:text-lg font-medium mb-2">Select a User</p>
-                          <p className="text-xs sm:text-sm">Choose a user from the list to transfer coins</p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="history" className="p-3 sm:p-4 lg:p-6 space-y-4 lg:space-y-6">
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                  <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200"><CardContent className="p-3 sm:p-4"><div className="flex items-center justify-between"><div><p className="text-xs sm:text-sm text-blue-700 font-medium">Total Transfers</p><p className="text-lg sm:text-xl lg:text-2xl font-bold text-blue-900">{transferStats.totalTransfers}</p></div><History className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-blue-600" /></div></CardContent></Card>
-                  <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200"><CardContent className="p-3 sm:p-4"><div className="flex items-center justify-between"><div><p className="text-xs sm:text-sm text-yellow-700 font-medium">Total Amount</p><p className="text-lg sm:text-xl lg:text-2xl font-bold text-yellow-900">{transferStats.totalAmount.toLocaleString()}</p></div><Coins className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-yellow-600" /></div></CardContent></Card>
-                  <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200"><CardContent className="p-3 sm:p-4"><div className="flex items-center justify-between"><div><p className="text-xs sm:text-sm text-green-700 font-medium">Completed</p><p className="text-lg sm:text-xl lg:text-2xl font-bold text-green-900">{transferStats.completedTransfers}</p></div><CheckCircle className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-green-600" /></div></CardContent></Card>
-                  <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200"><CardContent className="p-3 sm:p-4"><div className="flex items-center justify-between"><div><p className="text-xs sm:text-sm text-orange-700 font-medium">Average</p><p className="text-lg sm:text-xl lg:text-2xl font-bold text-orange-900">{Math.round(transferStats.averageAmount)}</p></div><TrendingUp className="w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 text-orange-600" /></div></CardContent></Card>
-                </div>
-
-                <Card className="shadow-sm border-0 bg-gradient-to-br from-white to-gray-50">
-                  <CardHeader className="pb-3 sm:pb-4">
-                    <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:justify-between sm:items-center">
-                      <CardTitle className="flex items-center text-base sm:text-lg"><History className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-purple-600" />Transfer History</CardTitle>
-                      <Button onClick={fetchTransferHistory} variant="outline" size="sm" className="w-full sm:w-auto bg-transparent text-xs sm:text-sm px-2 sm:px-3" disabled={loading}><RefreshCw className={`w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 ${loading ? "animate-spin" : ""}`} />Refresh</Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="rounded-lg border bg-white overflow-hidden">
-                      {loading ? (
-                        <div className="text-center py-8 sm:py-12"><RefreshCw className="w-6 h-6 sm:w-8 sm:h-8 animate-spin mx-auto mb-3 sm:mb-4 text-purple-500" /><p className="text-gray-600 text-sm">Loading transfer history...</p></div>
-                      ) : transferHistory.length === 0 ? (
-                        <div className="text-center py-8 sm:py-12 text-gray-500"><History className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 text-gray-300" /><p className="text-base sm:text-lg font-medium mb-2">No Transfer History</p><p className="text-xs sm:text-sm">No transfers found matching your criteria</p></div>
-                      ) : (
-                        <div className="space-y-3 p-3 sm:p-4">
-                          {transferHistory.map((transfer, index) => (
-                            <Card key={transfer.id || index} className="border border-gray-200">
-                              <CardContent className="p-3 sm:p-4">
-                                <div className="space-y-2 sm:space-y-3">
-                                  <div className="flex justify-between items-start gap-2">
-                                    <UserAvatar user={{ name: transfer.userName, email: transfer.userEmail }} size="sm" />
-                                    <div className="flex-1 min-w-0"><p className="font-medium text-gray-900 text-sm break-words">{transfer.userName || "Unknown User"}</p><p className="text-xs text-gray-600 break-all">{transfer.userEmail || "No email"}</p></div>
-                                    <Badge variant={transfer.status === "completed" ? "default" : transfer.status === "pending" ? "secondary" : "destructive"} className="text-xs shrink-0">{transfer.status || "completed"}</Badge>
-                                  </div>
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center"><Coins className="w-3 h-3 sm:w-4 sm:h-4 mr-1 text-yellow-500" /><span className="font-semibold text-gray-900 text-sm">{transfer.amount || 0} coins</span></div>
-                                    <div className="text-xs text-gray-600">{transfer.date || new Date().toLocaleDateString()} {transfer.time || new Date().toLocaleTimeString()}</div>
-                                  </div>
-                                  <div className="pt-2 border-t border-gray-100">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                                      <div><span className="text-gray-500">Reason:</span><span className="ml-1 text-gray-700 break-words">{transfer.reason || "No reason provided"}</span></div>
-                                      <div><span className="text-gray-500">Admin:</span><span className="ml-1 text-gray-700 break-words">{transfer.transferredBy || "System"}</span></div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </div>
-          </Tabs>
         ) : (
-          <Card className="shadow-sm border-0 bg-gradient-to-br from-white to-gray-50">
-            <CardHeader className="pb-3 sm:pb-4">
-              <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:justify-between sm:items-center">
-                <CardTitle className="flex items-center text-base sm:text-lg"><History className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-purple-600" />Transfer History</CardTitle>
-                <Button onClick={fetchTransferHistory} variant="outline" size="sm" className="w-full sm:w-auto bg-transparent text-xs sm:text-sm px-2 sm:px-3" disabled={loading}><RefreshCw className={`w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 ${loading ? "animate-spin" : ""}`} />Refresh</Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-lg border bg-white overflow-hidden">
-                {loading ? (
-                  <div className="text-center py-8 sm:py-12"><RefreshCw className="w-6 h-6 sm:w-8 sm:h-8 animate-spin mx-auto mb-3 sm:mb-4 text-purple-500" /><p className="text-gray-600 text-sm">Loading transfer history...</p></div>
-                ) : transferHistory.length === 0 ? (
-                  <div className="text-center py-8 sm:py-12 text-gray-500"><History className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 text-gray-300" /><p className="text-base sm:text-lg font-medium mb-2">No Transfer History</p><p className="text-xs sm:text-sm">No transfers found</p></div>
-                ) : (
-                  <div className="space-y-3 p-3 sm:p-4">
-                    {transferHistory.map((transfer, index) => (
-                      <Card key={transfer.id || index} className="border border-gray-200">
-                        <CardContent className="p-3 sm:p-4">
-                          <div className="space-y-2 sm:space-y-3">
-                            <div className="flex justify-between items-start gap-2">
-                              <div className="flex-1 min-w-0"><p className="font-medium text-gray-900 text-sm break-words">{transfer.userName || "Unknown User"}</p><p className="text-xs text-gray-600 break-all">{transfer.userEmail || "No email"}</p></div>
-                              <Badge variant={transfer.status === "completed" ? "default" : transfer.status === "pending" ? "secondary" : "destructive"} className="text-xs shrink-0">{transfer.status || "completed"}</Badge>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center"><Coins className="w-3 h-3 sm:w-4 sm:h-4 mr-1 text-yellow-500" /><span className="font-semibold text-gray-900 text-sm">{transfer.amount || 0} coins</span></div>
-                              <div className="text-xs text-gray-600">{transfer.date || new Date().toLocaleDateString()} {transfer.time || new Date().toLocaleTimeString()}</div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          <Card><CardContent className="p-8 text-center"><History className="w-12 h-12 mx-auto text-gray-300 mb-4" /><p>View-only mode. Contact admin for transfer permissions.</p></CardContent></Card>
         )}
       </div>
+    </div>
+  )
+}
+
+// Debug Panel Component
+const DebugPanel = ({ logs, onClear, visible, onToggle }) => {
+  if (!visible) return null
+  return (
+    <div className="fixed bottom-4 right-16 z-50 w-96 bg-black/90 text-white rounded-lg shadow-xl">
+      <div className="flex justify-between items-center p-2 bg-gray-800"><span className="text-xs font-mono">🐛 DEBUG</span><div><button onClick={onClear} className="text-xs mr-2">Clear</button><button onClick={onToggle}>✕</button></div></div>
+      <div className="p-2 h-64 overflow-auto text-xs font-mono">{logs.map((l, i) => <div key={i} className={`py-1 border-b border-gray-700 ${l.type === 'error' ? 'text-red-400' : l.type === 'success' ? 'text-green-400' : 'text-gray-300'}`}><span className="text-gray-500">[{l.timestamp}]</span> {l.msg}</div>)}</div>
     </div>
   )
 }
