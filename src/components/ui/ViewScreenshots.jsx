@@ -20,7 +20,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser, onUse
   const [processingId, setProcessingId] = useState(null)
   const [previewIndex, setPreviewIndex] = useState(null)
 
-  // ✅ Load screenshots with approved status from selectedUser
+  // Load screenshots
   useEffect(() => {
     if (!selectedUser?.screenshots) {
       setLoading(false)
@@ -31,7 +31,6 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser, onUse
       url && typeof url === 'string' && url !== 'null' && url !== 'undefined' && url.trim() !== ''
     )
 
-    // Get approved status from user object (already loaded from API)
     const screenshotsApproved = selectedUser.screenshotsApproved || {}
 
     const items = validLinks.map((url, idx) => ({
@@ -69,10 +68,11 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser, onUse
       })
       
       const result = await response.json()
+      console.log("Status save result:", result)
       
       if (result.success && onUserUpdate) {
-        // Refresh user data to update parent component
-        onUserUpdate()
+        // Refresh user data
+        await onUserUpdate()
       }
       
       return result.success
@@ -82,7 +82,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser, onUse
     }
   }
 
-  // ✅ APPROVE - Add coins and mark as approved
+  // ✅ APPROVE - Add coins
   const handleApprove = async (id) => {
     const screenshot = screenshots.find(s => s.id === id)
     const screenshotIndex = screenshots.findIndex(s => s.id === id)
@@ -95,7 +95,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser, onUse
       const admin = adminUser.username || adminUser.name || "Admin"
       const token = localStorage.getItem("token")
       
-      // Step 1: Transfer coins to user
+      // Transfer coins
       const transferResponse = await fetch('/api/users/edit-balance', {
         method: 'POST',
         headers: {
@@ -112,26 +112,25 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser, onUse
       const transferResult = await transferResponse.json()
       
       if (transferResult.success) {
-        // Step 2: Save approved status to database
+        // Save status to database
         const statusSaved = await saveApprovedStatusToDB(screenshotIndex, true)
         
+        // Update local state
+        const updatedScreenshots = screenshots.map(s => 
+          s.id === id ? { ...s, approved: true } : s
+        )
+        setScreenshots(updatedScreenshots)
+        
+        onApprove?.({
+          approvedCount: approvedCount + 1,
+          totalCoins: totalCoins + screenshot.coins,
+          hasApprovedScreenshots: true,
+        })
+        
         if (statusSaved) {
-          // Step 3: Update local state
-          const updatedScreenshots = screenshots.map(s => 
-            s.id === id ? { ...s, approved: true } : s
-          )
-          setScreenshots(updatedScreenshots)
-          
-          // Step 4: Notify parent
-          onApprove?.({
-            approvedCount: approvedCount + 1,
-            totalCoins: totalCoins + screenshot.coins,
-            hasApprovedScreenshots: true,
-          })
-          
-          alert(`✅ ${screenshot.coins} coins added to ${selectedUser.name}`)
+          alert(`✅ ${screenshot.coins} coins added and screenshot approved!`)
         } else {
-          alert("⚠️ Coins added but status not saved. Please refresh.")
+          alert(`⚠️ ${screenshot.coins} coins added but status may not be saved. Please refresh.`)
         }
       } else {
         alert("❌ Failed to add coins: " + (transferResult.message || "Unknown error"))
@@ -144,7 +143,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser, onUse
     }
   }
 
-  // ✅ UNAPPROVE - Deduct coins and mark as not approved
+  // ✅ UNAPPROVE - Deduct coins
   const handleUnapprove = async (id) => {
     const screenshot = screenshots.find(s => s.id === id)
     const screenshotIndex = screenshots.findIndex(s => s.id === id)
@@ -160,7 +159,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser, onUse
       const admin = adminUser.username || adminUser.name || "Admin"
       const token = localStorage.getItem("token")
       
-      // Step 1: Deduct coins from user (send negative amount)
+      // Deduct coins (negative amount)
       const deductResponse = await fetch('/api/users/edit-balance', {
         method: 'POST',
         headers: {
@@ -177,26 +176,25 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser, onUse
       const deductResult = await deductResponse.json()
       
       if (deductResult.success) {
-        // Step 2: Save unapproved status to database
+        // Save status to database
         const statusSaved = await saveApprovedStatusToDB(screenshotIndex, false)
         
+        // Update local state
+        const updatedScreenshots = screenshots.map(s => 
+          s.id === id ? { ...s, approved: false } : s
+        )
+        setScreenshots(updatedScreenshots)
+        
+        onApprove?.({
+          approvedCount: approvedCount - 1,
+          totalCoins: totalCoins - screenshot.coins,
+          hasApprovedScreenshots: approvedCount - 1 > 0,
+        })
+        
         if (statusSaved) {
-          // Step 3: Update local state
-          const updatedScreenshots = screenshots.map(s => 
-            s.id === id ? { ...s, approved: false } : s
-          )
-          setScreenshots(updatedScreenshots)
-          
-          // Step 4: Notify parent
-          onApprove?.({
-            approvedCount: approvedCount - 1,
-            totalCoins: totalCoins - screenshot.coins,
-            hasApprovedScreenshots: approvedCount - 1 > 0,
-          })
-          
-          alert(`✅ Unapproved! ${screenshot.coins} coins deducted from ${selectedUser.name}'s balance.`)
+          alert(`✅ ${screenshot.coins} coins deducted and screenshot unapproved!`)
         } else {
-          alert("⚠️ Coins deducted but status not saved. Please refresh.")
+          alert(`⚠️ ${screenshot.coins} coins deducted but status may not be saved. Please refresh.`)
         }
       } else {
         alert("❌ Failed to deduct coins: " + (deductResult.message || "Please try again"))
