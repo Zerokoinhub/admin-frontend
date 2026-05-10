@@ -39,7 +39,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
       imageUrl: url,
       description: `Screenshot ${idx + 1}`,
       coins: 10,
-      approved: savedApproved[idx] == true,  // ✅ Double equals
+      approved: savedApproved[idx] == true,
       uploadedAt: new Date().toISOString(),
     }))
 
@@ -58,7 +58,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
     localStorage.setItem(getStorageKey(), JSON.stringify(approvedStatus))
   }
 
-  // ✅ APPROVE - Positive amount
+  // ✅ APPROVE
   const handleApprove = async (id) => {
     const screenshot = screenshots.find(s => s.id === id)
     if (!screenshot || screenshot.approved) return
@@ -110,12 +110,12 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
     }
   }
 
-  // ✅ UNAPPROVE - Fetch balance, send positive new balance
+  // ✅ UNAPPROVE
   const handleUnapprove = async (id) => {
     const screenshot = screenshots.find(s => s.id === id)
     if (!screenshot || !screenshot.approved) return
 
-    const confirm = window.confirm(`⚠️ Are you sure? ${screenshot.coins} coins will be DEDUCTED.`)
+    const confirm = window.confirm(`⚠️ Are you sure? ${screenshot.coins} coins will be DEDUCTED from ${selectedUser.name}'s balance.`)
     if (!confirm) return
 
     setProcessingId(id)
@@ -137,12 +137,11 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
       const newBalance = currentBalance - screenshot.coins
       
       if (newBalance < 0) {
-        alert(`❌ User only has ${currentBalance} coins.`)
+        alert(`❌ Cannot unapprove! User only has ${currentBalance} coins.`)
         setProcessingId(null)
         return
       }
       
-      // Send POSITIVE new balance
       const response = await fetch('/api/users/edit-balance', {
         method: 'POST',
         headers: {
@@ -173,9 +172,10 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
         
         alert(`✅ Unapproved! ${screenshot.coins} coins deducted. New balance: ${newBalance}`)
       } else {
-        alert("❌ Failed to unapprove: " + (result.message))
+        alert("❌ Failed to unapprove: " + (result.message || "Please try again"))
       }
     } catch (error) {
+      console.error("Unapprove error:", error)
       alert("❌ Error unapproving screenshot")
     } finally {
       setProcessingId(null)
@@ -191,7 +191,64 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
     setScreenshots(updatedScreenshots)
   }
 
-  // ... rest of the component (openPreviewAt, closePreview, etc.)
+  const openPreviewAt = (idx) => setPreviewIndex(idx)
+  const closePreview = () => setPreviewIndex(null)
+  
+  const prevPreview = (e) => {
+    e?.stopPropagation()
+    if (previewIndex === null) return
+    setPreviewIndex((prev) => (prev - 1 + screenshots.length) % screenshots.length)
+  }
+  
+  const nextPreview = (e) => {
+    e?.stopPropagation()
+    if (previewIndex === null) return
+    setPreviewIndex((prev) => (prev + 1) % screenshots.length)
+  }
+
+  const handleKey = useCallback((e) => {
+    if (previewIndex === null) return
+    if (e.key === "Escape") closePreview()
+    if (e.key === "ArrowLeft") setPreviewIndex(i => (i - 1 + screenshots.length) % screenshots.length)
+    if (e.key === "ArrowRight") setPreviewIndex(i => (i + 1) % screenshots.length)
+  }, [previewIndex, screenshots.length])
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleKey)
+    return () => window.removeEventListener("keydown", handleKey)
+  }, [handleKey])
+
+  // ✅ ScreenshotImage Component
+  const ScreenshotImage = ({ screenshot, index }) => {
+    const [imageError, setImageError] = useState(false)
+    const [imageLoaded, setImageLoaded] = useState(false)
+
+    if (!screenshot?.imageUrl || imageError) {
+      return (
+        <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+          <ImageIcon className="h-8 w-8 text-gray-400" />
+        </div>
+      )
+    }
+
+    return (
+      <>
+        {!imageLoaded && (
+          <div className="absolute inset-0 bg-gray-100 flex items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+          </div>
+        )}
+        <img
+          src={screenshot.imageUrl}
+          alt={`Screenshot ${index + 1}`}
+          className="w-full h-full object-cover"
+          onLoad={() => setImageLoaded(true)}
+          onError={() => setImageError(true)}
+          crossOrigin="anonymous"
+        />
+      </>
+    )
+  }
 
   if (loading) {
     return (
@@ -253,6 +310,9 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
                       <Coins className="inline h-3 w-3 mr-1" />
                       {s.coins} coins
                     </p>
+                    {s.uploadedAt && (
+                      <p className="text-xs text-gray-400">{new Date(s.uploadedAt).toLocaleDateString()}</p>
+                    )}
                   </div>
                   
                   <div>
@@ -262,7 +322,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
                         disabled={processingId === s.id}
                         variant="outline"
                         size="sm"
-                        className="bg-red-600 text-white"
+                        className="bg-red-600 text-white hover:bg-red-700 border-red-600"
                       >
                         {processingId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Unapprove"}
                       </Button>
@@ -272,7 +332,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
                         disabled={processingId === s.id}
                         variant="default"
                         size="sm"
-                        className="bg-green-600"
+                        className="bg-green-600 hover:bg-green-700"
                       >
                         {processingId === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Approve"}
                       </Button>
@@ -282,6 +342,15 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
               </CardContent>
             </Card>
           ))}
+        </div>
+      )}
+
+      {previewIndex !== null && screenshots[previewIndex] && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center" onClick={closePreview}>
+          <button className="absolute top-4 right-4 text-white text-2xl" onClick={closePreview}>✕</button>
+          <button className="absolute left-4 text-white text-4xl" onClick={prevPreview}>‹</button>
+          <img src={screenshots[previewIndex].imageUrl} className="max-w-[90vw] max-h-[90vh] object-contain" />
+          <button className="absolute right-4 text-white text-4xl" onClick={nextPreview}>›</button>
         </div>
       )}
     </div>
