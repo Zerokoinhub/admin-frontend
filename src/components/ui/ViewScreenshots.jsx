@@ -58,7 +58,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
     localStorage.setItem(getStorageKey(), JSON.stringify(approvedStatus))
   }
 
-  // ✅ APPROVE - Sirf +10 bhejo
+  // ✅ APPROVE - Sirf +10 bhejo (backend add kar dega)
   const handleApprove = async (id) => {
     const screenshot = screenshots.find(s => s.id === id)
     if (!screenshot || screenshot.approved) return
@@ -78,7 +78,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
         },
         body: JSON.stringify({
           email: selectedUser.email,
-          newBalance: screenshot.coins,  // ✅ Sirf 10 bhejo
+          newBalance: screenshot.coins,
           admin: admin
         })
       })
@@ -110,7 +110,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
     }
   }
 
-  // ✅ UNAPPROVE - Sirf -10 bhejo
+  // ✅ UNAPPROVE - Fetch balance, subtract, send positive number
   const handleUnapprove = async (id) => {
     const screenshot = screenshots.find(s => s.id === id)
     if (!screenshot || !screenshot.approved) return
@@ -125,6 +125,25 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
       const admin = adminUser.username || adminUser.name || "Admin"
       const token = localStorage.getItem("token")
       
+      // Step 1: Get current balance
+      const userResponse = await fetch(`/api/users?email=${selectedUser.email}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      const userData = await userResponse.json()
+      const users = userData.users || userData.data || []
+      const currentUser = users.find(u => u.email === selectedUser.email)
+      const currentBalance = currentUser?.balance || 0
+      
+      // Step 2: Calculate new balance
+      const newBalance = currentBalance - screenshot.coins
+      
+      if (newBalance < 0) {
+        alert(`❌ Cannot unapprove! User only has ${currentBalance} coins.`)
+        setProcessingId(null)
+        return
+      }
+      
+      // Step 3: Send positive number
       const response = await fetch('/api/users/edit-balance', {
         method: 'POST',
         headers: {
@@ -133,7 +152,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
         },
         body: JSON.stringify({
           email: selectedUser.email,
-          newBalance: -screenshot.coins,  // ✅ Sirf -10 bhejo
+          newBalance: newBalance,
           admin: admin
         })
       })
@@ -153,7 +172,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
           hasApprovedScreenshots: approvedCount - 1 > 0,
         })
         
-        alert(`✅ Unapproved! ${screenshot.coins} coins deducted from ${selectedUser.name}'s balance.`)
+        alert(`✅ Unapproved! ${screenshot.coins} coins deducted. New balance: ${newBalance}`)
       } else {
         alert("❌ Failed to unapprove: " + (result.message || "Please try again"))
       }
