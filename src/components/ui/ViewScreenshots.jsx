@@ -22,7 +22,6 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
 
   const getStorageKey = () => `screenshots_approved_${selectedUser?.email}`
 
-  // Load screenshots from localStorage
   useEffect(() => {
     if (!selectedUser?.screenshots) {
       setLoading(false)
@@ -111,12 +110,12 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
     }
   }
 
-  // ✅ UNAPPROVE - Get current balance, calculate new, set directly via database
+  // ✅ UNAPPROVE - Using dedicated deduct endpoint
   const handleUnapprove = async (id) => {
     const screenshot = screenshots.find(s => s.id === id)
     if (!screenshot || !screenshot.approved) return
 
-    const confirm = window.confirm(`⚠️ Are you sure? ${screenshot.coins} coins will be DEDUCTED from ${selectedUser.name}'s balance.`)
+    const confirm = window.confirm(`⚠️ Are you sure? ${screenshot.coins} coins will be DEDUCTED.`)
     if (!confirm) return
 
     setProcessingId(id)
@@ -126,29 +125,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
       const admin = adminUser.username || adminUser.name || "Admin"
       const token = localStorage.getItem("token")
       
-      // Get current balance
-      const userResponse = await fetch(`/api/users?email=${selectedUser.email}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const userData = await userResponse.json()
-      const users = userData.users || userData.data || []
-      const currentUser = users.find(u => u.email === selectedUser.email)
-      const currentBalance = currentUser?.balance || 0
-      
-      const newBalance = currentBalance - screenshot.coins
-      
-      if (newBalance < 0) {
-        alert(`❌ Cannot unapprove! User only has ${currentBalance} coins.`)
-        setProcessingId(null)
-        return
-      }
-      
-      // Using the same API - it will ADD the amount
-      // To achieve subtraction, we need to send negative? No, API rejects negative
-      // Alternative: Use the force update method
-      
-      // Try with negative first (if your backend supports it)
-      let response = await fetch('/api/users/edit-balance', {
+      const response = await fetch('/api/users/deduct-screenshot-coins', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -156,32 +133,13 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
         },
         body: JSON.stringify({
           email: selectedUser.email,
-          newBalance: -screenshot.coins,
-          admin: admin
+          amount: screenshot.coins,
+          admin: admin,
+          screenshotId: id
         })
       })
       
-      let result = await response.json()
-      
-      // If negative fails, try direct user update via PUT
-      if (!result.success) {
-        console.log("Negative amount failed, trying direct user update...")
-        
-        // Get user ID
-        const userId = currentUser._id
-        response = await fetch(`/api/users/${userId}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            balance: newBalance
-          })
-        })
-        
-        result = await response.json()
-      }
+      const result = await response.json()
       
       if (result.success) {
         const updatedScreenshots = screenshots.map(s => 
@@ -196,9 +154,9 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
           hasApprovedScreenshots: approvedCount - 1 > 0,
         })
         
-        alert(`✅ Unapproved! ${screenshot.coins} coins deducted from ${selectedUser.name}'s balance.`)
+        alert(`✅ Unapproved! ${screenshot.coins} coins deducted. New balance: ${result.newBalance}`)
       } else {
-        alert("❌ Failed to unapprove: Please contact support")
+        alert("❌ Failed to unapprove: " + (result.error || "Please try again"))
       }
     } catch (error) {
       console.error("Unapprove error:", error)
@@ -244,7 +202,6 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
     return () => window.removeEventListener("keydown", handleKey)
   }, [handleKey])
 
-  // ScreenshotImage Component
   const ScreenshotImage = ({ screenshot, index }) => {
     const [imageError, setImageError] = useState(false)
     const [imageLoaded, setImageLoaded] = useState(false)
@@ -287,7 +244,6 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
 
   return (
     <div className="p-4 sm:p-6 space-y-4">
-      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <Button onClick={onBack} variant="outline">
@@ -306,7 +262,6 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
         </div>
       </div>
 
-      {/* Refresh Button */}
       <div className="flex gap-2">
         <Button onClick={handleRefresh} variant="outline" size="sm">
           <RefreshCw className="h-4 w-4 mr-2" />
@@ -314,7 +269,6 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
         </Button>
       </div>
 
-      {/* Screenshots List */}
       {screenshots.length === 0 ? (
         <div className="text-center py-12">
           <ImageIcon className="h-16 w-16 mx-auto text-gray-300 mb-4" />
@@ -326,7 +280,6 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
             <Card key={s.id} className={s.approved ? "border-green-500 bg-green-50" : ""}>
               <CardContent className="p-4">
                 <div className="flex gap-4 items-center">
-                  {/* Screenshot Thumbnail */}
                   <button
                     className="relative w-20 h-20 rounded overflow-hidden border shrink-0"
                     onClick={() => openPreviewAt(idx)}
@@ -334,7 +287,6 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
                     <ScreenshotImage screenshot={s} index={idx} />
                   </button>
                   
-                  {/* Screenshot Info */}
                   <div className="flex-1">
                     <p className="font-medium">{s.description}</p>
                     <p className="text-sm text-gray-600">
@@ -346,7 +298,6 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
                     )}
                   </div>
                   
-                  {/* Action Button */}
                   <div>
                     {s.approved ? (
                       <Button
@@ -377,7 +328,6 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
         </div>
       )}
 
-      {/* Lightbox Preview */}
       {previewIndex !== null && screenshots[previewIndex] && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center" onClick={closePreview}>
           <button className="absolute top-4 right-4 text-white text-2xl" onClick={closePreview}>✕</button>
