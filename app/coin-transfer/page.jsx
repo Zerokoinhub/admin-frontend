@@ -286,9 +286,6 @@ const TransferHistory = ({ onBack, onRefresh }) => {
                 <div key={transfer.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-3">
-                      {/* <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                        <User className="h-5 w-5 text-blue-600" />
-                      </div> */}
                       <UserAvatar user={{ name: transfer.userName, email: transfer.userEmail }} size="sm" className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center shrink-0" />
                       <div>
                         <p className="font-medium">{transfer.userName}</p>
@@ -334,7 +331,7 @@ const TransferHistory = ({ onBack, onRefresh }) => {
   )
 }
 
-// Enhanced User Selector Component
+// ✅ FIXED User Selector Component - No mock data, only real screenshots
 const UserSelector = ({ selectedUser, onUserSelect, className, onUsersRefresh }) => {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(false)
@@ -362,6 +359,8 @@ const UserSelector = ({ selectedUser, onUserSelect, className, onUsersRefresh })
           id: user._id || user.id,
           balance: user.balance || user.coins || 0,
           hasWallet: !!(user.walletAddresses && (user.walletAddresses.metamask || user.walletAddresses.trustWallet)),
+          // ✅ Count only REAL screenshots (not null, not undefined, not empty)
+          realScreenshotsCount: (user.screenshots || []).filter(s => s && s !== null && s !== 'null' && typeof s === 'string' && s.startsWith('http')).length
         }))
 
         setUsers(formattedUsers)
@@ -383,65 +382,8 @@ const UserSelector = ({ selectedUser, onUserSelect, className, onUsersRefresh })
         throw new Error("Invalid response format")
       }
     } catch (apiError) {
-      console.warn("API call failed, using fallback data:", apiError)
-      setError("Failed to load users from API - using sample data")
-
-      // Mock users with screenshots array structure
-      const mockUsers = [
-        {
-          _id: "6894b393fa0a8cb4aac53db5",
-          name: "Mr Sulam",
-          email: "yk377623@gmail.com",
-          balance: 4223,
-          isActive: true,
-          role: "user",
-          createdAt: new Date().toISOString(),
-          walletAddresses: { metamask: "0x123..." },
-          calculatorUsage: 5,
-          firebaseUid: "QfnqduUOrlhEctkQvtwIIXPnbcN2",
-          screenshots: [
-            "https://res.cloudinary.com/dw2ybyiek/image/upload/v1754662341/user_scr...",
-            "https://res.cloudinary.com/dw2ybyiek/image/upload/v1754662341/user_scr...",
-            "https://res.cloudinary.com/dw2ybyiek/image/upload/v1754662343/user_scr...",
-          ],
-        },
-        {
-          _id: "2",
-          name: "Jane Smith",
-          email: "jane@example.com",
-          balance: 250,
-          isActive: true,
-          role: "user",
-          createdAt: new Date().toISOString(),
-          walletAddresses: { trustWallet: "0x456..." },
-          calculatorUsage: 12,
-          firebaseUid: "firebase_uid_2",
-          screenshots: ["/placeholder.svg?height=800&width=1200", "/placeholder.svg?height=800&width=1200"],
-        },
-        {
-          _id: "3",
-          name: "Bob Johnson",
-          email: "bob@example.com",
-          balance: 75,
-          isActive: true,
-          role: "user",
-          createdAt: new Date().toISOString(),
-          calculatorUsage: 3,
-          firebaseUid: "firebase_uid_3",
-          screenshots: ["/placeholder.svg?height=800&width=1200"],
-        },
-      ]
-
-      const formattedMockUsers = mockUsers.map((user) => ({
-        ...user,
-        id: user._id,
-        hasWallet: !!(user.walletAddresses && (user.walletAddresses.metamask || user.walletAddresses.trustWallet)),
-      }))
-
-      setUsers(formattedMockUsers)
-      if (onUsersRefresh) {
-        onUsersRefresh(formattedMockUsers)
-      }
+      console.error("API call failed:", apiError)
+      setError("Failed to load users from API")
     } finally {
       setLoading(false)
     }
@@ -455,8 +397,8 @@ const UserSelector = ({ selectedUser, onUserSelect, className, onUsersRefresh })
     return users.filter((user) => {
       const matchesSearch =
         !searchTerm ||
-        user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchTerm.toLowerCase())
+        user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email?.toLowerCase().includes(searchTerm.toLowerCase())
 
       const matchesStatus =
         filters.status === "all" ||
@@ -572,12 +514,13 @@ const UserSelector = ({ selectedUser, onUserSelect, className, onUsersRefresh })
                       </div>
                       <div className="flex items-center gap-2 ml-4">
                         <Badge variant="outline" className="text-xs">
-                          {user.coins || user.balance || 0} coins
+                          {user.balance || 0} coins
                         </Badge>
                         {user.hasWallet && <Wallet className="h-3 w-3 text-green-500" />}
-                        {user.screenshots && user.screenshots.length > 0 && (
-                          <Badge variant="outline" className="text-xs">
-                            {user.screenshots.length} screenshots
+                        {/* ✅ Show ONLY real screenshots badge */}
+                        {user.realScreenshotsCount > 0 && (
+                          <Badge variant="outline" className="text-xs bg-green-100 text-green-700">
+                            {user.realScreenshotsCount} 📸
                           </Badge>
                         )}
                       </div>
@@ -650,22 +593,6 @@ export default function CoinTransferPage() {
 
   // Check permissions
   const hasTransferAccess = userRole === "superadmin"
-  const hasHistoryAccess = true
-
-  const hasPermission = (action) => {
-    const role = userData.role
-    switch (role) {
-      case "superadmin":
-      case "admin":
-        return ["view", "transfer", "viewHistory", "viewScreenshots", "editTransfer"].includes(action)
-      case "editor":
-        return ["view", "transfer", "viewHistory", "viewScreenshots", "editTransfer"].includes(action)
-      case "viewer":
-        return ["view", "viewHistory", "viewScreenshots"].includes(action)
-      default:
-        return false
-    }
-  }
 
   // Fetch transfer history
   const fetchTransferHistory = async () => {
@@ -676,7 +603,6 @@ export default function CoinTransferPage() {
         const transfers = response.data || []
         const formattedTransfers = transfers.map((transfer) => userHelpers.formatTransferData(transfer))
         setTransferHistory(formattedTransfers)
-        // console.log(formattedTransfers)
       } else {
         setMessage({ type: "error", text: response.message || "Failed to fetch transfer history" })
       }
@@ -720,7 +646,6 @@ export default function CoinTransferPage() {
       return
     }
 
-    // Check screenshot approval requirement
     if (screenshotApprovalData && !screenshotApprovalData.allScreenshotsApproved) {
       setMessage({ type: "error", text: "All screenshots must be approved before transfer can be executed" })
       return
@@ -756,11 +681,9 @@ export default function CoinTransferPage() {
       const response = await userAPI.editUserBalance(selectedUser.email, amount, admin)
 
       if (response.success) {
-        // Trigger animations
         setBalanceAnimation(true)
         setTransferSuccess(true)
 
-        // Store transfer result
         setLastTransferResult({
           amount: amount,
           newBalance: response.data.newBalance,
@@ -775,13 +698,11 @@ export default function CoinTransferPage() {
           text: `Successfully transferred ${amount} coins to ${selectedUser.name}. New balance: ${response.data.newBalance}`,
         })
 
-        // Update selected user balance
         setSelectedUser((prev) => ({
           ...prev,
           balance: response.data.newBalance,
         }))
 
-        // Clear form after success
         setTimeout(() => {
           setTransferAmount("")
           setTransferReason("")
@@ -793,7 +714,6 @@ export default function CoinTransferPage() {
           setTransferSuccess(false)
         }, 8000)
 
-        // Refresh transfer history
         fetchTransferHistory()
       } else {
         setMessage({
@@ -812,7 +732,6 @@ export default function CoinTransferPage() {
     }
   }
 
-  // Enhanced role display
   const getRoleDisplay = (role) => {
     switch (role) {
       case "superadmin":
@@ -828,11 +747,8 @@ export default function CoinTransferPage() {
 
   const roleDisplay = getRoleDisplay(userRole)
   const RoleIcon = roleDisplay.icon
-
-  // Calculate transfer statistics
   const transferStats = userHelpers.calculateTransferStats(transferHistory)
 
-  // Show different views based on state
   if (showScreenshots) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -840,6 +756,19 @@ export default function CoinTransferPage() {
           onBack={() => setShowScreenshots(false)}
           onApprove={handleScreenshotApproval}
           selectedUser={selectedUser}
+          onRefreshUser={async () => {
+            // Refresh user data after approve/unapprove
+            const token = localStorage.getItem('token')
+            const response = await fetch(`/api/users?email=${selectedUser.email}`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            })
+            const data = await response.json()
+            const users = data.users || data.data || []
+            const freshUser = users.find(u => u.email === selectedUser.email)
+            if (freshUser) {
+              setSelectedUser(freshUser)
+            }
+          }}
         />
       </div>
     )
@@ -874,7 +803,6 @@ export default function CoinTransferPage() {
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Role Badge */}
             <div
               className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg ${roleDisplay.bg} border`}
             >
@@ -888,7 +816,6 @@ export default function CoinTransferPage() {
           </div>
         </div>
 
-        {/* Access Control Notice for Non-Super Admin */}
         {!hasTransferAccess && (
           <Alert className="border-blue-200 bg-blue-50">
             <Eye className="h-4 w-4 text-blue-600" />
@@ -898,7 +825,6 @@ export default function CoinTransferPage() {
           </Alert>
         )}
 
-        {/* Enhanced Success/Error Messages */}
         <AnimatePresence>
           {transferSuccess && (
             <motion.div
@@ -945,7 +871,6 @@ export default function CoinTransferPage() {
           )}
         </AnimatePresence>
 
-        {/* Screenshot Approval Notice */}
         {screenshotApprovalData && screenshotApprovalData.hasApprovedScreenshots && (
           <Alert
             className={`${
@@ -978,9 +903,7 @@ export default function CoinTransferPage() {
           </Alert>
         )}
 
-        {/* Main Content - Show transfer interface directly or tabs */}
         {hasTransferAccess ? (
-          // Show tabs for super admin
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
               <TabsList className="grid w-full grid-cols-2 bg-gray-50 p-1 m-1 rounded-lg">
@@ -1002,10 +925,8 @@ export default function CoinTransferPage() {
                 </TabsTrigger>
               </TabsList>
 
-              {/* Transfer Tab */}
               <TabsContent value="transfer" className="p-3 sm:p-4 lg:p-6 space-y-4 lg:space-y-6">
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 lg:gap-6">
-                  {/* User Selection */}
                   <Card className="shadow-sm border-0 bg-gradient-to-br from-white to-gray-50">
                     <CardHeader className="pb-3 sm:pb-4">
                       <CardTitle className="flex items-center text-base sm:text-lg">
@@ -1023,7 +944,6 @@ export default function CoinTransferPage() {
                     </CardContent>
                   </Card>
 
-                  {/* Transfer Form */}
                   <Card className="shadow-sm border-0 bg-gradient-to-br from-white to-gray-50">
                     <CardHeader className="pb-3 sm:pb-4">
                       <CardTitle className="flex items-center text-base sm:text-lg">
@@ -1034,7 +954,6 @@ export default function CoinTransferPage() {
                     <CardContent className="space-y-4 sm:space-y-6">
                       {selectedUser ? (
                         <>
-                          {/* Selected User Info */}
                           <div className="p-3 sm:p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
                             <h3 className="font-semibold mb-2 sm:mb-3 text-gray-900 text-sm sm:text-base">
                               Selected User
@@ -1061,23 +980,22 @@ export default function CoinTransferPage() {
                               <div>
                                 <span className="text-gray-600">Screenshots:</span>
                                 <p className="font-medium text-gray-900">
-                                  {selectedUser.screenshots?.length || 0} uploaded
+                                  {(selectedUser.screenshots || []).filter(s => s && s !== null && s !== 'null').length || 0} uploaded
                                 </p>
                               </div>
                             </div>
                           </div>
 
-                          {/* Screenshot Actions */}
                           <div className="flex gap-2">
                             <Button
                               onClick={() => setShowScreenshots(true)}
                               variant="outline"
                               size="sm"
                               className="flex-1"
-                              disabled={!selectedUser.screenshots || selectedUser.screenshots.length === 0}
+                              disabled={!selectedUser.screenshots || (selectedUser.screenshots || []).filter(s => s && s !== null && s !== 'null').length === 0}
                             >
                               <ImageIcon className="w-4 h-4 mr-2" />
-                              Review Screenshots ({selectedUser.screenshots?.length || 0})
+                              Review Screenshots ({(selectedUser.screenshots || []).filter(s => s && s !== null && s !== 'null').length || 0})
                             </Button>
                             <Button onClick={() => setShowHistory(true)} variant="outline" size="sm" className="flex-1">
                               <History className="w-4 w-4 mr-2" />
@@ -1085,7 +1003,6 @@ export default function CoinTransferPage() {
                             </Button>
                           </div>
 
-                          {/* Transfer Form */}
                           <div className="space-y-3 sm:space-y-4">
                             <div>
                               <Label htmlFor="amount" className="text-xs sm:text-sm font-medium text-gray-700">
@@ -1116,7 +1033,6 @@ export default function CoinTransferPage() {
                               />
                             </div>
 
-                            {/* Transfer Preview */}
                             {transferAmount &&
                               !isNaN(Number.parseInt(transferAmount)) &&
                               Number.parseInt(transferAmount) > 0 && (
@@ -1185,7 +1101,6 @@ export default function CoinTransferPage() {
                 </div>
               </TabsContent>
 
-              {/* History Tab */}
               <TabsContent value="history" className="p-3 sm:p-4 lg:p-6 space-y-4 lg:space-y-6">
                 {/* Statistics Cards */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -1346,7 +1261,6 @@ export default function CoinTransferPage() {
             </div>
           </Tabs>
         ) : (
-          // Show only history for non-super admin users
           <Card className="shadow-sm border-0 bg-gradient-to-br from-white to-gray-50">
             <CardHeader className="pb-3 sm:pb-4">
               <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:justify-between sm:items-center">
