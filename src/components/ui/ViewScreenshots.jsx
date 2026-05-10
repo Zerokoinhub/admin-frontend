@@ -134,99 +134,62 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser, onUse
 
   // ✅ UNAPPROVE Function - Deduct coins
   const handleUnapprove = async (id) => {
-    const screenshot = screenshots.find(s => s.id === id)
-    const screenshotIndex = screenshots.findIndex(s => s.id === id)
-    if (!screenshot || !screenshot.approved) return
+  const screenshot = screenshots.find(s => s.id === id)
+  if (!screenshot || !screenshot.approved) return
 
-    const confirm = window.confirm(`⚠️ Are you sure? ${screenshot.coins} coins will be DEDUCTED from ${selectedUser.name}'s balance.`)
-    if (!confirm) return
+  const confirm = window.confirm(`⚠️ Are you sure? ${screenshot.coins} coins will be DEDUCTED.`)
+  if (!confirm) return
 
-    setProcessingId(id)
+  setProcessingId(id)
+  
+  try {
+    const adminUser = JSON.parse(localStorage.getItem("user") || "{}")
+    const admin = adminUser.username || adminUser.name || "Admin"
+    const token = localStorage.getItem("token")
     
-    try {
-      const adminUser = JSON.parse(localStorage.getItem("user") || "{}")
-      const admin = adminUser.username || adminUser.name || "Admin"
-      const token = localStorage.getItem("token")
-      
-      // ✅ Get current balance first
-      const userResponse = await fetch(`/api/users?email=${selectedUser.email}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+    // ✅ Sirf negative amount bhejo (backend add kar dega)
+    const response = await fetch('/api/users/edit-balance', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        email: selectedUser.email,
+        newBalance: -screenshot.coins,  // ✅ Negative amount
+        admin: admin
       })
-      const userData = await userResponse.json()
-      const users = userData.users || userData.data || []
-      const currentUser = users.find(u => u.email === selectedUser.email)
-      const currentBalance = currentUser?.balance || 0
+    })
+    
+    const result = await response.json()
+    
+    if (result.success) {
+      const updatedScreenshots = screenshots.map(s => 
+        s.id === id ? { ...s, approved: false } : s
+      )
+      setScreenshots(updatedScreenshots)
+      saveToLocalStorage(updatedScreenshots)
       
-      // ✅ Calculate new balance (positive number)
-      const newBalance = currentBalance - screenshot.coins
+      // ✅ Refresh parent to get fresh data
+      if (onUserUpdate) await onUserUpdate()
       
-      if (newBalance < 0) {
-        alert(`❌ Cannot unapprove! User only has ${currentBalance} coins.`)
-        setProcessingId(null)
-        return
-      }
-      
-      // ✅ Send POSITIVE number (not negative)
-      const deductResponse = await fetch('/api/users/edit-balance', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          email: selectedUser.email,
-          newBalance: newBalance,
-          admin: admin
-        })
+      onApprove?.({
+        approvedCount: approvedCount - 1,
+        totalCoins: totalCoins - screenshot.coins,
+        hasApprovedScreenshots: approvedCount - 1 > 0,
       })
       
-      const deductResult = await deductResponse.json()
-      
-      if (deductResult.success) {
-        // ✅ Update local state
-        const updatedScreenshots = screenshots.map(s => 
-          s.id === id ? { ...s, approved: false } : s
-        )
-        setScreenshots(updatedScreenshots)
-        saveToLocalStorage(updatedScreenshots)
-        
-        // ✅ Update status in backend
-        await fetch('/api/users/update-screenshot-status', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            email: selectedUser.email,
-            screenshotIndex: screenshotIndex,
-            approved: false
-          })
-        })
-        
-        // ✅ Refresh parent data
-        if (onUserUpdate) {
-          await onUserUpdate()
-        }
-        
-        onApprove?.({
-          approvedCount: approvedCount - 1,
-          totalCoins: totalCoins - screenshot.coins,
-          hasApprovedScreenshots: approvedCount - 1 > 0,
-        })
-        
-        alert(`✅ Unapproved! ${screenshot.coins} coins deducted. New balance: ${newBalance}`)
-      } else {
-        alert("❌ Failed to unapprove: " + (deductResult.message || "Please try again"))
-      }
-    } catch (error) {
-      console.error("Unapprove error:", error)
-      alert("❌ Error unapproving screenshot")
-    } finally {
-      setProcessingId(null)
+      alert(`✅ Unapproved! ${screenshot.coins} coins deducted.`)
+    } else {
+      alert("❌ Failed to unapprove: " + (result.message || "Please try again"))
     }
+  } catch (error) {
+    console.error("Unapprove error:", error)
+    alert("❌ Error unapproving screenshot")
+  } finally {
+    setProcessingId(null)
   }
-
+}
   const handleRefresh = () => {
     if (onUserUpdate) {
       onUserUpdate()
