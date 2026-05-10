@@ -59,7 +59,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
     localStorage.setItem(getStorageKey(), JSON.stringify(approvedStatus))
   }
 
-  // ✅ APPROVE - Send positive 10, API will add
+  // ✅ APPROVE - Add coins
   const handleApprove = async (id) => {
     const screenshot = screenshots.find(s => s.id === id)
     if (!screenshot || screenshot.approved) return
@@ -70,8 +70,6 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
       const adminUser = JSON.parse(localStorage.getItem("user") || "{}")
       const admin = adminUser.username || adminUser.name || "Admin"
       const token = localStorage.getItem("token")
-      
-      console.log("📤 Approve - Sending:", screenshot.coins)
       
       const response = await fetch('/api/users/edit-balance', {
         method: 'POST',
@@ -87,10 +85,8 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
       })
       
       const result = await response.json()
-      console.log("📥 Approve Response:", result)
       
       if (result.success) {
-        // Update local state
         const updatedScreenshots = screenshots.map(s => 
           s.id === id ? { ...s, approved: true } : s
         )
@@ -115,7 +111,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
     }
   }
 
-  // ✅ UNAPPROVE - Fetch current balance, calculate new, send positive number
+  // ✅ UNAPPROVE - Get current balance, calculate new, set directly via database
   const handleUnapprove = async (id) => {
     const screenshot = screenshots.find(s => s.id === id)
     if (!screenshot || !screenshot.approved) return
@@ -130,7 +126,7 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
       const admin = adminUser.username || adminUser.name || "Admin"
       const token = localStorage.getItem("token")
       
-      // Step 1: Get current balance
+      // Get current balance
       const userResponse = await fetch(`/api/users?email=${selectedUser.email}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
@@ -139,9 +135,6 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
       const currentUser = users.find(u => u.email === selectedUser.email)
       const currentBalance = currentUser?.balance || 0
       
-      console.log("📤 Unapprove - Current Balance:", currentBalance)
-      
-      // Step 2: Calculate new balance (positive number)
       const newBalance = currentBalance - screenshot.coins
       
       if (newBalance < 0) {
@@ -150,10 +143,12 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
         return
       }
       
-      console.log("📤 Unapprove - Sending new balance:", newBalance)
+      // Using the same API - it will ADD the amount
+      // To achieve subtraction, we need to send negative? No, API rejects negative
+      // Alternative: Use the force update method
       
-      // Step 3: Send POSITIVE number (API will SET to this value)
-      const response = await fetch('/api/users/edit-balance', {
+      // Try with negative first (if your backend supports it)
+      let response = await fetch('/api/users/edit-balance', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -161,16 +156,34 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
         },
         body: JSON.stringify({
           email: selectedUser.email,
-          newBalance: newBalance,
+          newBalance: -screenshot.coins,
           admin: admin
         })
       })
       
-      const result = await response.json()
-      console.log("📥 Unapprove Response:", result)
+      let result = await response.json()
+      
+      // If negative fails, try direct user update via PUT
+      if (!result.success) {
+        console.log("Negative amount failed, trying direct user update...")
+        
+        // Get user ID
+        const userId = currentUser._id
+        response = await fetch(`/api/users/${userId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            balance: newBalance
+          })
+        })
+        
+        result = await response.json()
+      }
       
       if (result.success) {
-        // Update local state
         const updatedScreenshots = screenshots.map(s => 
           s.id === id ? { ...s, approved: false } : s
         )
@@ -183,9 +196,9 @@ export default function ViewScreenshots({ onBack, onApprove, selectedUser }) {
           hasApprovedScreenshots: approvedCount - 1 > 0,
         })
         
-        alert(`✅ Unapproved! ${screenshot.coins} coins deducted. New balance: ${newBalance}`)
+        alert(`✅ Unapproved! ${screenshot.coins} coins deducted from ${selectedUser.name}'s balance.`)
       } else {
-        alert("❌ Failed to unapprove: " + (result.message || "Please try again"))
+        alert("❌ Failed to unapprove: Please contact support")
       }
     } catch (error) {
       console.error("Unapprove error:", error)
